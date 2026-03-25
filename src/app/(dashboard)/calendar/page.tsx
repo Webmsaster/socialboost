@@ -224,8 +224,8 @@ export default function CalendarPage() {
       ) : (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
           {/* Calendar Grid */}
-          <Card className="overflow-hidden">
-            <CardContent className="p-0">
+          <Card className="overflow-x-auto">
+            <CardContent className="p-0 min-w-[640px]">
               {/* Weekday headers */}
               <div className="grid grid-cols-7 border-b bg-muted/50">
                 {WEEKDAYS.map((day) => (

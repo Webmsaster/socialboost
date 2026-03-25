@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { PostPreview } from "@/components/post-preview";
 
 // --- Types ---
 
@@ -999,6 +1000,14 @@ export default function CreatePage() {
       </Tabs>
 
       {/* Results */}
+      {contentType === "post" && !enableVariants && postResult && (
+        <PostPreview
+          platform={platform}
+          content={postResult.content}
+          hashtags={postResult.hashtags}
+          imageUrl={imageUrl}
+        />
+      )}
       {contentType === "post" && !enableVariants && renderPostResult()}
       {contentType === "post" && enableVariants && renderVariantsResult()}
       {contentType === "video-script" && renderVideoScriptResult()}

@@ -7,10 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { forgotPasswordSchema } from "@/lib/validations";
+import { toast } from "sonner";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
@@ -18,6 +21,18 @@ export default function ForgotPasswordPage() {
   async function handleReset(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setFieldErrors({});
+
+    const result = forgotPasswordSchema.safeParse({ email });
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        errors[issue.path[0] as string] = issue.message;
+      }
+      setFieldErrors(errors);
+      return;
+    }
+
     setLoading(true);
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -32,6 +47,7 @@ export default function ForgotPasswordPage() {
 
     setSuccess(true);
     setLoading(false);
+    toast.success("Reset link sent! Check your inbox.");
   }
 
   if (success) {
@@ -66,7 +82,8 @@ export default function ForgotPasswordPage() {
             )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required aria-invalid={!!fieldErrors.email} />
+              {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">

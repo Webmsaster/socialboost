@@ -44,7 +44,7 @@ export function DashboardNav() {
           <span className="text-lg font-bold">SocialBoost</span>
         </Link>
       </div>
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex-1 space-y-1 p-4" aria-label="Main navigation">
         {navKeys.map((item) => (
           <Link
             key={item.href}
@@ -80,7 +80,12 @@ export function DashboardNav() {
   return (
     <>
       <div className="fixed top-0 left-0 right-0 z-40 flex h-14 items-center border-b bg-background px-4 md:hidden">
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2">
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="p-2"
+          aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
+        >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d={mobileOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
           </svg>
@@ -93,6 +98,8 @@ export function DashboardNav() {
       )}
 
       <aside
+        role="navigation"
+        aria-label="Dashboard sidebar"
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r bg-card transition-transform md:static md:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full"

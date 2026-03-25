@@ -7,11 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { resetPasswordSchema } from "@/lib/validations";
+import { toast } from "sonner";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
@@ -19,14 +22,20 @@ export default function ResetPasswordPage() {
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setFieldErrors({});
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    const result = resetPasswordSchema.safeParse({ password });
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        errors[issue.path[0] as string] = issue.message;
+      }
+      setFieldErrors(errors);
       return;
     }
 
@@ -40,6 +49,7 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    toast.success("Password updated successfully!");
     router.push("/dashboard");
     router.refresh();
   }
@@ -58,11 +68,13 @@ export default function ResetPasswordPage() {
             )}
             <div className="space-y-2">
               <Label htmlFor="password">New Password</Label>
-              <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+              <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required aria-invalid={!!fieldErrors.password} />
+              {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
+              <p className="text-xs text-muted-foreground">At least 8 characters with uppercase, lowercase, and a number</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input id="confirmPassword" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} />
+              <Input id="confirmPassword" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
             </div>
           </CardContent>
           <CardFooter>

@@ -118,7 +118,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b">
+      <header className="border-b" role="banner">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
@@ -142,8 +142,8 @@ export default function LandingPage() {
 
       <main>
         {/* Hero */}
-        <section className="mx-auto max-w-4xl px-6 py-24 text-center">
-          <h1 className="text-5xl font-bold tracking-tight md:text-6xl">
+        <section className="mx-auto max-w-4xl px-6 py-16 text-center md:py-24">
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
             AI-powered content
             <span className="text-primary"> for every platform</span>
           </h1>
@@ -151,16 +151,16 @@ export default function LandingPage() {
             Generate social posts, video scripts, carousels, ad storyboards, and AI images
             — all from a single prompt. Choose your platform, tone, and topic. Our AI handles the rest.
           </p>
-          <div className="mt-10 flex items-center justify-center gap-4">
+          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
               href="/signup"
-              className="rounded-lg bg-primary px-8 py-3 text-lg font-medium text-primary-foreground hover:bg-primary/90"
+              className="w-full rounded-lg bg-primary px-8 py-3 text-center text-lg font-medium text-primary-foreground hover:bg-primary/90 sm:w-auto"
             >
               Start for free
             </Link>
             <Link
               href="/login"
-              className="rounded-lg border px-8 py-3 text-lg font-medium hover:bg-muted"
+              className="w-full rounded-lg border px-8 py-3 text-center text-lg font-medium hover:bg-muted sm:w-auto"
             >
               Sign in
             </Link>
@@ -344,7 +344,7 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t py-8">
+      <footer className="border-t py-8" role="contentinfo">
         <div className="mx-auto max-w-6xl px-6 text-center text-sm text-muted-foreground">
           &copy; {new Date().getFullYear()} SocialBoost. All rights reserved.
         </div>
