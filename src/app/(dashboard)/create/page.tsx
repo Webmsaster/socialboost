@@ -1,72 +1,393 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { useLanguage } from "@/lib/i18n";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 
-const platforms = ["linkedin", "facebook", "instagram", "pinterest", "twitter"] as const;
-const tones = ["professional", "casual", "inspirational", "humorous", "educational"] as const;
+// --- Types ---
+
+type ContentType = "post" | "video-script" | "video-ad" | "carousel";
+
+const platforms = [
+  "linkedin",
+  "facebook",
+  "instagram",
+  "pinterest",
+  "twitter",
+] as const;
+const tones = [
+  "professional",
+  "casual",
+  "inspirational",
+  "humorous",
+  "educational",
+] as const;
+
+interface PostResult {
+  content: string;
+  hashtags: string[];
+}
+
+interface PostVariant {
+  variantLabel: string;
+  content: string;
+  hashtags: string[];
+  approach: string;
+}
+
+interface VideoScriptResult {
+  hook: string;
+  scenes: Array<{
+    sceneNumber: number;
+    duration: string;
+    visual: string;
+    narration: string;
+    textOverlay: string;
+  }>;
+  cta: string;
+  totalDuration: string;
+  musicSuggestion: string;
+}
+
+interface VideoAdResult {
+  concept: string;
+  frames: Array<{
+    frameNumber: number;
+    duration: string;
+    background: string;
+    headline: string;
+    subtext: string;
+    animation: string;
+  }>;
+  cta: string;
+  targetAudience: string;
+  adFormat: string;
+}
+
+interface CarouselResult {
+  title: string;
+  slides: Array<{
+    slideNumber: number;
+    heading: string;
+    body: string;
+    visualSuggestion: string;
+    speakerNotes: string;
+  }>;
+  hashtags: string[];
+}
+
+// --- Component ---
 
 export default function CreatePage() {
+  const searchParams = useSearchParams();
+  const supabase = createClient();
+
+  // Common state
+  const [contentType, setContentType] = useState<ContentType>("post");
   const [platform, setPlatform] = useState<string>("linkedin");
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState<string>("professional");
   const [language, setLanguage] = useState("English");
-  const [result, setResult] = useState<{ content: string; hashtags: string[] } | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Post-specific
+  const [enableImage, setEnableImage] = useState(false);
+  const [enableVariants, setEnableVariants] = useState(false);
+  const [postResult, setPostResult] = useState<PostResult | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [variants, setVariants] = useState<PostVariant[] | null>(null);
+
+  // Video ad specific
+  const [product, setProduct] = useState("");
+
+  // Carousel specific
+  const [slideCount, setSlideCount] = useState(5);
+
+  // Video script result
+  const [videoScriptResult, setVideoScriptResult] =
+    useState<VideoScriptResult | null>(null);
+
+  // Video ad result
+  const [videoAdResult, setVideoAdResult] = useState<VideoAdResult | null>(
+    null
+  );
+
+  // Carousel result
+  const [carouselResult, setCarouselResult] = useState<CarouselResult | null>(
+    null
+  );
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Copy states
   const [copied, setCopied] = useState(false);
-  const { t } = useLanguage();
-  const supabase = createClient();
+  const [copiedVariant, setCopiedVariant] = useState<string | null>(null);
+
+  // Template prefill from URL params
+  useEffect(() => {
+    const templateId = searchParams.get("template");
+    if (!templateId) return;
+
+    async function loadTemplate() {
+      const { data } = await supabase
+        .from("templates")
+        .select("platform, tone, topic, language")
+        .eq("id", templateId)
+        .single();
+
+      if (data) {
+        if (data.platform) setPlatform(data.platform);
+        if (data.tone) setTone(data.tone);
+        if (data.topic) setTopic(data.topic);
+        if (data.language) setLanguage(data.language);
+      }
+    }
+
+    loadTemplate();
+  }, [searchParams, supabase]);
+
+  // Clear results when content type changes
+  useEffect(() => {
+    setPostResult(null);
+    setImageUrl(null);
+    setVariants(null);
+    setVideoScriptResult(null);
+    setVideoAdResult(null);
+    setCarouselResult(null);
+    setCurrentSlide(0);
+  }, [contentType]);
+
+  // --- Handlers ---
+
+  const clearAllResults = useCallback(() => {
+    setPostResult(null);
+    setImageUrl(null);
+    setVariants(null);
+    setVideoScriptResult(null);
+    setVideoAdResult(null);
+    setCarouselResult(null);
+    setCurrentSlide(0);
+  }, []);
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     if (!topic.trim()) return;
 
     setLoading(true);
-    setResult(null);
+    clearAllResults();
 
     try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ platform, topic, tone, language }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Generation failed");
+      switch (contentType) {
+        case "post":
+          await handleGeneratePost();
+          break;
+        case "video-script":
+          await handleGenerateVideoScript();
+          break;
+        case "video-ad":
+          await handleGenerateVideoAd();
+          break;
+        case "carousel":
+          await handleGenerateCarousel();
+          break;
       }
-
-      const data = await res.json();
-      setResult(data);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(
+        err instanceof Error ? err.message : "Something went wrong"
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleCopy() {
-    if (!result) return;
-    const fullText = result.hashtags.length > 0
-      ? `${result.content}\n\n${result.hashtags.map((h) => `#${h}`).join(" ")}`
-      : result.content;
-    await navigator.clipboard.writeText(fullText);
+  async function handleGeneratePost() {
+    if (enableVariants) {
+      // A/B Variants mode
+      const res = await fetch("/api/generate-variants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platform,
+          topic,
+          tone,
+          language,
+          count: 3,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Generation failed");
+      }
+      const data = await res.json();
+      setVariants(data.variants);
+    } else {
+      // Single post mode
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform, topic, tone, language }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Generation failed");
+      }
+      const data = await res.json();
+      setPostResult(data);
+
+      // Generate image if enabled
+      if (enableImage) {
+        try {
+          const imgRes = await fetch("/api/generate-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: topic }),
+          });
+          if (imgRes.ok) {
+            const imgData = await imgRes.json();
+            setImageUrl(imgData.url);
+          }
+        } catch {
+          toast.error("Image generation failed, but your post is ready.");
+        }
+      }
+    }
+  }
+
+  async function handleGenerateVideoScript() {
+    const res = await fetch("/api/generate-video-script", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic, tone, language, platform }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Generation failed");
+    }
+    const data = await res.json();
+    setVideoScriptResult(data);
+  }
+
+  async function handleGenerateVideoAd() {
+    if (!product.trim()) {
+      toast.error("Please enter a product/brand name.");
+      return;
+    }
+    const res = await fetch("/api/generate-video-ad", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic, tone, language, product }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Generation failed");
+    }
+    const data = await res.json();
+    setVideoAdResult(data);
+  }
+
+  async function handleGenerateCarousel() {
+    const res = await fetch("/api/generate-carousel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic, tone, language, platform, slideCount }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Generation failed");
+    }
+    const data = await res.json();
+    setCarouselResult(data);
+    setCurrentSlide(0);
+  }
+
+  // --- Copy Helpers ---
+
+  async function copyToClipboard(text: string) {
+    await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  async function handleSave() {
-    if (!result) return;
+  async function copyVariant(variant: PostVariant) {
+    const fullText =
+      variant.hashtags.length > 0
+        ? `${variant.content}\n\n${variant.hashtags.map((h) => `#${h}`).join(" ")}`
+        : variant.content;
+    await navigator.clipboard.writeText(fullText);
+    setCopiedVariant(variant.variantLabel);
+    setTimeout(() => setCopiedVariant(null), 2000);
+  }
 
-    const { data: { user } } = await supabase.auth.getUser();
+  function formatPostText(content: string, hashtags: string[]): string {
+    return hashtags.length > 0
+      ? `${content}\n\n${hashtags.map((h) => `#${h}`).join(" ")}`
+      : content;
+  }
+
+  function formatVideoScriptText(script: VideoScriptResult): string {
+    let text = `HOOK: ${script.hook}\n\n`;
+    for (const scene of script.scenes) {
+      text += `SCENE ${scene.sceneNumber} (${scene.duration})\n`;
+      text += `Visual: ${scene.visual}\n`;
+      text += `Narration: ${scene.narration}\n`;
+      text += `Text Overlay: ${scene.textOverlay}\n\n`;
+    }
+    text += `CTA: ${script.cta}\n`;
+    text += `Total Duration: ${script.totalDuration}\n`;
+    text += `Music: ${script.musicSuggestion}`;
+    return text;
+  }
+
+  function formatVideoAdText(ad: VideoAdResult): string {
+    let text = `CONCEPT: ${ad.concept}\n\n`;
+    for (const frame of ad.frames) {
+      text += `FRAME ${frame.frameNumber} (${frame.duration})\n`;
+      text += `Background: ${frame.background}\n`;
+      text += `Headline: ${frame.headline}\n`;
+      text += `Subtext: ${frame.subtext}\n`;
+      text += `Animation: ${frame.animation}\n\n`;
+    }
+    text += `CTA: ${ad.cta}\n`;
+    text += `Target Audience: ${ad.targetAudience}\n`;
+    text += `Ad Format: ${ad.adFormat}`;
+    return text;
+  }
+
+  function formatCarouselText(carousel: CarouselResult): string {
+    let text = `TITLE: ${carousel.title}\n\n`;
+    for (const slide of carousel.slides) {
+      text += `SLIDE ${slide.slideNumber}\n`;
+      text += `Heading: ${slide.heading}\n`;
+      text += `Body: ${slide.body}\n`;
+      text += `Visual: ${slide.visualSuggestion}\n`;
+      text += `Notes: ${slide.speakerNotes}\n\n`;
+    }
+    if (carousel.hashtags.length > 0) {
+      text += carousel.hashtags.map((h) => `#${h}`).join(" ");
+    }
+    return text;
+  }
+
+  // --- Save Helper ---
+
+  async function handleSavePost(content: string, hashtags: string[]) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase.from("posts").insert({
@@ -74,109 +395,615 @@ export default function CreatePage() {
       platform,
       topic,
       tone,
-      content: result.content,
-      hashtags: result.hashtags,
+      content,
+      hashtags,
       status: "draft",
     });
 
     if (error) {
       toast.error("Failed to save");
     } else {
-      toast.success(t("create.saved"));
+      toast.success("Post saved as draft!");
     }
   }
 
+  // --- Render Helpers ---
+
+  function getGenerateButtonText(): string {
+    if (loading) return "Generating...";
+    switch (contentType) {
+      case "post":
+        return enableVariants ? "Generate A/B Variants" : "Generate Post";
+      case "video-script":
+        return "Generate Video Script";
+      case "video-ad":
+        return "Generate Storyboard";
+      case "carousel":
+        return "Generate Carousel";
+    }
+  }
+
+  // --- Result Components ---
+
+  function renderPostResult() {
+    if (!postResult) return null;
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Generated Post
+            <Badge variant="secondary">{platform}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="whitespace-pre-wrap rounded-lg bg-muted p-4 text-sm">
+            {postResult.content}
+            {postResult.hashtags.length > 0 && (
+              <>
+                <br />
+                <br />
+                <span className="text-primary">
+                  {postResult.hashtags.map((h) => `#${h}`).join(" ")}
+                </span>
+              </>
+            )}
+          </div>
+
+          {imageUrl && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Generated Image</p>
+              <img
+                src={imageUrl}
+                alt="AI generated visual"
+                className="w-full max-w-md rounded-lg border"
+              />
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() =>
+                copyToClipboard(
+                  formatPostText(postResult.content, postResult.hashtags)
+                )
+              }
+            >
+              {copied ? "Copied!" : "Copy"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() =>
+                handleSavePost(postResult.content, postResult.hashtags)
+              }
+            >
+              Save as Draft
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  function renderVariantsResult() {
+    if (!variants) return null;
+
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">
+          A/B Variants
+          <Badge variant="secondary" className="ml-2">
+            {variants.length} variants
+          </Badge>
+        </h3>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {variants.map((variant) => (
+            <Card key={variant.variantLabel} className="relative">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                    {variant.variantLabel}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {variant.approach}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">
+                  {variant.content}
+                  {variant.hashtags.length > 0 && (
+                    <>
+                      <br />
+                      <br />
+                      <span className="text-primary">
+                        {variant.hashtags.map((h) => `#${h}`).join(" ")}
+                      </span>
+                    </>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyVariant(variant)}
+                  >
+                    {copiedVariant === variant.variantLabel
+                      ? "Copied!"
+                      : "Copy"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      handleSavePost(variant.content, variant.hashtags)
+                    }
+                  >
+                    Select & Save
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function renderVideoScriptResult() {
+    if (!videoScriptResult) return null;
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Video Script
+            <Badge variant="secondary">
+              {videoScriptResult.totalDuration}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Hook */}
+          <div className="rounded-lg border-l-4 border-primary bg-primary/5 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+              Hook (First 3 seconds)
+            </p>
+            <p className="mt-1 text-sm font-medium">
+              {videoScriptResult.hook}
+            </p>
+          </div>
+
+          {/* Scenes */}
+          <div className="space-y-4">
+            <p className="text-sm font-semibold">Scenes</p>
+            {videoScriptResult.scenes.map((scene) => (
+              <div
+                key={scene.sceneNumber}
+                className="rounded-lg border bg-card p-4"
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <Badge variant="outline">Scene {scene.sceneNumber}</Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {scene.duration}
+                  </span>
+                </div>
+                <div className="grid gap-2 text-sm">
+                  <div>
+                    <span className="font-medium text-muted-foreground">
+                      Visual:{" "}
+                    </span>
+                    {scene.visual}
+                  </div>
+                  <div>
+                    <span className="font-medium text-muted-foreground">
+                      Narration:{" "}
+                    </span>
+                    {scene.narration}
+                  </div>
+                  <div>
+                    <span className="font-medium text-muted-foreground">
+                      Text Overlay:{" "}
+                    </span>
+                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                      {scene.textOverlay}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <div className="rounded-lg border-l-4 border-green-500 bg-green-500/5 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-green-600">
+              Call to Action
+            </p>
+            <p className="mt-1 text-sm font-medium">{videoScriptResult.cta}</p>
+          </div>
+
+          {/* Music */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="font-medium">Music Suggestion:</span>
+            {videoScriptResult.musicSuggestion}
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() =>
+                copyToClipboard(formatVideoScriptText(videoScriptResult))
+              }
+            >
+              {copied ? "Copied!" : "Copy Script"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  function renderVideoAdResult() {
+    if (!videoAdResult) return null;
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Video Ad Storyboard
+            <Badge variant="secondary">{videoAdResult.adFormat}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Concept */}
+          <div className="rounded-lg bg-muted p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Creative Concept
+            </p>
+            <p className="mt-1 text-sm">{videoAdResult.concept}</p>
+          </div>
+
+          {/* Frames */}
+          <div className="space-y-4">
+            <p className="text-sm font-semibold">Frames</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              {videoAdResult.frames.map((frame) => (
+                <div
+                  key={frame.frameNumber}
+                  className="rounded-lg border bg-card p-4"
+                >
+                  <div className="mb-3 flex items-center gap-2">
+                    <Badge variant="outline">Frame {frame.frameNumber}</Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {frame.duration}
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="font-medium text-muted-foreground">
+                        Background:{" "}
+                      </span>
+                      {frame.background}
+                    </div>
+                    <div className="text-lg font-bold">{frame.headline}</div>
+                    <div className="text-muted-foreground">{frame.subtext}</div>
+                    <div className="text-xs italic text-muted-foreground">
+                      Animation: {frame.animation}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* CTA */}
+          <div className="rounded-lg border-l-4 border-green-500 bg-green-500/5 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-green-600">
+              Call to Action
+            </p>
+            <p className="mt-1 text-sm font-medium">{videoAdResult.cta}</p>
+          </div>
+
+          {/* Meta */}
+          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+            <div>
+              <span className="font-medium">Target Audience:</span>{" "}
+              {videoAdResult.targetAudience}
+            </div>
+            <div>
+              <span className="font-medium">Format:</span>{" "}
+              {videoAdResult.adFormat}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() =>
+                copyToClipboard(formatVideoAdText(videoAdResult))
+              }
+            >
+              {copied ? "Copied!" : "Copy Storyboard"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  function renderCarouselResult() {
+    if (!carouselResult) return null;
+
+    const slide = carouselResult.slides[currentSlide];
+    if (!slide) return null;
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {carouselResult.title}
+            <Badge variant="secondary">
+              {carouselResult.slides.length} slides
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Slide preview */}
+          <div className="rounded-lg border bg-gradient-to-br from-muted to-muted/50 p-6">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Slide {slide.slideNumber} of {carouselResult.slides.length}
+            </div>
+            <h4 className="mb-2 text-xl font-bold">{slide.heading}</h4>
+            <p className="mb-4 text-sm">{slide.body}</p>
+            <div className="rounded bg-background/50 p-2 text-xs text-muted-foreground">
+              <span className="font-medium">Visual suggestion: </span>
+              {slide.visualSuggestion}
+            </div>
+            {slide.speakerNotes && (
+              <div className="mt-2 text-xs italic text-muted-foreground">
+                Notes: {slide.speakerNotes}
+              </div>
+            )}
+          </div>
+
+          {/* Navigation */}
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentSlide === 0}
+              onClick={() => setCurrentSlide((prev) => prev - 1)}
+            >
+              Previous
+            </Button>
+
+            {/* Dots */}
+            <div className="flex gap-1.5">
+              {carouselResult.slides.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentSlide(idx)}
+                  className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                    idx === currentSlide
+                      ? "bg-primary"
+                      : "bg-muted-foreground/30"
+                  }`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentSlide === carouselResult.slides.length - 1}
+              onClick={() => setCurrentSlide((prev) => prev + 1)}
+            >
+              Next
+            </Button>
+          </div>
+
+          {/* Hashtags */}
+          {carouselResult.hashtags.length > 0 && (
+            <div className="text-sm text-primary">
+              {carouselResult.hashtags.map((h) => `#${h}`).join(" ")}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() =>
+                copyToClipboard(formatCarouselText(carouselResult))
+              }
+            >
+              {copied ? "Copied!" : "Copy All"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() =>
+                handleSavePost(
+                  formatCarouselText(carouselResult),
+                  carouselResult.hashtags
+                )
+              }
+            >
+              Save as Draft
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // --- Main Render ---
+
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold">{t("create.title")}</h1>
+      <h1 className="text-3xl font-bold">Create Content</h1>
 
-      <form onSubmit={handleGenerate} className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>{t("create.platform")}</Label>
-            <Select value={platform} onValueChange={setPlatform}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {platforms.map((p) => (
-                  <SelectItem key={p} value={p}>{t(`platform.${p}`)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      {/* Content Type Tabs */}
+      <Tabs
+        value={contentType}
+        onValueChange={(v) => setContentType(v as ContentType)}
+      >
+        <TabsList className="w-full md:w-auto">
+          <TabsTrigger value="post">Social Post</TabsTrigger>
+          <TabsTrigger value="video-script">Video Script</TabsTrigger>
+          <TabsTrigger value="video-ad">Video Ad</TabsTrigger>
+          <TabsTrigger value="carousel">Carousel</TabsTrigger>
+        </TabsList>
 
-          <div className="space-y-2">
-            <Label>{t("create.tone")}</Label>
-            <Select value={tone} onValueChange={setTone}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {tones.map((tn) => (
-                  <SelectItem key={tn} value={tn}>{t(`tone.${tn}`)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        {/* All tab contents share the same form */}
+        <TabsContent value={contentType}>
+          <form onSubmit={handleGenerate} className="space-y-6">
+            {/* Common inputs */}
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Platform</Label>
+                <Select value={platform} onValueChange={setPlatform}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {platforms.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p.charAt(0).toUpperCase() + p.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-        <div className="space-y-2">
-          <Label>{t("create.language")}</Label>
-          <Select value={language} onValueChange={setLanguage}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="English">English</SelectItem>
-              <SelectItem value="German">Deutsch</SelectItem>
-              <SelectItem value="French">Francais</SelectItem>
-              <SelectItem value="Spanish">Espanol</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+              <div className="space-y-2">
+                <Label>Tone</Label>
+                <Select value={tone} onValueChange={setTone}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tones.map((tn) => (
+                      <SelectItem key={tn} value={tn}>
+                        {tn.charAt(0).toUpperCase() + tn.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-        <div className="space-y-2">
-          <Label>{t("create.topic")}</Label>
-          <Textarea
-            placeholder={t("create.topicPlaceholder")}
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            rows={4}
-            required
-          />
-        </div>
+            <div className="space-y-2">
+              <Label>Language</Label>
+              <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="English">English</SelectItem>
+                  <SelectItem value="German">Deutsch</SelectItem>
+                  <SelectItem value="French">Francais</SelectItem>
+                  <SelectItem value="Spanish">Espanol</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-        <Button type="submit" disabled={loading} className="w-full md:w-auto">
-          {loading ? t("create.generating") : t("create.generate")}
-        </Button>
-      </form>
+            <div className="space-y-2">
+              <Label>Topic</Label>
+              <Textarea
+                placeholder="Describe what you want to create content about..."
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                rows={4}
+                required
+              />
+            </div>
 
-      {result && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {t("create.result")}
-              <Badge variant="secondary">{platform}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="whitespace-pre-wrap rounded-lg bg-muted p-4 text-sm">
-              {result.content}
-              {result.hashtags.length > 0 && (
-                <>
-                  <br /><br />
-                  <span className="text-primary">
-                    {result.hashtags.map((h) => `#${h}`).join(" ")}
+            {/* Type-specific inputs */}
+            {contentType === "video-ad" && (
+              <div className="space-y-2">
+                <Label>Product / Brand Name</Label>
+                <Input
+                  placeholder="e.g. Nike Air Max, Notion, your SaaS product..."
+                  value={product}
+                  onChange={(e) => setProduct(e.target.value)}
+                  required
+                />
+              </div>
+            )}
+
+            {contentType === "carousel" && (
+              <div className="space-y-2">
+                <Label>Number of Slides ({slideCount})</Label>
+                <input
+                  type="range"
+                  min={3}
+                  max={10}
+                  value={slideCount}
+                  onChange={(e) => setSlideCount(Number(e.target.value))}
+                  className="w-full accent-primary"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>3</span>
+                  <span>10</span>
+                </div>
+              </div>
+            )}
+
+            {/* Post-specific toggles */}
+            {contentType === "post" && (
+              <div className="flex flex-wrap gap-6">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={enableVariants}
+                    onChange={(e) => setEnableVariants(e.target.checked)}
+                    className="h-4 w-4 rounded border-input accent-primary"
+                  />
+                  <span className="text-sm font-medium">
+                    Generate A/B Variants
                   </span>
-                </>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleCopy}>
-                {copied ? t("create.copied") : t("create.copy")}
-              </Button>
-              <Button variant="outline" onClick={handleSave}>
-                {t("create.save")}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                  <span className="text-xs text-muted-foreground">
+                    (3 different versions)
+                  </span>
+                </label>
+
+                {!enableVariants && (
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={enableImage}
+                      onChange={(e) => setEnableImage(e.target.checked)}
+                      className="h-4 w-4 rounded border-input accent-primary"
+                    />
+                    <span className="text-sm font-medium">
+                      Also generate image
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      (DALL-E 3)
+                    </span>
+                  </label>
+                )}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full md:w-auto"
+            >
+              {getGenerateButtonText()}
+            </Button>
+          </form>
+        </TabsContent>
+      </Tabs>
+
+      {/* Results */}
+      {contentType === "post" && !enableVariants && renderPostResult()}
+      {contentType === "post" && enableVariants && renderVariantsResult()}
+      {contentType === "video-script" && renderVideoScriptResult()}
+      {contentType === "video-ad" && renderVideoAdResult()}
+      {contentType === "carousel" && renderCarouselResult()}
     </div>
   );
 }
