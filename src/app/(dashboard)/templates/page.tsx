@@ -71,6 +71,11 @@ export default function TemplatesPage() {
       return;
     }
 
+    if (templates.some((t) => t.name.toLowerCase() === name.trim().toLowerCase())) {
+      toast.error("A template with this name already exists");
+      return;
+    }
+
     setLoading(true);
 
     const {

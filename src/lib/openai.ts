@@ -27,6 +27,22 @@ interface GeneratePostOutput {
   hashtags: string[];
 }
 
+/**
+ * Sanitize user input before including it in OpenAI prompts.
+ * Strips common prompt injection patterns and limits length.
+ */
+export function sanitizeInput(input: string, maxLength = 1000): string {
+  let sanitized = input.slice(0, maxLength);
+  // Remove attempts to override system instructions
+  sanitized = sanitized.replace(/\b(ignore|disregard|forget)\b.*\b(instructions?|above|previous|system)\b/gi, "[filtered]");
+  sanitized = sanitized.replace(/\b(you are now|act as|pretend to be|new instructions?)\b/gi, "[filtered]");
+  // Remove markdown/code block injection attempts
+  sanitized = sanitized.replace(/```[\s\S]*?```/g, "[filtered]");
+  // Remove excessive whitespace
+  sanitized = sanitized.replace(/\s{3,}/g, " ").trim();
+  return sanitized;
+}
+
 const platformRules: Record<Platform, string> = {
   linkedin: `LinkedIn post. Professional formatting with line breaks for readability. Max 3000 characters. 3-5 relevant hashtags at the end. Use a hook in the first line.`,
   facebook: `Facebook post. Conversational, storytelling style. Emojis allowed but not excessive. Up to 5 hashtags.`,
@@ -62,7 +78,7 @@ Make the content authentic, engaging, and platform-appropriate. Never use generi
       },
       {
         role: "user",
-        content: `Create a ${input.tone} ${input.platform} post about: ${input.topic}`,
+        content: `Create a ${input.tone} ${input.platform} post about: ${sanitizeInput(input.topic)}`,
       },
     ],
     temperature: 0.8,
@@ -80,7 +96,7 @@ Make the content authentic, engaging, and platform-appropriate. Never use generi
 
 export async function generateImage(prompt: string): Promise<string> {
   const openai = getOpenAI();
-  const safePrompt = `Create a social media visual for: ${prompt}. Professional, clean, modern design.`;
+  const safePrompt = `Create a social media visual for: ${sanitizeInput(prompt, 500)}. Professional, clean, modern design.`;
 
   const response = await openai.images.generate({
     model: "dall-e-3",
@@ -153,7 +169,7 @@ Create 3-6 scenes. Keep total duration between 15-60 seconds. Make it engaging a
       },
       {
         role: "user",
-        content: `Create a ${input.tone} video script about: ${input.topic}`,
+        content: `Create a ${input.tone} video script about: ${sanitizeInput(input.topic)}`,
       },
     ],
     temperature: 0.8,
@@ -227,7 +243,7 @@ Create 4-8 frames. Make the ad compelling, visually descriptive, and conversion-
       },
       {
         role: "user",
-        content: `Create a ${input.tone} video ad storyboard for "${input.product}" about: ${input.topic}`,
+        content: `Create a ${input.tone} video ad storyboard for "${sanitizeInput(input.product, 200)}" about: ${sanitizeInput(input.topic)}`,
       },
     ],
     temperature: 0.8,
@@ -297,7 +313,7 @@ The first slide should be an attention-grabbing cover. The last slide should be 
       },
       {
         role: "user",
-        content: `Create a ${input.slideCount}-slide ${input.tone} carousel about: ${input.topic}`,
+        content: `Create a ${input.slideCount}-slide ${input.tone} carousel about: ${sanitizeInput(input.topic)}`,
       },
     ],
     temperature: 0.8,
@@ -360,7 +376,7 @@ Each variant should be meaningfully different in approach (e.g., storytelling vs
       },
       {
         role: "user",
-        content: `Create ${input.count} ${input.tone} ${input.platform} post variants about: ${input.topic}`,
+        content: `Create ${input.count} ${input.tone} ${input.platform} post variants about: ${sanitizeInput(input.topic)}`,
       },
     ],
     temperature: 0.9,

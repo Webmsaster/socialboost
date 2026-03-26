@@ -165,7 +165,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">{t("dashboard.usage")}</span>
               <span className="text-sm font-medium">
-                {profile.generation_count} {t("dashboard.of")} {limit} {t("dashboard.generations")}
+                {limit - profile.generation_count} {t("dashboard.remaining")} ({profile.generation_count}/{limit})
               </span>
             </div>
             <div className="mt-2 h-2 rounded-full bg-muted">

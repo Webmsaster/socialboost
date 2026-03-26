@@ -6,7 +6,6 @@ const MAX_REQUESTS = 10;
 const WINDOW = "60 s";
 
 let ratelimit: Ratelimit | null = null;
-let warnedMissing = false;
 
 function getRatelimit() {
   if (!ratelimit) {
@@ -24,18 +23,26 @@ function getRatelimit() {
   return ratelimit;
 }
 
+export interface RateLimitResult {
+  success: boolean;
+  remaining: number;
+  limit: number;
+  reset: number;
+}
+
 export async function rateLimit(
   key: string,
   endpoint = "/api/generate"
-): Promise<{ success: boolean; remaining: number }> {
+): Promise<RateLimitResult> {
   const limiter = getRatelimit();
 
   if (!limiter) {
-    if (process.env.NODE_ENV === "production" && !warnedMissing) {
-      warnedMissing = true;
-      captureError("Rate limiting disabled: Redis not configured", new Error("Missing KV_REST_API_URL/UPSTASH_REDIS_REST_URL"));
+    if (process.env.NODE_ENV === "production") {
+      captureError("Rate limiting unavailable: Redis not configured", new Error("Missing KV_REST_API_URL/UPSTASH_REDIS_REST_URL"));
+      return { success: false, remaining: 0, limit: MAX_REQUESTS, reset: 0 };
     }
-    return { success: true, remaining: MAX_REQUESTS };
+    // Allow in development without Redis
+    return { success: true, remaining: MAX_REQUESTS, limit: MAX_REQUESTS, reset: 0 };
   }
 
   try {
@@ -43,9 +50,15 @@ export async function rateLimit(
     return {
       success: result.success,
       remaining: result.remaining,
+      limit: result.limit,
+      reset: result.reset,
     };
   } catch (error) {
     captureError(`Rate limit check failed for ${endpoint}`, error);
-    return { success: true, remaining: MAX_REQUESTS };
+    // Fail open in dev, fail closed in prod
+    if (process.env.NODE_ENV === "production") {
+      return { success: false, remaining: 0, limit: MAX_REQUESTS, reset: 0 };
+    }
+    return { success: true, remaining: MAX_REQUESTS, limit: MAX_REQUESTS, reset: 0 };
   }
 }

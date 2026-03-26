@@ -28,6 +28,7 @@ export const translations = {
     "dashboard.usage": "Usage this month",
     "dashboard.of": "of",
     "dashboard.generations": "generations",
+    "dashboard.remaining": "remaining",
 
     // Create
     "create.title": "Create Content",
@@ -229,6 +230,7 @@ export const translations = {
     "dashboard.usage": "Nutzung diesen Monat",
     "dashboard.of": "von",
     "dashboard.generations": "Generierungen",
+    "dashboard.remaining": "verbleibend",
 
     // Create
     "create.title": "Inhalt erstellen",

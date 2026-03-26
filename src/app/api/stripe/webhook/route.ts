@@ -70,6 +70,18 @@ export async function POST(request: NextRequest) {
       const session = event.data.object as Stripe.Checkout.Session;
       const userId = session.metadata?.userId;
       if (userId) {
+        // Verify user exists before updating
+        const { data: existingProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("id", userId)
+          .single();
+
+        if (!existingProfile) {
+          captureError("Webhook: userId from checkout metadata not found in profiles", null, { userId });
+          return NextResponse.json({ error: "User not found" }, { status: 400 });
+        }
+
         const { error } = await withRetry(() =>
           supabaseAdmin
             .from("profiles")

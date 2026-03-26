@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateVideoAd, type Tone } from "@/lib/openai";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
+import { isProSubscription } from "@/lib/subscription";
 
 const FREE_LIMIT = 10;
 const PRO_LIMIT = 100;
@@ -50,7 +51,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    const limit = profile.subscription_status === "active" ? PRO_LIMIT : FREE_LIMIT;
+    if (!isProSubscription(profile.subscription_status)) {
+      return NextResponse.json(
+        { error: "Video ad generation requires a Pro subscription." },
+        { status: 403 }
+      );
+    }
+
+    const limit = PRO_LIMIT;
 
     if (profile.generation_count >= limit) {
       return NextResponse.json(

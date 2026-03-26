@@ -16,11 +16,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { success: withinLimit } = await rateLimit(user.id, "/api/generate");
-    if (!withinLimit) {
+    const rateLimitResult = await rateLimit(user.id, "/api/generate");
+    const rateLimitHeaders = {
+      "X-RateLimit-Limit": String(rateLimitResult.limit),
+      "X-RateLimit-Remaining": String(rateLimitResult.remaining),
+      ...(rateLimitResult.reset ? { "X-RateLimit-Reset": String(rateLimitResult.reset) } : {}),
+    };
+    if (!rateLimitResult.success) {
       return NextResponse.json(
         { error: "Too many requests. Please wait a moment." },
-        { status: 429 }
+        { status: 429, headers: rateLimitHeaders }
       );
     }
 

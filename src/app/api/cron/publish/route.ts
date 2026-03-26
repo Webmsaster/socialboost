@@ -26,6 +26,16 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabaseAdmin();
 
+  // Reset generation counts for users whose reset date has passed
+  const { error: resetError } = await supabase
+    .from("profiles")
+    .update({ generation_count: 0, generation_reset_at: new Date().toISOString() })
+    .lt("generation_reset_at", new Date().toISOString());
+
+  if (resetError) {
+    captureError("Cron: failed to reset generation counts", resetError);
+  }
+
   // Find all posts scheduled for a time in the past that are still "scheduled"
   const { data: posts, error: fetchError } = await supabase
     .from("posts")

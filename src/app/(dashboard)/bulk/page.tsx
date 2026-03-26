@@ -85,6 +85,22 @@ export default function BulkPage() {
 
   const supabase = createClient();
 
+  const STORAGE_KEY = "socialboost_bulk_progress";
+
+  // Restore previous results from localStorage on mount
+  useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as { results: GeneratedPost[]; topic: string };
+        if (parsed.results?.length > 0) {
+          setResults(parsed.results);
+          setTopic(parsed.topic ?? "");
+        }
+      }
+    } catch { /* ignore parse errors */ }
+  });
+
   const totalPosts = selectedPlatforms.size * variations;
 
   const togglePlatform = useCallback((platformId: PlatformId) => {
@@ -172,6 +188,8 @@ export default function BulkPage() {
 
       // Update results progressively so cards appear as they complete
       setResults([...generated]);
+      // Persist to localStorage for crash recovery
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ results: generated, topic })); } catch { /* full storage */ }
     }
 
     setGenerating(false);
@@ -268,6 +286,7 @@ export default function BulkPage() {
         prev.map((p) => (savedIds.has(p.id) ? { ...p, saved: true } : p))
       );
       toast.success(`${unsaved.length} posts saved as drafts`);
+      try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
     } finally {
       setSavingAll(false);
     }

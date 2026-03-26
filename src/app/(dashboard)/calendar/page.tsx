@@ -149,9 +149,11 @@ export default function CalendarPage() {
     const post = posts.find((p) => p.id === postId);
     if (!post) return;
 
-    // Set to noon on the target date to avoid timezone issues
-    const newScheduledFor = new Date(targetDate);
-    newScheduledFor.setHours(12, 0, 0, 0);
+    // Use noon in the user's local timezone, then convert to UTC
+    const year = targetDate.getFullYear();
+    const month = targetDate.getMonth();
+    const day = targetDate.getDate();
+    const newScheduledFor = new Date(year, month, day, 12, 0, 0, 0);
     const isoString = newScheduledFor.toISOString();
 
     // Optimistic update
