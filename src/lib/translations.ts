@@ -8,6 +8,7 @@ export const translations = {
     "nav.history": "History",
     "nav.calendar": "Calendar",
     "nav.accounts": "Accounts",
+    "nav.analytics": "Analytics",
     "nav.settings": "Settings",
     "nav.signOut": "Sign out",
 
@@ -159,6 +160,34 @@ export const translations = {
     "accounts.connected": "Connected",
     "accounts.notConnected": "Not connected",
 
+    // Analytics
+    "analytics.title": "Analytics",
+    "analytics.totalPosts": "Total Posts",
+    "analytics.thisMonth": "This Month",
+    "analytics.vsLastMonth": "vs last month",
+    "analytics.published": "Published",
+    "analytics.platforms": "Platforms Used",
+    "analytics.byPlatform": "Posts by Platform",
+    "analytics.byTone": "Posts by Tone",
+    "analytics.byStatus": "Posts by Status",
+    "analytics.weeklyActivity": "Weekly Activity",
+    "analytics.noData": "No data yet. Start creating posts!",
+    "analytics.drafts": "Drafts",
+    "analytics.scheduled": "Scheduled",
+    "analytics.publishedCount": "Published",
+    "analytics.failed": "Failed",
+
+    // Onboarding
+    "onboarding.title": "Welcome to SocialBoost!",
+    "onboarding.subtitle": "Get started in 3 simple steps",
+    "onboarding.dismiss": "Dismiss",
+    "onboarding.step1.title": "Create your first post",
+    "onboarding.step1.desc": "Pick a platform, tone, and topic — AI does the rest",
+    "onboarding.step2.title": "Save a template",
+    "onboarding.step2.desc": "Reuse your best prompts with one click",
+    "onboarding.step3.title": "Schedule in calendar",
+    "onboarding.step3.desc": "Drag posts to plan your content week",
+
     // Settings
     "settings.title": "Settings",
     "settings.profile": "Profile",
@@ -180,6 +209,7 @@ export const translations = {
     "nav.history": "Verlauf",
     "nav.calendar": "Kalender",
     "nav.accounts": "Accounts",
+    "nav.analytics": "Statistiken",
     "nav.settings": "Einstellungen",
     "nav.signOut": "Abmelden",
 
@@ -330,6 +360,34 @@ export const translations = {
     "accounts.disconnect": "Trennen",
     "accounts.connected": "Verbunden",
     "accounts.notConnected": "Nicht verbunden",
+
+    // Analytics
+    "analytics.title": "Statistiken",
+    "analytics.totalPosts": "Posts gesamt",
+    "analytics.thisMonth": "Diesen Monat",
+    "analytics.vsLastMonth": "vs. letzten Monat",
+    "analytics.published": "Veroeffentlicht",
+    "analytics.platforms": "Genutzte Plattformen",
+    "analytics.byPlatform": "Posts nach Plattform",
+    "analytics.byTone": "Posts nach Tonalitaet",
+    "analytics.byStatus": "Posts nach Status",
+    "analytics.weeklyActivity": "Woechentliche Aktivitaet",
+    "analytics.noData": "Noch keine Daten. Erstelle deinen ersten Post!",
+    "analytics.drafts": "Entwuerfe",
+    "analytics.scheduled": "Geplant",
+    "analytics.publishedCount": "Veroeffentlicht",
+    "analytics.failed": "Fehlgeschlagen",
+
+    // Onboarding
+    "onboarding.title": "Willkommen bei SocialBoost!",
+    "onboarding.subtitle": "Starte in 3 einfachen Schritten",
+    "onboarding.dismiss": "Ausblenden",
+    "onboarding.step1.title": "Erstelle deinen ersten Post",
+    "onboarding.step1.desc": "Waehle Plattform, Ton und Thema — die KI erledigt den Rest",
+    "onboarding.step2.title": "Speichere eine Vorlage",
+    "onboarding.step2.desc": "Nutze deine besten Prompts mit einem Klick wieder",
+    "onboarding.step3.title": "Plane im Kalender",
+    "onboarding.step3.desc": "Ziehe Posts in den Kalender um deine Woche zu planen",
 
     // Settings
     "settings.title": "Einstellungen",

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/lib/i18n";
+import { Onboarding } from "@/components/onboarding";
 import { toast } from "sonner";
 
 interface Post {
@@ -126,6 +127,9 @@ export default function DashboardPage() {
           <Link href="/create">{t("dashboard.quickAction")}</Link>
         </Button>
       </div>
+
+      {/* Onboarding for new users */}
+      {allPosts.length === 0 && <Onboarding />}
 
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

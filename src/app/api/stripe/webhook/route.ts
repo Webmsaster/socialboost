@@ -11,6 +11,21 @@ function getSupabaseAdmin() {
   );
 }
 
+async function withRetry<T>(
+  fn: () => PromiseLike<{ data: T; error: unknown }>,
+  maxAttempts = 3
+): Promise<{ data: T; error: unknown }> {
+  let lastResult: { data: T; error: unknown } = { data: null as T, error: null };
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    lastResult = await fn();
+    if (!lastResult.error) return lastResult;
+    if (attempt < maxAttempts - 1) {
+      await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt)));
+    }
+  }
+  return lastResult;
+}
+
 function mapSubscriptionStatus(stripeStatus: Stripe.Subscription.Status): string {
   switch (stripeStatus) {
     case "active":
@@ -55,13 +70,15 @@ export async function POST(request: NextRequest) {
       const session = event.data.object as Stripe.Checkout.Session;
       const userId = session.metadata?.userId;
       if (userId) {
-        const { error } = await supabaseAdmin
-          .from("profiles")
-          .update({
-            stripe_customer_id: session.customer as string,
-            subscription_status: "active",
-          })
-          .eq("id", userId);
+        const { error } = await withRetry(() =>
+          supabaseAdmin
+            .from("profiles")
+            .update({
+              stripe_customer_id: session.customer as string,
+              subscription_status: "active",
+            })
+            .eq("id", userId)
+        );
         if (error) {
           captureError("Failed to update profile after checkout", error);
           return NextResponse.json({ error: "Database update failed" }, { status: 500 });
@@ -74,10 +91,12 @@ export async function POST(request: NextRequest) {
       const subscription = event.data.object as Stripe.Subscription;
       const customerId = subscription.customer as string;
       const status = mapSubscriptionStatus(subscription.status);
-      const { error } = await supabaseAdmin
-        .from("profiles")
-        .update({ subscription_status: status })
-        .eq("stripe_customer_id", customerId);
+      const { error } = await withRetry(() =>
+        supabaseAdmin
+          .from("profiles")
+          .update({ subscription_status: status })
+          .eq("stripe_customer_id", customerId)
+      );
       if (error) {
         captureError("Failed to update subscription status", error);
         return NextResponse.json({ error: "Database update failed" }, { status: 500 });
@@ -88,10 +107,12 @@ export async function POST(request: NextRequest) {
     case "customer.subscription.deleted": {
       const subscription = event.data.object as Stripe.Subscription;
       const customerId = subscription.customer as string;
-      const { error } = await supabaseAdmin
-        .from("profiles")
-        .update({ subscription_status: "canceled" })
-        .eq("stripe_customer_id", customerId);
+      const { error } = await withRetry(() =>
+        supabaseAdmin
+          .from("profiles")
+          .update({ subscription_status: "canceled" })
+          .eq("stripe_customer_id", customerId)
+      );
       if (error) {
         captureError("Failed to update canceled subscription", error);
         return NextResponse.json({ error: "Database update failed" }, { status: 500 });

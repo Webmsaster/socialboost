@@ -1,5 +1,30 @@
 import Link from "next/link";
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "SocialBoost",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  description:
+    "AI-powered social media post generator for LinkedIn, Facebook, Instagram, Pinterest, and Twitter/X.",
+  offers: [
+    {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+      name: "Free Plan",
+    },
+    {
+      "@type": "Offer",
+      price: "9",
+      priceCurrency: "USD",
+      name: "Pro Plan",
+      billingIncrement: "P1M",
+    },
+  ],
+};
+
 const features = [
   {
     title: "AI Image Generation",
@@ -117,6 +142,10 @@ const contentTypes = [
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Header */}
       <header className="border-b" role="banner">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">

@@ -24,6 +24,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { t } = useLanguage();
   const supabase = createClient();
 
@@ -77,6 +78,24 @@ export default function SettingsPage() {
       toast.error("Failed to start checkout");
     } finally {
       setCheckoutLoading(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/account/delete", { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error ?? "Failed to delete account");
+        setDeleting(false);
+        return;
+      }
+      await supabase.auth.signOut();
+      window.location.href = "/";
+    } catch {
+      toast.error("Failed to delete account");
+      setDeleting(false);
     }
   }
 
@@ -186,8 +205,12 @@ export default function SettingsPage() {
             <div className="space-y-3">
               <p className="text-sm text-destructive">{t("settings.deleteConfirm")}</p>
               <div className="flex gap-2">
-                <Button variant="destructive" disabled>
-                  Confirm Delete
+                <Button
+                  variant="destructive"
+                  disabled={deleting}
+                  onClick={handleDeleteAccount}
+                >
+                  {deleting ? "Deleting..." : "Confirm Delete"}
                 </Button>
                 <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
                   Cancel
