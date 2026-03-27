@@ -50,9 +50,9 @@ test.describe("Public Pages", () => {
     await expect(page).toHaveTitle(/Pricing/);
     await expect(page.getByText("$0")).toBeVisible();
     await expect(page.getByText("$9")).toBeVisible();
-    await expect(page.getByText("10 AI post generations / month")).toBeVisible();
-    await expect(page.getByText("100 AI post generations / month")).toBeVisible();
-    await expect(page.getByText("AI image generation (DALL-E 3)")).toBeVisible();
+    await expect(page.getByText("Free", { exact: true })).toBeVisible();
+    await expect(page.getByText("Pro", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Save 27%")).toBeVisible();
   });
 
   test("OG image endpoint returns PNG", async ({ request }) => {
