@@ -52,6 +52,11 @@ create table if not exists public.posts (
   platform_post_id text,
   connected_account_id uuid,
   error_message text,
+  likes integer not null default 0,
+  shares integer not null default 0,
+  comments integer not null default 0,
+  impressions integer not null default 0,
+  content_score integer not null default 0,
   created_at timestamptz not null default now()
 );
 
@@ -192,5 +197,84 @@ begin
     select generation_count as new_count, false as was_incremented
     from public.profiles where id = p_user_id;
   end if;
+end;
+$$ language plpgsql security definer;
+
+-- ============================================
+-- 8. Brand Voice & Model Preference columns
+-- ============================================
+alter table public.profiles
+  add column if not exists brand_voice text,
+  add column if not exists preferred_model text default 'gpt-4o-mini';
+
+-- ============================================
+-- 9. Referral system
+-- ============================================
+
+-- Add referral columns to profiles
+alter table public.profiles add column if not exists referral_code text unique;
+alter table public.profiles add column if not exists bonus_generations integer not null default 0;
+
+-- Auto-generate referral code for new profiles
+create or replace function public.generate_referral_code()
+returns trigger as $$
+begin
+  if new.referral_code is null then
+    new.referral_code := substr(md5(new.id::text || now()::text), 1, 8);
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists generate_referral_code_trigger on public.profiles;
+create trigger generate_referral_code_trigger
+  before insert on public.profiles
+  for each row execute function public.generate_referral_code();
+
+-- Backfill existing profiles without referral codes
+update public.profiles
+set referral_code = substr(md5(id::text || created_at::text), 1, 8)
+where referral_code is null;
+
+-- Referrals tracking table
+create table if not exists public.referrals (
+  id uuid default gen_random_uuid() primary key,
+  referrer_id uuid references public.profiles(id) on delete cascade not null,
+  referred_id uuid references public.profiles(id) on delete cascade not null,
+  bonus_granted boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique(referrer_id, referred_id)
+);
+
+alter table public.referrals enable row level security;
+
+create policy "Users can read own referrals"
+  on public.referrals for select
+  using (auth.uid() = referrer_id);
+
+create policy "Service role full access on referrals"
+  on public.referrals for all
+  using (auth.role() = 'service_role');
+
+create index if not exists idx_referrals_referrer on public.referrals(referrer_id);
+create index if not exists idx_referrals_referred on public.referrals(referred_id);
+
+-- Function to grant referral bonus to both users
+create or replace function public.grant_referral_bonus(
+  p_referrer_id uuid,
+  p_referred_id uuid,
+  p_bonus integer
+)
+returns void as $$
+begin
+  perform set_config('role', 'service_role', true);
+
+  update public.profiles
+  set bonus_generations = bonus_generations + p_bonus
+  where id = p_referrer_id;
+
+  update public.profiles
+  set bonus_generations = bonus_generations + p_bonus
+  where id = p_referred_id;
 end;
 $$ language plpgsql security definer;

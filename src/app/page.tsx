@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PricingToggle } from "@/components/pricing-toggle";
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -19,8 +20,15 @@ const jsonLd = {
       "@type": "Offer",
       price: "9",
       priceCurrency: "USD",
-      name: "Pro Plan",
+      name: "Pro Plan Monthly",
       billingIncrement: "P1M",
+    },
+    {
+      "@type": "Offer",
+      price: "79",
+      priceCurrency: "USD",
+      name: "Pro Plan Annual",
+      billingIncrement: "P1Y",
     },
   ],
 };
@@ -359,87 +367,8 @@ export default function LandingPage() {
             <p className="mt-4 text-muted-foreground">
               Start free. Upgrade when you need the full toolkit.
             </p>
-            <div className="mt-12 grid gap-8 md:grid-cols-2">
-              {/* Free plan */}
-              <div className="rounded-xl border bg-background p-8">
-                <h3 className="text-xl font-semibold">Free</h3>
-                <p className="mt-2 text-4xl font-bold">$0</p>
-                <p className="mt-1 text-sm text-muted-foreground">forever</p>
-                <ul className="mt-6 space-y-3 text-left text-sm text-muted-foreground">
-                  <li className="flex items-start gap-2">
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                    10 generations / month
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                    Social posts only
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                    5 platforms
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                    5 tones
-                  </li>
-                </ul>
-                <Link
-                  href="/signup"
-                  className="mt-8 block rounded-lg border px-6 py-2.5 text-center font-medium hover:bg-muted"
-                >
-                  Get started
-                </Link>
-              </div>
-
-              {/* Pro plan */}
-              <div className="rounded-xl border-2 border-primary bg-background p-8">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold">Pro</h3>
-                  <span className="rounded-full bg-primary/10 px-3 py-0.5 text-xs font-semibold text-primary">
-                    Most popular
-                  </span>
-                </div>
-                <p className="mt-2 text-4xl font-bold">
-                  $9<span className="text-lg font-normal text-muted-foreground">/mo</span>
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">billed monthly</p>
-                <ul className="mt-6 space-y-3 text-left text-sm text-muted-foreground">
-                  <li className="flex items-start gap-2">
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                    100 generations / month
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                    All content types (posts, video scripts, carousels, ads, images)
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                    A/B variants
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                    Bulk generation
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                    Post templates
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                    Post scheduling with calendar
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                    5 tones + 4 languages
-                  </li>
-                </ul>
-                <Link
-                  href="/signup"
-                  className="mt-8 block rounded-lg bg-primary px-6 py-2.5 text-center font-medium text-primary-foreground hover:bg-primary/90"
-                >
-                  Start Pro
-                </Link>
-              </div>
+            <div className="mt-12">
+              <PricingToggle />
             </div>
           </div>
         </section>

@@ -26,6 +26,31 @@ interface WeeklyStat {
   count: number;
 }
 
+interface MetricsSummary {
+  totalPosts: number;
+  totalLikes: number;
+  totalShares: number;
+  totalComments: number;
+  totalImpressions: number;
+  avgScore: number;
+}
+
+interface MetricsData {
+  summary: MetricsSummary;
+  byPlatform: Record<string, number>;
+  recentPosts: Array<{
+    id: string;
+    platform: string;
+    content: string;
+    published_at: string;
+    likes: number;
+    shares: number;
+    comments: number;
+    impressions: number;
+    content_score: number;
+  }>;
+}
+
 const PLATFORM_COLORS: Record<string, string> = {
   linkedin: "bg-blue-600",
   facebook: "bg-blue-500",
@@ -37,6 +62,8 @@ const PLATFORM_COLORS: Record<string, string> = {
 export default function AnalyticsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [metrics, setMetrics] = useState<MetricsData | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(true);
   const { t } = useLanguage();
   const supabase = createClient();
 
@@ -57,7 +84,23 @@ export default function AnalyticsPage() {
         setLoading(false);
       }
     }
+
+    async function loadMetrics() {
+      try {
+        const res = await fetch("/api/metrics");
+        if (res.ok) {
+          const data = await res.json();
+          setMetrics(data);
+        }
+      } catch {
+        // Metrics are non-critical, fail silently
+      } finally {
+        setMetricsLoading(false);
+      }
+    }
+
     load();
+    loadMetrics();
   }, [supabase]);
 
   if (loading) {
@@ -291,6 +334,97 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Post Performance Metrics */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t("analytics.performance")}</h2>
+
+        {metricsLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="pt-6">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="mt-2 h-8 w-16" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : !metrics || metrics.summary.totalPosts === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">{t("analytics.noMetrics")}</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">{t("analytics.totalLikes")}</p>
+                  <p className="text-3xl font-bold">{metrics.summary.totalLikes.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">{t("analytics.totalShares")}</p>
+                  <p className="text-3xl font-bold">{metrics.summary.totalShares.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">{t("analytics.totalComments")}</p>
+                  <p className="text-3xl font-bold">{metrics.summary.totalComments.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">{t("analytics.totalImpressions")}</p>
+                  <p className="text-3xl font-bold">{metrics.summary.totalImpressions.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">{t("analytics.avgScore")}</p>
+                  <p className="text-3xl font-bold">{metrics.summary.avgScore}/100</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent published posts with metrics */}
+            {metrics.recentPosts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("analytics.published")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {metrics.recentPosts.map((post) => (
+                      <div key={post.id} className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="secondary" className="capitalize">{post.platform}</Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(post.published_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-sm truncate">{post.content}</p>
+                        </div>
+                        <div className="flex items-center gap-4 ml-4 text-sm text-muted-foreground shrink-0">
+                          <span title="Likes">{post.likes}</span>
+                          <span title="Shares">{post.shares}</span>
+                          <span title="Comments">{post.comments}</span>
+                          <span title="Impressions">{post.impressions.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

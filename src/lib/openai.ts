@@ -15,16 +15,20 @@ function getOpenAI() {
 export type Platform = "linkedin" | "facebook" | "instagram" | "pinterest" | "twitter";
 export type Tone = "professional" | "casual" | "inspirational" | "humorous" | "educational";
 
-interface GeneratePostInput {
+export interface GeneratePostInput {
   platform: Platform;
   topic: string;
   tone: Tone;
   language: string;
+  brandVoice?: string;
+  model?: string;
 }
 
 interface GeneratePostOutput {
   content: string;
   hashtags: string[];
+  content_score?: number;
+  score_reason?: string;
 }
 
 /**
@@ -54,8 +58,12 @@ const platformRules: Record<Platform, string> = {
 export async function generatePost(input: GeneratePostInput): Promise<GeneratePostOutput> {
   const openai = getOpenAI();
 
+  const brandVoiceSection = input.brandVoice
+    ? `\n\nBrand voice guidelines from the user:\n${input.brandVoice}`
+    : "";
+
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: input.model || "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
       {
@@ -66,13 +74,17 @@ Rules for this post:
 ${platformRules[input.platform]}
 
 Output language: ${input.language}
-Tone: ${input.tone}
+Tone: ${input.tone}${brandVoiceSection}
 
 Respond in JSON format:
 {
   "content": "the full post text (without hashtags)",
-  "hashtags": ["hashtag1", "hashtag2", ...]
+  "hashtags": ["hashtag1", "hashtag2", ...],
+  "content_score": 8,
+  "score_reason": "Brief explanation of the score"
 }
+
+content_score is a rating from 1-10 of the post quality based on engagement potential, clarity, and platform fit.
 
 Make the content authentic, engaging, and platform-appropriate. Never use generic filler. Every post should provide value.`,
       },
@@ -131,13 +143,19 @@ interface VideoScriptInput {
   tone: Tone;
   language: string;
   platform: Platform;
+  brandVoice?: string;
+  model?: string;
 }
 
 export async function generateVideoScript(input: VideoScriptInput): Promise<VideoScriptOutput> {
   const openai = getOpenAI();
 
+  const brandVoiceSection = input.brandVoice
+    ? `\n\nBrand voice guidelines from the user:\n${input.brandVoice}`
+    : "";
+
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: input.model || "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
       {
@@ -146,7 +164,7 @@ export async function generateVideoScript(input: VideoScriptInput): Promise<Vide
 
 Output language: ${input.language}
 Tone: ${input.tone}
-Platform: ${input.platform}
+Platform: ${input.platform}${brandVoiceSection}
 
 Output JSON with this exact structure:
 {
@@ -204,13 +222,19 @@ interface VideoAdInput {
   tone: Tone;
   language: string;
   product: string;
+  brandVoice?: string;
+  model?: string;
 }
 
 export async function generateVideoAd(input: VideoAdInput): Promise<VideoAdOutput> {
   const openai = getOpenAI();
 
+  const brandVoiceSection = input.brandVoice
+    ? `\n\nBrand voice guidelines from the user:\n${input.brandVoice}`
+    : "";
+
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: input.model || "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
       {
@@ -219,7 +243,7 @@ export async function generateVideoAd(input: VideoAdInput): Promise<VideoAdOutpu
 
 Output language: ${input.language}
 Tone: ${input.tone}
-Product/Brand: ${input.product}
+Product/Brand: ${input.product}${brandVoiceSection}
 
 Output JSON with this exact structure:
 {
@@ -276,13 +300,19 @@ interface CarouselInput {
   language: string;
   platform: Platform;
   slideCount: number;
+  brandVoice?: string;
+  model?: string;
 }
 
 export async function generateCarousel(input: CarouselInput): Promise<CarouselOutput> {
   const openai = getOpenAI();
 
+  const brandVoiceSection = input.brandVoice
+    ? `\n\nBrand voice guidelines from the user:\n${input.brandVoice}`
+    : "";
+
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: input.model || "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
       {
@@ -292,7 +322,7 @@ export async function generateCarousel(input: CarouselInput): Promise<CarouselOu
 Output language: ${input.language}
 Tone: ${input.tone}
 Platform: ${input.platform}
-Number of slides: ${input.slideCount}
+Number of slides: ${input.slideCount}${brandVoiceSection}
 
 Output JSON with this exact structure:
 {
@@ -341,13 +371,19 @@ interface VariantsInput {
   tone: Tone;
   language: string;
   count: number;
+  brandVoice?: string;
+  model?: string;
 }
 
 export async function generateVariants(input: VariantsInput): Promise<PostVariant[]> {
   const openai = getOpenAI();
 
+  const brandVoiceSection = input.brandVoice
+    ? `\n\nBrand voice guidelines from the user:\n${input.brandVoice}`
+    : "";
+
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: input.model || "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
       {
@@ -358,7 +394,7 @@ Platform rules:
 ${platformRules[input.platform]}
 
 Output language: ${input.language}
-Tone: ${input.tone}
+Tone: ${input.tone}${brandVoiceSection}
 
 Output JSON with this exact structure:
 {

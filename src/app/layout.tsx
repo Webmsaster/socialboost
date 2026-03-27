@@ -29,6 +29,7 @@ export const metadata: Metadata = {
     "social media automation",
     "AI marketing",
   ],
+  manifest: "/manifest.json",
   openGraph: {
     type: "website",
     siteName: "SocialBoost",
@@ -48,7 +49,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#6366f1",
+  themeColor: "#7c3aed",
 };
 
 export default function RootLayout({

@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
 import { trackEvent } from "@/lib/analytics";
 import { sendLimitReachedEmail } from "@/lib/email";
+import { isProSubscription } from "@/lib/subscription";
 
 const FREE_LIMIT = 10;
 const PRO_LIMIT = 100;
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
     // Check generation limit
     const { data: profile } = await supabase
       .from("profiles")
-      .select("generation_count, subscription_status, email")
+      .select("generation_count, subscription_status, email, brand_voice, preferred_model")
       .eq("id", user.id)
       .single();
 
@@ -68,11 +69,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const model = isProSubscription(profile.subscription_status)
+      ? (profile.preferred_model || "gpt-4o-mini")
+      : "gpt-4o-mini";
+
     const result = await generatePost({
       platform,
       topic,
       tone,
       language: language || "English",
+      brandVoice: profile.brand_voice || undefined,
+      model,
     });
 
     // Increment generation count

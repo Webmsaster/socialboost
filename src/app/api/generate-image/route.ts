@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     // Check generation limit
     const { data: profile } = await supabase
       .from("profiles")
-      .select("generation_count, subscription_status")
+      .select("generation_count, subscription_status, brand_voice, preferred_model")
       .eq("id", user.id)
       .single();
 

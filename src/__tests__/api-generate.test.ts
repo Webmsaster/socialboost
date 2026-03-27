@@ -201,12 +201,14 @@ describe("POST /api/generate", () => {
     expect(response.status).toBe(200);
     expect(json.content).toBe("Great post!");
     expect(json.hashtags).toEqual(["#test"]);
-    expect(mockGeneratePost).toHaveBeenCalledWith({
-      platform: "linkedin",
-      topic: "test topic",
-      tone: "professional",
-      language: "English",
-    });
+    expect(mockGeneratePost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: "linkedin",
+        topic: "test topic",
+        tone: "professional",
+        language: "English",
+      })
+    );
   });
 
   it("defaults language to English if not provided", async () => {

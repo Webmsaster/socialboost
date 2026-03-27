@@ -16,14 +16,26 @@ export function getStripe() {
   return _stripe;
 }
 
-export async function createCheckoutSession(userId: string, email: string) {
+export async function createCheckoutSession(
+  userId: string,
+  email: string,
+  plan: "monthly" | "annual" = "monthly"
+) {
   const stripe = getStripe();
+
+  const priceId =
+    plan === "annual"
+      ? process.env.STRIPE_ANNUAL_PRICE_ID ||
+        process.env.NEXT_PUBLIC_STRIPE_ANNUAL_PRICE_ID!
+      : process.env.STRIPE_PRICE_ID ||
+        process.env.NEXT_PUBLIC_STRIPE_PRICE_ID!;
+
   return stripe.checkout.sessions.create({
     customer_email: email,
     mode: "subscription",
     line_items: [
       {
-        price: process.env.STRIPE_PRICE_ID || process.env.NEXT_PUBLIC_STRIPE_PRICE_ID!,
+        price: priceId,
         quantity: 1,
       },
     ],
@@ -31,6 +43,7 @@ export async function createCheckoutSession(userId: string, email: string) {
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
     metadata: {
       userId,
+      plan,
     },
   });
 }

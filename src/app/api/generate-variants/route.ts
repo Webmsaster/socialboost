@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     // Check generation limit
     const { data: profile } = await supabase
       .from("profiles")
-      .select("generation_count, subscription_status")
+      .select("generation_count, subscription_status, brand_voice, preferred_model")
       .eq("id", user.id)
       .single();
 
@@ -71,12 +71,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const model = isProSubscription(profile.subscription_status)
+      ? (profile.preferred_model || "gpt-4o-mini")
+      : "gpt-4o-mini";
+
     const variants = await generateVariants({
       platform,
       topic,
       tone,
       language: language || "English",
       count: validCount,
+      brandVoice: profile.brand_voice || undefined,
+      model,
     });
 
     // Counts as 1 generation, not per variant

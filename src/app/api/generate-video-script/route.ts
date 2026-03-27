@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Check generation limit
     const { data: profile } = await supabase
       .from("profiles")
-      .select("generation_count, subscription_status")
+      .select("generation_count, subscription_status, brand_voice, preferred_model")
       .eq("id", user.id)
       .single();
 
@@ -68,11 +68,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const model = isProSubscription(profile.subscription_status)
+      ? (profile.preferred_model || "gpt-4o-mini")
+      : "gpt-4o-mini";
+
     const result = await generateVideoScript({
       topic,
       tone,
       language: language || "English",
       platform,
+      brandVoice: profile.brand_voice || undefined,
+      model,
     });
 
     await supabase.rpc("increment_generation_count", {

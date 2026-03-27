@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,8 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const referralCode = searchParams.get("ref");
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
@@ -47,6 +50,19 @@ export default function SignupPage() {
       setError(error.message);
       setLoading(false);
       return;
+    }
+
+    // Claim referral bonus if referral code is present
+    if (data.user && referralCode) {
+      try {
+        await fetch("/api/referral/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ referralCode, newUserId: data.user.id }),
+        });
+      } catch {
+        // Referral claim failure is non-blocking
+      }
     }
 
     if (data.user && !data.session) {
@@ -85,7 +101,11 @@ export default function SignupPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Create account</CardTitle>
-          <CardDescription>Start generating AI social media posts</CardDescription>
+          <CardDescription>
+            {referralCode
+              ? "You've been referred! Sign up to get 10 bonus generations."
+              : "Start generating AI social media posts"}
+          </CardDescription>
         </CardHeader>
         <form onSubmit={handleSignup}>
           <CardContent className="space-y-4">
