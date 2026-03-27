@@ -150,7 +150,7 @@ export default function HistoryPage() {
               size="sm"
               onClick={() => setFilter(f)}
             >
-              {t(`history.filter.${f === "all" ? "all" : f + "s"}`)}
+              {t(`history.filter.${f === "draft" ? "drafts" : f}`)}
             </Button>
           ))}
         </div>
