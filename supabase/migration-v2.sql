@@ -125,10 +125,18 @@ CREATE INDEX IF NOT EXISTS idx_posts_published_metrics ON public.posts(status, m
 -- 6. Generate referral code on signup
 -- ============================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
+RETURNS trigger
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, referral_code)
-  VALUES (new.id, new.email, encode(gen_random_bytes(6), 'hex'));
+  INSERT INTO profiles (id, email, referral_code)
+  VALUES (new.id, new.email, replace(gen_random_uuid()::text, '-', ''));
+  RETURN new;
+EXCEPTION WHEN OTHERS THEN
+  -- Fallback without referral code
+  INSERT INTO profiles (id, email)
+  VALUES (new.id, new.email);
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
