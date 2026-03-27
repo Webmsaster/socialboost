@@ -18,8 +18,8 @@ interface ConnectedAccount {
 const platformConfigs = [
   { id: "linkedin", name: "LinkedIn", color: "bg-blue-600", supported: true },
   { id: "facebook", name: "Facebook", color: "bg-blue-500", supported: true },
-  { id: "instagram", name: "Instagram", color: "bg-pink-500", supported: false },
-  { id: "pinterest", name: "Pinterest", color: "bg-red-500", supported: false },
+  { id: "instagram", name: "Instagram", color: "bg-pink-500", supported: true },
+  { id: "pinterest", name: "Pinterest", color: "bg-red-500", supported: true },
   { id: "twitter", name: "Twitter / X", color: "bg-neutral-800", supported: true },
 ];
 
