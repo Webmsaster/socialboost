@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { captureError } from "@/lib/logger";
+import { sendPostPublishedEmail, sendPublishFailedEmail } from "@/lib/email";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -58,23 +59,75 @@ export async function GET(request: NextRequest) {
   let failed = 0;
 
   for (const post of posts) {
-    // When OAuth is implemented, publish to the platform here.
-    // For now, mark as published since there's no platform connection.
     if (post.connected_account_id) {
-      // TODO: Publish to platform via OAuth token
-      // For now, mark as failed with explanation
-      const { error } = await supabase
-        .from("posts")
-        .update({
-          status: "failed",
-          error_message: "Platform publishing not yet implemented",
-        })
-        .eq("id", post.id);
+      // Look up connected account for OAuth publishing
+      const { data: account } = await supabase
+        .from("connected_accounts")
+        .select("*")
+        .eq("id", post.connected_account_id)
+        .single();
 
-      if (error) {
-        captureError("Cron: failed to update post status", error, { postId: post.id });
+      if (!account) {
+        await supabase
+          .from("posts")
+          .update({ status: "failed", error_message: "Connected account not found" })
+          .eq("id", post.id);
+        failed++;
+
+        const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
+        if (profile?.email) {
+          sendPublishFailedEmail(profile.email, post.platform, "Connected account not found");
+        }
+        continue;
       }
-      failed++;
+
+      const { getPublisher } = await import("@/lib/platforms/registry");
+      const publisher = getPublisher(account.platform);
+
+      if (!publisher) {
+        await supabase
+          .from("posts")
+          .update({ status: "failed", error_message: `Publishing to ${account.platform} is not yet supported` })
+          .eq("id", post.id);
+        failed++;
+
+        const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
+        if (profile?.email) {
+          sendPublishFailedEmail(profile.email, post.platform, `Publishing to ${account.platform} is not yet supported`);
+        }
+        continue;
+      }
+
+      const result = await publisher.publish(account, post.content);
+
+      if (result.success) {
+        await supabase
+          .from("posts")
+          .update({
+            status: "published",
+            published_at: new Date().toISOString(),
+            platform_post_id: result.platformPostId || null,
+          })
+          .eq("id", post.id);
+        published++;
+
+        const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
+        if (profile?.email) {
+          sendPostPublishedEmail(profile.email, post.content, post.platform);
+        }
+      } else {
+        captureError("Cron: platform publish failed", new Error(result.error || "Unknown error"), { postId: post.id, platform: account.platform });
+        await supabase
+          .from("posts")
+          .update({ status: "failed", error_message: result.error || "Publishing failed" })
+          .eq("id", post.id);
+        failed++;
+
+        const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
+        if (profile?.email) {
+          sendPublishFailedEmail(profile.email, post.platform, result.error || "Publishing failed");
+        }
+      }
     } else {
       // No connected account — mark as published (user handles manual posting)
       const { error } = await supabase
@@ -90,6 +143,12 @@ export async function GET(request: NextRequest) {
         failed++;
       } else {
         published++;
+
+        // Send notification email
+        const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
+        if (profile?.email) {
+          sendPostPublishedEmail(profile.email, post.content, post.platform);
+        }
       }
     }
   }

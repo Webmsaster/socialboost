@@ -4,6 +4,7 @@ import { generatePost, type Platform, type Tone } from "@/lib/openai";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
 import { trackEvent } from "@/lib/analytics";
+import { sendLimitReachedEmail } from "@/lib/email";
 
 const FREE_LIMIT = 10;
 const PRO_LIMIT = 100;
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     // Check generation limit
     const { data: profile } = await supabase
       .from("profiles")
-      .select("generation_count, subscription_status")
+      .select("generation_count, subscription_status, email")
       .eq("id", user.id)
       .single();
 
@@ -59,6 +60,8 @@ export async function POST(request: NextRequest) {
     const limit = profile.subscription_status === "active" ? PRO_LIMIT : FREE_LIMIT;
 
     if (profile.generation_count >= limit) {
+      // Notify user (fire-and-forget, don't block response)
+      sendLimitReachedEmail(profile.email || user.email!, profile.subscription_status, limit);
       return NextResponse.json(
         { error: `Monthly limit reached (${limit}). Upgrade to Pro for more.` },
         { status: 403 }

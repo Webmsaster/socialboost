@@ -1,6 +1,13 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
 const BUCKET = "generated-images";
+
+function getStorageAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 /**
  * Downloads an image from a URL and uploads it to Supabase Storage.
@@ -19,10 +26,9 @@ export async function persistImage(
 
     const blob = await response.blob();
     const buffer = Buffer.from(await blob.arrayBuffer());
-    const ext = "png";
-    const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`;
 
-    const supabase = await createClient();
+    const supabase = getStorageAdmin();
 
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)

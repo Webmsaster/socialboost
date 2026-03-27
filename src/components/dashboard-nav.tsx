@@ -18,6 +18,7 @@ const navKeys = [
   { href: "/history", key: "nav.history", icon: ClockIcon },
   { href: "/calendar", key: "nav.calendar", icon: CalendarIcon },
   { href: "/analytics", key: "nav.analytics", icon: ChartIcon },
+  { href: "/accounts", key: "nav.accounts", icon: LinkIcon },
   { href: "/settings", key: "nav.settings", icon: SettingsIcon },
 ];
 
