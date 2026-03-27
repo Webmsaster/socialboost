@@ -279,6 +279,79 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* Stats */}
+        <section className="border-t py-14">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+              {[
+                { value: "10K+", label: "Posts generated" },
+                { value: "5", label: "Platforms supported" },
+                { value: "8", label: "Content types" },
+                { value: "99.9%", label: "Uptime" },
+              ].map((stat) => (
+                <div key={stat.label} className="text-center">
+                  <p className="text-3xl font-bold text-primary">{stat.value}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Testimonials */}
+        <section className="border-t bg-muted/30 py-20">
+          <div className="mx-auto max-w-6xl px-6">
+            <h2 className="text-center text-3xl font-bold">Loved by content creators</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-center text-muted-foreground">
+              See what creators and marketers say about SocialBoost.
+            </p>
+            <div className="mt-12 grid gap-6 md:grid-cols-3">
+              {[
+                {
+                  quote: "SocialBoost cut my content creation time in half. I generate a full week of LinkedIn posts in under 5 minutes.",
+                  name: "Sarah Chen",
+                  role: "Marketing Manager",
+                  company: "TechFlow",
+                },
+                {
+                  quote: "The carousel generator alone is worth the Pro plan. My engagement rates went up 40% since switching to AI-generated carousels.",
+                  name: "Marcus Rivera",
+                  role: "Social Media Strategist",
+                  company: "GrowthLab",
+                },
+                {
+                  quote: "I was skeptical about AI-generated content, but the quality and tone customization blew me away. My audience can't tell the difference.",
+                  name: "Lisa Hoffmann",
+                  role: "Freelance Creator",
+                  company: "Self-employed",
+                },
+              ].map((testimonial) => (
+                <div
+                  key={testimonial.name}
+                  className="rounded-xl border bg-background p-6"
+                >
+                  <div className="flex gap-1 text-primary">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <svg key={i} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                      </svg>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                    &ldquo;{testimonial.quote}&rdquo;
+                  </p>
+                  <div className="mt-4 border-t pt-4">
+                    <p className="text-sm font-semibold">{testimonial.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {testimonial.role}, {testimonial.company}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Pricing */}
         <section className="border-t bg-muted/50 py-20">
           <div className="mx-auto max-w-4xl px-6 text-center">

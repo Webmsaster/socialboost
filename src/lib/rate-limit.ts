@@ -3,7 +3,7 @@ import { Redis } from "@upstash/redis";
 import { captureError } from "@/lib/logger";
 
 const MAX_REQUESTS = 10;
-const WINDOW = "60 s";
+const WINDOW_MS = 60_000; // 60 seconds
 
 let ratelimit: Ratelimit | null = null;
 
@@ -16,11 +16,35 @@ function getRatelimit() {
     }
     ratelimit = new Ratelimit({
       redis: new Redis({ url, token }),
-      limiter: Ratelimit.slidingWindow(MAX_REQUESTS, WINDOW),
+      limiter: Ratelimit.slidingWindow(MAX_REQUESTS, "60 s"),
       prefix: "ratelimit:socialboost",
     });
   }
   return ratelimit;
+}
+
+// In-memory fallback for when Redis is not configured
+const memoryStore = new Map<string, number[]>();
+
+function memoryRateLimit(key: string): { success: boolean; remaining: number } {
+  const now = Date.now();
+  const windowStart = now - WINDOW_MS;
+
+  const timestamps = (memoryStore.get(key) ?? []).filter((t) => t > windowStart);
+  timestamps.push(now);
+  memoryStore.set(key, timestamps);
+
+  // Clean up old keys periodically (every 100th call)
+  if (Math.random() < 0.01) {
+    for (const [k, v] of memoryStore) {
+      const active = v.filter((t) => t > windowStart);
+      if (active.length === 0) memoryStore.delete(k);
+      else memoryStore.set(k, active);
+    }
+  }
+
+  const success = timestamps.length <= MAX_REQUESTS;
+  return { success, remaining: Math.max(0, MAX_REQUESTS - timestamps.length) };
 }
 
 export interface RateLimitResult {
@@ -37,12 +61,12 @@ export async function rateLimit(
   const limiter = getRatelimit();
 
   if (!limiter) {
+    // Use in-memory fallback (works in both dev and prod)
     if (process.env.NODE_ENV === "production") {
-      captureError("Rate limiting unavailable: Redis not configured", new Error("Missing KV_REST_API_URL/UPSTASH_REDIS_REST_URL"));
-      return { success: false, remaining: 0, limit: MAX_REQUESTS, reset: 0 };
+      captureError("Rate limiting: Redis not configured, using in-memory fallback", new Error("Missing KV_REST_API_URL/UPSTASH_REDIS_REST_URL"));
     }
-    // Allow in development without Redis
-    return { success: true, remaining: MAX_REQUESTS, limit: MAX_REQUESTS, reset: 0 };
+    const result = memoryRateLimit(`${endpoint}:${key}`);
+    return { ...result, limit: MAX_REQUESTS, reset: 0 };
   }
 
   try {
@@ -55,10 +79,8 @@ export async function rateLimit(
     };
   } catch (error) {
     captureError(`Rate limit check failed for ${endpoint}`, error);
-    // Fail open in dev, fail closed in prod
-    if (process.env.NODE_ENV === "production") {
-      return { success: false, remaining: 0, limit: MAX_REQUESTS, reset: 0 };
-    }
-    return { success: true, remaining: MAX_REQUESTS, limit: MAX_REQUESTS, reset: 0 };
+    // Fall back to in-memory on Redis errors
+    const result = memoryRateLimit(`${endpoint}:${key}`);
+    return { ...result, limit: MAX_REQUESTS, reset: 0 };
   }
 }

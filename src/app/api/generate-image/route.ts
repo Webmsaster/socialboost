@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateImage } from "@/lib/openai";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
+import { trackEvent } from "@/lib/analytics";
 import { isProSubscription } from "@/lib/subscription";
 
 const FREE_LIMIT = 10;
@@ -62,12 +63,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const url = await generateImage(prompt);
+    const temporaryUrl = await generateImage(prompt);
+
+    // Persist to Supabase Storage so URL doesn't expire
+    const { persistImage } = await import("@/lib/storage");
+    const url = await persistImage(temporaryUrl, user.id);
 
     await supabase.rpc("increment_generation_count", {
       p_user_id: user.id,
       p_limit: limit,
     });
+
+    trackEvent({ event: "generate_image", userId: user.id, properties: { persisted: url !== temporaryUrl } });
 
     return NextResponse.json({ url });
   } catch (error) {

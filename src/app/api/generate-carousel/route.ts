@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateCarousel, type Platform, type Tone } from "@/lib/openai";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
+import { trackEvent } from "@/lib/analytics";
 import { isProSubscription } from "@/lib/subscription";
 
 const FREE_LIMIT = 10;
@@ -82,6 +83,8 @@ export async function POST(request: NextRequest) {
       p_user_id: user.id,
       p_limit: limit,
     });
+
+    trackEvent({ event: "generate_carousel", userId: user.id, properties: { platform, tone, slideCount: validSlideCount } });
 
     return NextResponse.json(result);
   } catch (error) {

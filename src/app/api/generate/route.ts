@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generatePost, type Platform, type Tone } from "@/lib/openai";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
+import { trackEvent } from "@/lib/analytics";
 
 const FREE_LIMIT = 10;
 const PRO_LIMIT = 100;
@@ -76,6 +77,8 @@ export async function POST(request: NextRequest) {
       p_user_id: user.id,
       p_limit: limit,
     });
+
+    trackEvent({ event: "generate_post", userId: user.id, properties: { platform, tone, language: language || "English" } });
 
     return NextResponse.json(result);
   } catch (error) {
