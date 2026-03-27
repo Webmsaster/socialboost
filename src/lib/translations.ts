@@ -387,6 +387,14 @@ export const translations = {
     "analytics.scheduled": "Geplant",
     "analytics.publishedCount": "Veroeffentlicht",
     "analytics.failed": "Fehlgeschlagen",
+    "analytics.performance": "Post-Performance",
+    "analytics.totalLikes": "Likes gesamt",
+    "analytics.totalShares": "Shares gesamt",
+    "analytics.totalComments": "Kommentare gesamt",
+    "analytics.totalImpressions": "Impressionen",
+    "analytics.avgScore": "Durchschn. Content Score",
+    "analytics.noMetrics": "Noch keine veroeffentlichten Posts mit Metriken.",
+    "analytics.loadingMetrics": "Lade Metriken...",
 
     // Onboarding
     "onboarding.title": "Willkommen bei SocialBoost!",
