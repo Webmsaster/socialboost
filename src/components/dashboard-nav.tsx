@@ -52,7 +52,7 @@ export function DashboardNav() {
             href={item.href}
             onClick={() => setMobileOpen(false)}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
               pathname === item.href
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -68,8 +68,9 @@ export function DashboardNav() {
         <ThemeToggle />
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-muted-foreground"
+          className="w-full justify-start gap-3 text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
           onClick={handleSignOut}
+          aria-label="Sign out"
         >
           <LogoutIcon className="h-4 w-4" />
           {t("nav.signOut")}
@@ -83,7 +84,7 @@ export function DashboardNav() {
       <div className="fixed top-0 left-0 right-0 z-40 flex h-14 items-center border-b bg-background px-4 md:hidden">
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="p-2"
+          className="p-2 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none rounded-lg"
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
           aria-expanded={mobileOpen}
         >

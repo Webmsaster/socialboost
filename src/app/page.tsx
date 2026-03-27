@@ -224,12 +224,12 @@ export default function LandingPage() {
         </section>
 
         {/* How it works */}
-        <section className="border-t bg-muted/50 py-20">
+        <section className="border-t bg-muted/50 py-20" aria-labelledby="how-it-works">
           <div className="mx-auto max-w-6xl px-6">
-            <h2 className="text-center text-3xl font-bold">How it works</h2>
+            <h2 id="how-it-works" className="text-center text-3xl font-bold">How it works</h2>
             <div className="mt-12 grid gap-8 md:grid-cols-3">
               <div className="text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground text-xl font-bold">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground text-xl font-bold" aria-hidden="true">
                   1
                 </div>
                 <h3 className="mt-4 text-lg font-semibold">Choose your content type</h3>
@@ -238,7 +238,7 @@ export default function LandingPage() {
                 </p>
               </div>
               <div className="text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground text-xl font-bold">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground text-xl font-bold" aria-hidden="true">
                   2
                 </div>
                 <h3 className="mt-4 text-lg font-semibold">Describe your topic</h3>
@@ -247,7 +247,7 @@ export default function LandingPage() {
                 </p>
               </div>
               <div className="text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground text-xl font-bold">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground text-xl font-bold" aria-hidden="true">
                   3
                 </div>
                 <h3 className="mt-4 text-lg font-semibold">Publish or schedule</h3>
@@ -260,9 +260,9 @@ export default function LandingPage() {
         </section>
 
         {/* Features grid */}
-        <section className="py-20">
+        <section className="py-20" aria-labelledby="features">
           <div className="mx-auto max-w-6xl px-6">
-            <h2 className="text-center text-3xl font-bold">
+            <h2 id="features" className="text-center text-3xl font-bold">
               Everything you need to create faster
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-center text-muted-foreground">
@@ -274,7 +274,7 @@ export default function LandingPage() {
                   key={feature.title}
                   className="rounded-xl border bg-background p-6 transition-colors hover:bg-muted/50"
                 >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
                     {feature.icon}
                   </div>
                   <h3 className="mt-4 font-semibold">{feature.title}</h3>
@@ -307,9 +307,9 @@ export default function LandingPage() {
         </section>
 
         {/* Testimonials */}
-        <section className="border-t bg-muted/30 py-20">
+        <section className="border-t bg-muted/30 py-20" aria-labelledby="testimonials">
           <div className="mx-auto max-w-6xl px-6">
-            <h2 className="text-center text-3xl font-bold">Loved by content creators</h2>
+            <h2 id="testimonials" className="text-center text-3xl font-bold">Loved by content creators</h2>
             <p className="mx-auto mt-4 max-w-2xl text-center text-muted-foreground">
               See what creators and marketers say about SocialBoost.
             </p>
@@ -338,7 +338,7 @@ export default function LandingPage() {
                   key={testimonial.name}
                   className="rounded-xl border bg-background p-6"
                 >
-                  <div className="flex gap-1 text-primary">
+                  <div className="flex gap-1 text-primary" aria-hidden="true">
                     {Array.from({ length: 5 }).map((_, i) => (
                       <svg key={i} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
@@ -361,9 +361,9 @@ export default function LandingPage() {
         </section>
 
         {/* Pricing */}
-        <section className="border-t bg-muted/50 py-20">
+        <section className="border-t bg-muted/50 py-20" aria-labelledby="pricing">
           <div className="mx-auto max-w-4xl px-6 text-center">
-            <h2 className="text-3xl font-bold">Simple pricing</h2>
+            <h2 id="pricing" className="text-3xl font-bold">Simple pricing</h2>
             <p className="mt-4 text-muted-foreground">
               Start free. Upgrade when you need the full toolkit.
             </p>

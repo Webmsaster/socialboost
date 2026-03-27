@@ -6,9 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardSkeleton } from "@/components/loading-skeleton";
 import { useLanguage } from "@/lib/i18n";
 import { Onboarding } from "@/components/onboarding";
+import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { toast } from "sonner";
 
 interface Post {
@@ -33,6 +34,7 @@ export default function DashboardPage() {
   const { t } = useLanguage();
   const supabase = createClient();
 
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [allPosts, setAllPosts] = useState<Pick<Post, "platform" | "status" | "created_at">[]>([]);
 
   useEffect(() => {
@@ -52,7 +54,13 @@ export default function DashboardPage() {
 
         if (postsRes.data) setPosts(postsRes.data);
         if (allPostsRes.data) setAllPosts(allPostsRes.data);
-        if (profileRes.data) setProfile(profileRes.data);
+        if (profileRes.data) {
+          setProfile(profileRes.data);
+          // Show onboarding wizard for first-time users
+          if (profileRes.data.generation_count === 0 && !localStorage.getItem("onboarding_done")) {
+            setShowOnboarding(true);
+          }
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load dashboard";
         setError(message);
@@ -80,44 +88,19 @@ export default function DashboardPage() {
   }
 
   if (loading) {
-    return (
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <Skeleton className="h-9 w-48" />
-            <Skeleton className="h-5 w-32" />
-          </div>
-          <Skeleton className="h-10 w-36" />
-        </div>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-4 w-24" />
-            </div>
-            <Skeleton className="mt-2 h-2 w-full rounded-full" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
-          <CardContent className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between rounded-lg border p-3">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-5 w-16 rounded-full" />
-                  <Skeleton className="h-4 w-48" />
-                </div>
-                <Skeleton className="h-5 w-14 rounded-full" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
     <div className="space-y-8">
+      {showOnboarding && (
+        <OnboardingWizard
+          onComplete={() => {
+            setShowOnboarding(false);
+            localStorage.setItem("onboarding_done", "1");
+          }}
+        />
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">{t("dashboard.title")}</h1>

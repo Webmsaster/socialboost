@@ -19,6 +19,7 @@ export function PricingToggle() {
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${annual ? "bg-primary" : "bg-muted"}`}
           role="switch"
           aria-checked={annual}
+          aria-label="Toggle annual billing"
         >
           <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${annual ? "translate-x-6" : "translate-x-1"}`} />
         </button>

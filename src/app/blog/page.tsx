@@ -35,6 +35,36 @@ const posts = [
     readTime: "5 min read",
     category: "Instagram",
   },
+  {
+    slug: "social-media-scheduling-strategy",
+    title:
+      "How to Build a Social Media Scheduling Strategy That Actually Works",
+    excerpt:
+      "Learn optimal posting times, content batching, and consistency frameworks that drive real results across platforms.",
+    date: "2026-03-27",
+    readTime: "7 min read",
+    category: "Strategy",
+  },
+  {
+    slug: "twitter-x-growth-tips",
+    title:
+      "12 Twitter/X Growth Tips for 2026: From Zero to Engaged Audience",
+    excerpt:
+      "Actionable strategies to build an engaged Twitter/X audience from scratch with threads, engagement tactics, and content systems.",
+    date: "2026-03-27",
+    readTime: "8 min read",
+    category: "Twitter",
+  },
+  {
+    slug: "content-repurposing-guide",
+    title:
+      "Content Repurposing: How to Turn 1 Post Into 5 Platform-Ready Pieces",
+    excerpt:
+      "Master content repurposing workflows to multiply your social media output without multiplying your effort.",
+    date: "2026-03-27",
+    readTime: "8 min read",
+    category: "Strategy",
+  },
 ];
 
 export default function BlogPage() {
@@ -70,7 +100,7 @@ export default function BlogPage() {
                 href={`/blog/${post.slug}`}
                 className="block rounded-xl border p-6 transition-colors hover:bg-muted/50"
               >
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                   <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                     {post.category}
                   </span>

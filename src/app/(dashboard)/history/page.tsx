@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { TableSkeleton } from "@/components/loading-skeleton";
 import { useLanguage } from "@/lib/i18n";
 import { toast } from "sonner";
 
@@ -163,23 +163,7 @@ export default function HistoryPage() {
       </div>
 
       {loading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="pt-6 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                  </div>
-                  <Skeleton className="h-4 w-20" />
-                </div>
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-12 w-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <TableSkeleton rows={6} />
       ) : filteredPosts.length === 0 ? (
         <p className="text-muted-foreground">
           {search ? "No posts matching your search." : t("history.empty")}

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { CardSkeleton, Skeleton } from "@/components/loading-skeleton";
 import { useLanguage } from "@/lib/i18n";
 import { toast } from "sonner";
 
@@ -109,17 +109,12 @@ export default function AnalyticsPage() {
         <Skeleton className="h-9 w-40" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="pt-6">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="mt-2 h-8 w-16" />
-              </CardContent>
-            </Card>
+            <CardSkeleton key={i} />
           ))}
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
-          <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full" /></CardContent></Card>
-          <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full" /></CardContent></Card>
+          <CardSkeleton />
+          <CardSkeleton />
         </div>
       </div>
     );

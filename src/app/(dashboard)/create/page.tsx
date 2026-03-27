@@ -138,6 +138,42 @@ export default function CreatePage() {
   const [copied, setCopied] = useState(false);
   const [copiedVariant, setCopiedVariant] = useState<string | null>(null);
 
+  // Auto-save draft to localStorage
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (topic.trim()) {
+        localStorage.setItem("draft_create", JSON.stringify({
+          contentType, platform, tone, language, topic, product, slideCount,
+          enableVariants, enableImage, savedAt: Date.now()
+        }));
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [contentType, platform, tone, language, topic, product, slideCount, enableVariants, enableImage]);
+
+  // Restore draft on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("draft_create");
+    if (saved) {
+      try {
+        const draft = JSON.parse(saved);
+        // Only restore if saved less than 24h ago
+        if (Date.now() - draft.savedAt < 86400000) {
+          if (draft.topic) setTopic(draft.topic);
+          if (draft.platform) setPlatform(draft.platform);
+          if (draft.tone) setTone(draft.tone);
+          if (draft.language) setLanguage(draft.language);
+          if (draft.contentType) setContentType(draft.contentType);
+          if (draft.product) setProduct(draft.product);
+          if (draft.slideCount) setSlideCount(draft.slideCount);
+          toast.info("Draft restored from auto-save");
+        }
+      } catch {
+        // Ignore invalid JSON
+      }
+    }
+  }, []);
+
   // Template prefill from URL params
   useEffect(() => {
     const templateId = searchParams.get("template");
@@ -235,6 +271,7 @@ export default function CreatePage() {
       }
       const data = await res.json();
       setVariants(data.variants);
+      localStorage.removeItem("draft_create");
     } else {
       // Single post mode
       const res = await fetch("/api/generate", {
@@ -248,6 +285,7 @@ export default function CreatePage() {
       }
       const data = await res.json();
       setPostResult(data);
+      localStorage.removeItem("draft_create");
 
       // Generate image if enabled
       if (enableImage) {
@@ -280,6 +318,7 @@ export default function CreatePage() {
     }
     const data = await res.json();
     setVideoScriptResult(data);
+    localStorage.removeItem("draft_create");
   }
 
   async function handleGenerateVideoAd() {
@@ -298,6 +337,7 @@ export default function CreatePage() {
     }
     const data = await res.json();
     setVideoAdResult(data);
+    localStorage.removeItem("draft_create");
   }
 
   async function handleGenerateCarousel() {
@@ -313,6 +353,7 @@ export default function CreatePage() {
     const data = await res.json();
     setCarouselResult(data);
     setCurrentSlide(0);
+    localStorage.removeItem("draft_create");
   }
 
   // --- Copy Helpers ---
@@ -858,7 +899,7 @@ export default function CreatePage() {
 
         {/* All tab contents share the same form */}
         <TabsContent value={contentType}>
-          <form onSubmit={handleGenerate} className="space-y-6">
+          <form onSubmit={handleGenerate} className="space-y-6" aria-label="Content generation form">
             {/* Common inputs */}
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
@@ -992,6 +1033,7 @@ export default function CreatePage() {
               type="submit"
               disabled={loading}
               className="w-full md:w-auto"
+              aria-busy={loading}
             >
               {getGenerateButtonText()}
             </Button>
@@ -1000,6 +1042,7 @@ export default function CreatePage() {
       </Tabs>
 
       {/* Results */}
+      <div aria-live="polite">
       {contentType === "post" && !enableVariants && postResult && (
         <PostPreview
           platform={platform}
@@ -1013,6 +1056,7 @@ export default function CreatePage() {
       {contentType === "video-script" && renderVideoScriptResult()}
       {contentType === "video-ad" && renderVideoAdResult()}
       {contentType === "carousel" && renderCarouselResult()}
+      </div>
     </div>
   );
 }

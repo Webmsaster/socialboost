@@ -8,6 +8,14 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/lib/i18n";
 import { toast } from "sonner";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { optimalPostingTimes } from "@/lib/optimal-times";
+import {
   startOfMonth,
   endOfMonth,
   startOfWeek,
@@ -58,6 +66,7 @@ export default function CalendarPage() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [bestTimesPlatform, setBestTimesPlatform] = useState("linkedin");
   const { t } = useLanguage();
   const supabase = createClient();
 
@@ -473,6 +482,50 @@ export default function CalendarPage() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Best Times to Post */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Best Times to Post</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Select value={bestTimesPlatform} onValueChange={setBestTimesPlatform}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="linkedin">LinkedIn</SelectItem>
+                    <SelectItem value="facebook">Facebook</SelectItem>
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                    <SelectItem value="twitter">Twitter/X</SelectItem>
+                    <SelectItem value="pinterest">Pinterest</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="space-y-2">
+                  {(optimalPostingTimes[bestTimesPlatform] ?? []).map((slot) => (
+                    <div
+                      key={slot.day}
+                      className="flex items-center justify-between rounded-lg border p-2 text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{slot.day}</span>
+                        {slot.engagement === "high" && (
+                          <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            High
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {slot.times.join(", ")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Based on general engagement data. Results may vary.
+                </p>
               </CardContent>
             </Card>
           </div>

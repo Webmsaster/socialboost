@@ -103,14 +103,14 @@ export default function TeamPage() {
             <p className="mt-2 text-sm text-muted-foreground">
               Create a team to collaborate with colleagues on content creation.
             </p>
-            <div className="mt-6 flex items-center justify-center gap-2">
+            <div className="mt-6 flex flex-col items-center justify-center gap-2 sm:flex-row">
               <Input
                 placeholder="Team name"
                 value={newOrgName}
                 onChange={(e) => setNewOrgName(e.target.value)}
-                className="max-w-xs"
+                className="w-full max-w-xs"
               />
-              <Button onClick={handleCreateOrg} disabled={creating || !newOrgName.trim()}>
+              <Button onClick={handleCreateOrg} disabled={creating || !newOrgName.trim()} className="w-full sm:w-auto">
                 {creating ? "Creating..." : "Create Team"}
               </Button>
             </div>
@@ -133,18 +133,19 @@ export default function TeamPage() {
               </div>
 
               {["owner", "admin"].includes(m.role) && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Input
                     placeholder="Email to invite"
                     type="email"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
-                    className="max-w-xs"
+                    className="w-full max-w-xs"
                   />
                   <Button
                     size="sm"
                     onClick={() => handleInvite(m.org_id)}
                     disabled={inviting || !inviteEmail.trim()}
+                    className="w-full sm:w-auto"
                   >
                     {inviting ? "Sending..." : "Invite"}
                   </Button>
