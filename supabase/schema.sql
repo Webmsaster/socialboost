@@ -103,6 +103,10 @@ create policy "Users can read own connected accounts"
   on public.connected_accounts for select
   using (auth.uid() = user_id);
 
+create policy "Users can insert own connected accounts"
+  on public.connected_accounts for insert
+  with check (auth.uid() = user_id);
+
 create policy "Users can delete own connected accounts"
   on public.connected_accounts for delete
   using (auth.uid() = user_id);

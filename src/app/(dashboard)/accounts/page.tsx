@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Info } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -90,6 +91,13 @@ export default function AccountsPage() {
         <h1 className="text-3xl font-bold">{t("accounts.title")}</h1>
         <p className="mt-2 text-muted-foreground">
           Connect your social media accounts to publish posts directly from SocialBoost.
+        </p>
+      </div>
+
+      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950">
+        <Info className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+        <p className="text-sm text-blue-800 dark:text-blue-200">
+          Social media account connections will be available soon. You can already generate and copy content for any platform.
         </p>
       </div>
 

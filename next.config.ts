@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   headers: async () => [
     {
       source: "/:path*",
@@ -9,6 +10,19 @@ const nextConfig: NextConfig = {
         { key: "X-DNS-Prefetch-Control", value: "on" },
         { key: "X-Content-Type-Options", value: "nosniff" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        {
+          key: "Content-Security-Policy",
+          value: [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob: https:",
+            "font-src 'self' https://fonts.gstatic.com",
+            "connect-src 'self' https://*.supabase.co https://api.openai.com https://api.stripe.com https://vitals.vercel-insights.com",
+            "frame-src 'self' https://js.stripe.com",
+            "frame-ancestors 'none'",
+          ].join("; "),
+        },
       ],
     },
     {
