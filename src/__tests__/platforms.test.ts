@@ -30,6 +30,15 @@ describe("platforms", () => {
     expect(getPublisher("pinterest")).not.toBeNull();
   });
 
+  it("returns null for unknown platform", () => {
+    expect(getPublisher("tiktok" as never)).toBeNull();
+    expect(getPublisher("snapchat" as never)).toBeNull();
+  });
+
+  it("reports unknown platforms as not supported", () => {
+    expect(isPublishingSupported("tiktok" as never)).toBe(false);
+  });
+
   it("reports all platforms as supported", () => {
     expect(isPublishingSupported("linkedin")).toBe(true);
     expect(isPublishingSupported("twitter")).toBe(true);

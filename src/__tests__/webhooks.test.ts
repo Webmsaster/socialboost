@@ -56,4 +56,21 @@ describe("fireWebhook", () => {
 
     fetchSpy.mockRestore();
   });
+
+  it("calls captureError when response is not ok", async () => {
+    const { captureError } = await import("@/lib/logger");
+    const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response("Server Error", { status: 500 })
+    );
+
+    await fireWebhook("https://hooks.example.com/bad", "test.event", { key: "val" });
+
+    expect(captureError).toHaveBeenCalledWith(
+      "Webhook delivery failed",
+      expect.any(Error),
+      expect.objectContaining({ webhookUrl: "https://hooks.example.com/bad", event: "test.event" })
+    );
+
+    fetchSpy.mockRestore();
+  });
 });

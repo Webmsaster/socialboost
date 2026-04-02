@@ -34,6 +34,42 @@ describe("OpenAI lib", () => {
     process.env.OPENAI_API_KEY = "test-key";
   });
 
+  // ---------- getOpenAI branch ----------
+  describe("getOpenAI", () => {
+    it("throws when OPENAI_API_KEY is not set", async () => {
+      vi.resetModules();
+      delete process.env.OPENAI_API_KEY;
+      const { generatePost } = await import("@/lib/openai");
+
+      await expect(
+        generatePost({
+          platform: "linkedin",
+          topic: "test",
+          tone: "professional",
+          language: "English",
+        })
+      ).rejects.toThrow("OPENAI_API_KEY is not configured");
+    });
+  });
+
+  // ---------- getOpenAI singleton ----------
+  describe("getOpenAI singleton", () => {
+    it("reuses the OpenAI instance on second call (cached branch)", async () => {
+      const { generatePost } = await import("@/lib/openai");
+
+      mockChatCreate.mockResolvedValue(
+        chatResponse(JSON.stringify({ content: "x", hashtags: [] }))
+      );
+
+      // First call creates the OpenAI instance
+      await generatePost({ platform: "linkedin", topic: "a", tone: "casual", language: "English" });
+      // Second call reuses cached instance (hits !_openai false branch)
+      await generatePost({ platform: "twitter", topic: "b", tone: "casual", language: "English" });
+
+      expect(mockChatCreate).toHaveBeenCalledTimes(2);
+    });
+  });
+
   // ---------- generatePost ----------
   describe("generatePost", () => {
     it("returns content and hashtags", async () => {
@@ -73,6 +109,30 @@ describe("OpenAI lib", () => {
           language: "English",
         })
       ).rejects.toThrow("Empty response from OpenAI");
+    });
+
+    it("includes brandVoice and custom model when provided", async () => {
+      const { generatePost } = await import("@/lib/openai");
+
+      mockChatCreate.mockResolvedValueOnce(
+        chatResponse(JSON.stringify({ content: "x", hashtags: [] }))
+      );
+
+      await generatePost({
+        platform: "linkedin",
+        topic: "test",
+        tone: "professional",
+        language: "English",
+        brandVoice: "Friendly and approachable",
+        model: "gpt-4o",
+      });
+
+      expect(mockChatCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "gpt-4o" })
+      );
+      const systemMsg = mockChatCreate.mock.calls[0][0].messages[0].content;
+      expect(systemMsg).toContain("Brand voice guidelines");
+      expect(systemMsg).toContain("Friendly and approachable");
     });
 
     it("passes correct model and response_format", async () => {
@@ -183,6 +243,28 @@ describe("OpenAI lib", () => {
         })
       ).rejects.toThrow("Empty response from OpenAI");
     });
+
+    it("includes brandVoice and custom model when provided", async () => {
+      const { generateVideoScript } = await import("@/lib/openai");
+      mockChatCreate.mockResolvedValueOnce(
+        chatResponse(JSON.stringify({ hook: "h", scenes: [], cta: "c", totalDuration: "30s", musicSuggestion: "lo-fi" }))
+      );
+
+      await generateVideoScript({
+        topic: "test",
+        tone: "professional",
+        language: "English",
+        platform: "instagram",
+        brandVoice: "Bold and direct",
+        model: "gpt-4o",
+      });
+
+      expect(mockChatCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "gpt-4o" })
+      );
+      const systemMsg = mockChatCreate.mock.calls[0][0].messages[0].content;
+      expect(systemMsg).toContain("Brand voice guidelines");
+    });
   });
 
   // ---------- generateVideoAd ----------
@@ -239,6 +321,28 @@ describe("OpenAI lib", () => {
         })
       ).rejects.toThrow("Empty response from OpenAI");
     });
+
+    it("includes brandVoice and custom model when provided", async () => {
+      const { generateVideoAd } = await import("@/lib/openai");
+      mockChatCreate.mockResolvedValueOnce(
+        chatResponse(JSON.stringify({ concept: "c", frames: [], cta: "c", targetAudience: "t", adFormat: "Story" }))
+      );
+
+      await generateVideoAd({
+        topic: "test",
+        tone: "professional",
+        language: "English",
+        product: "TechGadget",
+        brandVoice: "Innovative and futuristic",
+        model: "gpt-4o",
+      });
+
+      expect(mockChatCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "gpt-4o" })
+      );
+      const systemMsg = mockChatCreate.mock.calls[0][0].messages[0].content;
+      expect(systemMsg).toContain("Brand voice guidelines");
+    });
   });
 
   // ---------- generateCarousel ----------
@@ -293,6 +397,29 @@ describe("OpenAI lib", () => {
           slideCount: 3,
         })
       ).rejects.toThrow("Empty response from OpenAI");
+    });
+
+    it("includes brandVoice and custom model when provided", async () => {
+      const { generateCarousel } = await import("@/lib/openai");
+      mockChatCreate.mockResolvedValueOnce(
+        chatResponse(JSON.stringify({ title: "t", slides: [], hashtags: [] }))
+      );
+
+      await generateCarousel({
+        topic: "test",
+        tone: "professional",
+        language: "English",
+        platform: "linkedin",
+        slideCount: 5,
+        brandVoice: "Corporate and polished",
+        model: "gpt-4o",
+      });
+
+      expect(mockChatCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "gpt-4o" })
+      );
+      const systemMsg = mockChatCreate.mock.calls[0][0].messages[0].content;
+      expect(systemMsg).toContain("Brand voice guidelines");
     });
   });
 
@@ -350,6 +477,29 @@ describe("OpenAI lib", () => {
           count: 2,
         })
       ).rejects.toThrow("Empty response from OpenAI");
+    });
+
+    it("includes brandVoice and custom model when provided", async () => {
+      const { generateVariants } = await import("@/lib/openai");
+      mockChatCreate.mockResolvedValueOnce(
+        chatResponse(JSON.stringify({ variants: [{ variantLabel: "A", content: "x", hashtags: [], approach: "a" }] }))
+      );
+
+      await generateVariants({
+        platform: "linkedin",
+        topic: "test",
+        tone: "professional",
+        language: "English",
+        count: 2,
+        brandVoice: "Warm and personal",
+        model: "gpt-4o",
+      });
+
+      expect(mockChatCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "gpt-4o" })
+      );
+      const systemMsg = mockChatCreate.mock.calls[0][0].messages[0].content;
+      expect(systemMsg).toContain("Brand voice guidelines");
     });
   });
 });
