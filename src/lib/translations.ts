@@ -9,6 +9,7 @@ export const translations = {
     "nav.calendar": "Calendar",
     "nav.accounts": "Accounts",
     "nav.analytics": "Analytics",
+    "nav.team": "Team",
     "nav.settings": "Settings",
     "nav.signOut": "Sign out",
 
@@ -219,6 +220,7 @@ export const translations = {
     "nav.calendar": "Kalender",
     "nav.accounts": "Accounts",
     "nav.analytics": "Statistiken",
+    "nav.team": "Team",
     "nav.settings": "Einstellungen",
     "nav.signOut": "Abmelden",
 
