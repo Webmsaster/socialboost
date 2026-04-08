@@ -65,6 +65,10 @@ export function DashboardNav() {
         ))}
       </nav>
       <div className="border-t p-4 space-y-2">
+        <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground">
+          <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px]">?</kbd>
+          <span>Keyboard shortcuts</span>
+        </div>
         <LanguageToggle />
         <ThemeToggle />
         <Button

@@ -80,7 +80,7 @@ export default function DashboardPage() {
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center space-y-4">
             <p className="text-destructive font-medium">{error}</p>
-            <Button onClick={() => window.location.reload()}>Try again</Button>
+            <Button onClick={() => window.location.reload()}>{t("dashboard.tryAgain")}</Button>
           </CardContent>
         </Card>
       </div>
@@ -118,25 +118,25 @@ export default function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total Posts</p>
+            <p className="text-sm text-muted-foreground">{t("dashboard.totalPosts")}</p>
             <p className="text-3xl font-bold">{allPosts.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Drafts</p>
+            <p className="text-sm text-muted-foreground">{t("dashboard.drafts")}</p>
             <p className="text-3xl font-bold">{allPosts.filter((p) => p.status === "draft").length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Scheduled</p>
+            <p className="text-sm text-muted-foreground">{t("dashboard.scheduled")}</p>
             <p className="text-3xl font-bold">{allPosts.filter((p) => p.status === "scheduled").length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Platforms</p>
+            <p className="text-sm text-muted-foreground">{t("dashboard.platforms")}</p>
             <p className="text-3xl font-bold">{new Set(allPosts.map((p) => p.platform)).size}</p>
           </CardContent>
         </Card>

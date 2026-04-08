@@ -21,7 +21,7 @@ interface SendEmailOptions {
 async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<boolean> {
   const resend = getResend();
   if (!resend) {
-    console.log(`[Email] Skipped (no RESEND_API_KEY): ${subject} -> ${to}`);
+    // No RESEND_API_KEY configured — skip silently in dev
     return false;
   }
 
@@ -62,7 +62,7 @@ export async function sendPostPublishedEmail(
           <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 3px solid #7c3aed;">
             <p style="margin: 0; color: #374151; font-size: 14px; white-space: pre-wrap;">${postContent.slice(0, 300)}${postContent.length > 300 ? "..." : ""}</p>
           </div>
-          <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://socialboost-green.vercel.app"}/history"
+          <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://socialboost.app"}/history"
              style="display: inline-block; background: #7c3aed; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px;">
             View in History
           </a>
@@ -99,7 +99,7 @@ export async function sendLimitReachedEmail(
             !isPro
               ? `<div style="background: #f5f3ff; padding: 16px; border-radius: 8px; margin: 16px 0;">
                   <p style="margin: 0 0 12px 0; font-weight: 600; color: #5b21b6;">Upgrade to Pro for 100 generations/month</p>
-                  <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://socialboost-green.vercel.app"}/settings"
+                  <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://socialboost.app"}/settings"
                      style="display: inline-block; background: #7c3aed; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px;">
                     Upgrade to Pro — $9/mo
                   </a>
@@ -140,7 +140,7 @@ export async function sendPublishFailedEmail(
           <p style="color: #374151; font-size: 14px;">
             Your post has been saved as a draft. You can try reconnecting your account or publishing manually.
           </p>
-          <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://socialboost-green.vercel.app"}/history"
+          <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://socialboost.app"}/history"
              style="display: inline-block; background: #7c3aed; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px;">
             View Post
           </a>

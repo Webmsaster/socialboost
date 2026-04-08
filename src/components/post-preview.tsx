@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface PostPreviewProps {
@@ -79,7 +80,7 @@ function InstagramPreview({ content, hashtags, imageUrl }: PostPreviewProps) {
         <span className="text-sm font-semibold">yourhandle</span>
       </div>
       {imageUrl ? (
-        <img src={imageUrl} alt="Post visual" className="w-full aspect-square object-cover" />
+        <Image src={imageUrl} alt="Post visual" width={400} height={400} className="w-full aspect-square object-cover" unoptimized />
       ) : (
         <div className="w-full aspect-square bg-gradient-to-br from-pink-100 to-purple-100 dark:from-pink-900/20 dark:to-purple-900/20 flex items-center justify-center">
           <span className="text-xs text-muted-foreground">Image placeholder</span>
@@ -138,7 +139,7 @@ function PinterestPreview({ content, hashtags, imageUrl }: PostPreviewProps) {
   return (
     <div className="rounded-2xl border bg-white dark:bg-zinc-900 overflow-hidden max-w-xs">
       {imageUrl ? (
-        <img src={imageUrl} alt="Pin visual" className="w-full aspect-[2/3] object-cover" />
+        <Image src={imageUrl} alt="Pin visual" width={320} height={480} className="w-full aspect-[2/3] object-cover" unoptimized />
       ) : (
         <div className="w-full aspect-[2/3] bg-gradient-to-b from-red-100 to-orange-100 dark:from-red-900/20 dark:to-orange-900/20 flex items-center justify-center">
           <span className="text-xs text-muted-foreground">Pin image</span>

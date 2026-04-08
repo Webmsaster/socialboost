@@ -20,6 +20,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { PostPreview } from "@/components/post-preview";
 
+// --- Platform character limits ---
+
+const PLATFORM_LIMITS = {
+  twitter: 280,
+  linkedin: 3000,
+  facebook: 63206,
+  instagram: 2200,
+  pinterest: 500,
+} as const satisfies Record<string, number>;
+
+type PlatformKey = keyof typeof PLATFORM_LIMITS;
+
 // --- Types ---
 
 type ContentType = "post" | "video-script" | "video-ad" | "carousel";
@@ -134,6 +146,10 @@ export default function CreatePage() {
   );
   const [currentSlide, setCurrentSlide] = useState(0);
 
+  // Hashtag suggestions
+  const [suggestedHashtags, setSuggestedHashtags] = useState<string[]>([]);
+  const [loadingHashtags, setLoadingHashtags] = useState(false);
+
   // Copy states
   const [copied, setCopied] = useState(false);
   const [copiedVariant, setCopiedVariant] = useState<string | null>(null);
@@ -207,6 +223,35 @@ export default function CreatePage() {
     setCarouselResult(null);
     setCurrentSlide(0);
   }, [contentType]);
+
+  // --- Hashtag suggestions ---
+
+  async function fetchHashtags() {
+    if (!topic.trim()) {
+      toast.error("Enter a topic first");
+      return;
+    }
+    setLoadingHashtags(true);
+    try {
+      const res = await fetch("/api/hashtags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, platform }),
+      });
+      if (!res.ok) throw new Error("Failed to fetch hashtags");
+      const data = await res.json();
+      const merged = [
+        ...(data.trending ?? []),
+        ...(data.niche ?? []),
+        ...(data.broad ?? []),
+      ];
+      setSuggestedHashtags(merged);
+    } catch {
+      toast.error("Could not load hashtag suggestions");
+    } finally {
+      setLoadingHashtags(false);
+    }
+  }
 
   // --- Handlers ---
 
@@ -959,6 +1004,44 @@ export default function CreatePage() {
                 rows={4}
                 required
               />
+              {contentType === "post" && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={fetchHashtags}
+                    disabled={loadingHashtags || !topic.trim()}
+                    className="text-primary hover:underline disabled:opacity-50 disabled:no-underline"
+                  >
+                    {loadingHashtags ? "Loading..." : "Suggest hashtags"}
+                  </button>
+                  <span className={postResult ? (
+                    postResult.content.length > PLATFORM_LIMITS[platform as PlatformKey]
+                      ? "text-destructive font-medium"
+                      : "text-muted-foreground"
+                  ) : "text-muted-foreground"}>
+                    {postResult
+                      ? `${postResult.content.length} / ${PLATFORM_LIMITS[platform as PlatformKey].toLocaleString()} chars`
+                      : `Limit: ${PLATFORM_LIMITS[platform as PlatformKey].toLocaleString()} chars`}
+                  </span>
+                </div>
+              )}
+              {suggestedHashtags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {suggestedHashtags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`#${tag}`);
+                        toast.success(`#${tag} copied`);
+                      }}
+                      className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+                    >
+                      #{tag}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Type-specific inputs */}

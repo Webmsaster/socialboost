@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import { AnalyticsConsent } from "@/components/analytics-consent";
+import { CookieConsent } from "@/components/cookie-consent";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -44,6 +44,13 @@ export const metadata: Metadata = {
     description:
       "Generate engaging social media posts with AI for all major platforms.",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "SocialBoost — AI Social Media Post Generator",
+    description:
+      "Generate engaging social media posts with AI for all major platforms.",
+    creator: "@socialboost",
+  },
   robots: {
     index: true,
     follow: true,
@@ -76,8 +83,8 @@ export default function RootLayout({
         <ThemeProvider>
           <div id="main-content">{children}</div>
           <Toaster />
-          <Analytics />
-          <SpeedInsights />
+          <CookieConsent />
+          <AnalyticsConsent />
         </ThemeProvider>
       </body>
     </html>

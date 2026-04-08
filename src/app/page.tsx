@@ -33,6 +33,53 @@ const jsonLd = {
   ],
 };
 
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "Is SocialBoost free to use?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes! The free plan includes 10 AI-generated posts per month. Upgrade to Pro for 100 generations, AI images, video scripts, carousels, and more.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Which platforms are supported?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "SocialBoost generates optimized content for LinkedIn, Facebook, Instagram, Pinterest, and Twitter/X.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Can I customize the tone of my posts?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Absolutely. Choose from 5 tones — professional, casual, inspirational, humorous, and educational — plus optional brand voice customization on the Pro plan.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "What AI model powers the content?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "SocialBoost uses OpenAI's GPT-4o-mini for fast, high-quality generations. Pro users can also select GPT-4o for even better results.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Can I cancel my Pro subscription?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes, cancel anytime from the billing portal. You keep Pro access until the end of your current billing period.",
+      },
+    },
+  ],
+};
+
 const features = [
   {
     title: "AI Image Generation",
@@ -153,6 +200,10 @@ export default function LandingPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
       {/* Header */}
       <header className="border-b" role="banner">
@@ -360,6 +411,64 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* FAQ */}
+        <section className="border-t py-20" aria-labelledby="faq">
+          <div className="mx-auto max-w-3xl px-6">
+            <h2 id="faq" className="text-center text-3xl font-bold">
+              Frequently Asked Questions
+            </h2>
+            <div className="mt-12 space-y-4">
+              {[
+                {
+                  q: "Is SocialBoost free to use?",
+                  a: "Yes! The free plan includes 10 AI-generated posts per month. Upgrade to Pro for 100 generations, AI images, video scripts, carousels, and more.",
+                },
+                {
+                  q: "Which platforms are supported?",
+                  a: "SocialBoost generates optimized content for LinkedIn, Facebook, Instagram, Pinterest, and Twitter/X. Each post is tailored to the platform's best practices.",
+                },
+                {
+                  q: "Can I customize the tone of my posts?",
+                  a: "Absolutely. Choose from 5 tones — professional, casual, inspirational, humorous, and educational — plus optional brand voice customization on the Pro plan.",
+                },
+                {
+                  q: "Do I need to connect my social accounts?",
+                  a: "No. You can copy and paste the generated content manually. Connecting accounts enables one-click publishing and scheduling — available on Pro.",
+                },
+                {
+                  q: "What AI model powers the content?",
+                  a: "SocialBoost uses OpenAI's GPT-4o-mini for fast, high-quality generations. Pro users can also select GPT-4o for even better results.",
+                },
+                {
+                  q: "Can I cancel my Pro subscription?",
+                  a: "Yes, cancel anytime from the billing portal. You keep Pro access until the end of your current billing period.",
+                },
+              ].map((item) => (
+                <details
+                  key={item.q}
+                  className="group rounded-xl border bg-background p-5 transition-colors hover:bg-muted/50"
+                >
+                  <summary className="flex cursor-pointer items-center justify-between font-medium">
+                    {item.q}
+                    <svg
+                      className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </summary>
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                    {item.a}
+                  </p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Pricing */}
         <section className="border-t bg-muted/50 py-20" aria-labelledby="pricing">
           <div className="mx-auto max-w-4xl px-6 text-center">
@@ -375,9 +484,47 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t py-8" role="contentinfo">
-        <div className="mx-auto max-w-6xl px-6 text-center text-sm text-muted-foreground">
-          &copy; {new Date().getFullYear()} SocialBoost. All rights reserved.
+      <footer className="border-t py-12" role="contentinfo">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="grid gap-8 sm:grid-cols-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground text-xs font-bold">
+                  S
+                </div>
+                <span className="font-bold">SocialBoost</span>
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">
+                AI-powered content for every platform.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">Product</h3>
+              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                <li><Link href="/features" className="hover:text-foreground">Features</Link></li>
+                <li><Link href="/pricing" className="hover:text-foreground">Pricing</Link></li>
+                <li><Link href="/changelog" className="hover:text-foreground">Changelog</Link></li>
+                <li><Link href="/blog" className="hover:text-foreground">Blog</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">Company</h3>
+              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                <li><Link href="/contact" className="hover:text-foreground">Contact</Link></li>
+                <li><Link href="/imprint" className="hover:text-foreground">Imprint</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">Legal</h3>
+              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                <li><Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link></li>
+                <li><Link href="/terms" className="hover:text-foreground">Terms of Service</Link></li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-10 border-t pt-6 text-center text-sm text-muted-foreground">
+            &copy; {new Date().getFullYear()} SocialBoost. All rights reserved.
+          </div>
         </div>
       </footer>
     </div>

@@ -48,8 +48,44 @@ export default function SettingsPage() {
   const [exporting, setExporting] = useState(false);
   const [referral, setReferral] = useState<ReferralData | null>(null);
   const [copied, setCopied] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [notifyMarketing, setNotifyMarketing] = useState(true);
+  const [notifyDigest, setNotifyDigest] = useState(true);
+  const [notifyPublish, setNotifyPublish] = useState(true);
   const { t } = useLanguage();
   const supabase = createClient();
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("socialboost-notification-prefs");
+      if (stored) {
+        const prefs = JSON.parse(stored);
+        if (typeof prefs.digest === "boolean") setNotifyDigest(prefs.digest);
+        if (typeof prefs.publish === "boolean") setNotifyPublish(prefs.publish);
+        if (typeof prefs.marketing === "boolean") setNotifyMarketing(prefs.marketing);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  function saveNotificationPrefs() {
+    try {
+      localStorage.setItem(
+        "socialboost-notification-prefs",
+        JSON.stringify({
+          digest: notifyDigest,
+          publish: notifyPublish,
+          marketing: notifyMarketing,
+        }),
+      );
+      toast.success(t("settings.preferencesSaved") || "Notification preferences saved");
+    } catch {
+      toast.error("Failed to save preferences");
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -163,6 +199,27 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleChangePassword() {
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    setChangingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password updated successfully");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+    setChangingPassword(false);
+  }
+
   async function handleManage() {
     setCheckoutLoading(true);
     try {
@@ -222,7 +279,7 @@ export default function SettingsPage() {
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="brand-voice">Brand Voice</Label>
+            <Label htmlFor="brand-voice">{t("settings.brandVoice")}</Label>
             <Textarea
               id="brand-voice"
               placeholder="e.g. We are a tech startup targeting young professionals. Our tone is friendly, knowledgeable, and slightly witty..."
@@ -232,14 +289,12 @@ export default function SettingsPage() {
               maxLength={1000}
             />
             <p className="text-xs text-muted-foreground">
-              Describe your writing style, target audience, and brand
-              personality. This will be used to customize all AI-generated
-              content.
+              {t("settings.brandVoiceDesc")}
             </p>
           </div>
           {isPro && (
             <div className="space-y-2">
-              <Label htmlFor="preferred-model">AI Model</Label>
+              <Label htmlFor="preferred-model">{t("settings.aiModel")}</Label>
               <Select
                 value={preferredModel}
                 onValueChange={setPreferredModel}
@@ -257,13 +312,12 @@ export default function SettingsPage() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Pro users can choose between faster or higher quality AI
-                generation.
+                {t("settings.aiModelDesc")}
               </p>
             </div>
           )}
           <Button onClick={handleSaveProfile} disabled={saving}>
-            {saving ? "Saving..." : "Save changes"}
+            {saving ? t("settings.saving") : t("settings.saveChanges")}
           </Button>
         </CardContent>
       </Card>
@@ -312,14 +366,103 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Change Password */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("settings.changePassword")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="new-password">{t("settings.newPassword")}</Label>
+            <Input
+              id="new-password"
+              type="password"
+              placeholder="Min. 8 characters"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              minLength={8}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">{t("settings.confirmPassword")}</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              placeholder="Repeat new password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          </div>
+          <Button
+            onClick={handleChangePassword}
+            disabled={changingPassword || !newPassword || !confirmPassword}
+          >
+            {changingPassword ? t("settings.updatingPassword") : t("settings.updatePassword")}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Notification Preferences */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("settings.notifications")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {t("settings.notificationsDesc")}
+          </p>
+          <div className="space-y-3">
+            <label className="flex cursor-pointer items-center justify-between rounded-lg border p-3 hover:bg-muted/50">
+              <div>
+                <p className="text-sm font-medium">{t("settings.weeklyDigest")}</p>
+                <p className="text-xs text-muted-foreground">{t("settings.weeklyDigestDesc")}</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={notifyDigest}
+                onChange={(e) => setNotifyDigest(e.target.checked)}
+                className="h-4 w-4 rounded border-input accent-primary"
+              />
+            </label>
+            <label className="flex cursor-pointer items-center justify-between rounded-lg border p-3 hover:bg-muted/50">
+              <div>
+                <p className="text-sm font-medium">{t("settings.publishAlerts")}</p>
+                <p className="text-xs text-muted-foreground">{t("settings.publishAlertsDesc")}</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={notifyPublish}
+                onChange={(e) => setNotifyPublish(e.target.checked)}
+                className="h-4 w-4 rounded border-input accent-primary"
+              />
+            </label>
+            <label className="flex cursor-pointer items-center justify-between rounded-lg border p-3 hover:bg-muted/50">
+              <div>
+                <p className="text-sm font-medium">{t("settings.productUpdates")}</p>
+                <p className="text-xs text-muted-foreground">{t("settings.productUpdatesDesc")}</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={notifyMarketing}
+                onChange={(e) => setNotifyMarketing(e.target.checked)}
+                className="h-4 w-4 rounded border-input accent-primary"
+              />
+            </label>
+          </div>
+          <Button variant="outline" onClick={saveNotificationPrefs}>
+            {t("settings.savePreferences")}
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Data Export */}
       <Card>
         <CardHeader>
-          <CardTitle>Data Export</CardTitle>
+          <CardTitle>{t("settings.dataExport")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Download all your data (profile, posts, templates) as a JSON file.
+            {t("settings.dataExportDesc")}
           </p>
           <Button
             variant="outline"
@@ -344,7 +487,7 @@ export default function SettingsPage() {
               }
             }}
           >
-            {exporting ? "Exporting..." : "Export my data"}
+            {exporting ? t("settings.exporting") : t("settings.exportData")}
           </Button>
         </CardContent>
       </Card>
@@ -352,11 +495,11 @@ export default function SettingsPage() {
       {/* Referral Program */}
       <Card>
         <CardHeader>
-          <CardTitle>Referral Program</CardTitle>
+          <CardTitle>{t("settings.referral")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Invite friends and earn 10 bonus generations for each signup. Your friend gets 10 bonus generations too!
+            {t("settings.referralDesc")}
           </p>
           {referral?.referralCode ? (
             <>
@@ -373,17 +516,17 @@ export default function SettingsPage() {
               <div className="grid grid-cols-2 gap-4 text-center">
                 <div className="rounded-lg border p-3">
                   <p className="text-2xl font-bold text-primary">{referral.totalReferrals}</p>
-                  <p className="text-xs text-muted-foreground">Total referrals</p>
+                  <p className="text-xs text-muted-foreground">{t("settings.totalReferrals")}</p>
                 </div>
                 <div className="rounded-lg border p-3">
                   <p className="text-2xl font-bold text-primary">{referral.bonusGenerations}</p>
-                  <p className="text-xs text-muted-foreground">Bonus generations</p>
+                  <p className="text-xs text-muted-foreground">{t("settings.bonusGenerations")}</p>
                 </div>
               </div>
             </>
           ) : (
             <p className="text-sm text-muted-foreground italic">
-              Your referral code is being generated...
+              {t("settings.referralGenerating")}
             </p>
           )}
         </CardContent>
@@ -404,7 +547,7 @@ export default function SettingsPage() {
                   disabled={deleting}
                   onClick={handleDeleteAccount}
                 >
-                  {deleting ? "Deleting..." : "Confirm Delete"}
+                  {deleting ? "..." : t("settings.confirmDelete")}
                 </Button>
                 <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
                   Cancel
