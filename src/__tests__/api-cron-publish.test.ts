@@ -3,7 +3,9 @@ import { NextRequest } from "next/server";
 
 // --- Mocks ---
 
-const mockAdminUpdate = vi.fn();
+type MockWith<T> = import("vitest").Mock<(...args: unknown[]) => unknown> & T;
+
+const mockAdminUpdate = vi.fn() as MockWith<{ _nextResult?: unknown }>;
 const mockAdminSelectResult = vi.fn();
 const mockAdminLteResult = vi.fn();
 const mockAdminResetResult = vi.fn();
@@ -27,7 +29,7 @@ vi.mock("@supabase/supabase-js", () => ({
           },
         };
       },
-      select: (...args: unknown[]) => ({
+      select: (..._args: unknown[]) => ({
         eq: (...eqArgs: unknown[]) => ({
           lte: () => ({
             order: () => ({

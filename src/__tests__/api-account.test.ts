@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // --- Mocks ---
 
+type MockWith<T> = import("vitest").Mock<(...args: unknown[]) => unknown> & T;
+
 const mockGetUser = vi.fn();
 const mockExportSingle = vi.fn();
-const mockExportSelect = vi.fn();
+const mockExportSelect = vi.fn() as MockWith<{ _orderResult?: Record<string, unknown> }>;
 
 // Server client mock (for auth + export)
 vi.mock("@/lib/supabase/server", () => ({
@@ -27,7 +29,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 // Admin client mock (for delete)
-const mockAdminDeleteEq = vi.fn();
+const mockAdminDeleteEq = vi.fn() as MockWith<{ _results?: Record<string, unknown> }>;
 const mockAdminDeleteUser = vi.fn();
 
 vi.mock("@supabase/supabase-js", () => ({

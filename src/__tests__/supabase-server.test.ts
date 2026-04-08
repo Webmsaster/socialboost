@@ -9,10 +9,12 @@ vi.mock("next/headers", () => ({
   cookies: vi.fn(),
 }));
 
+type CookiesOpts = { cookies: { getAll: () => unknown; setAll: (c: Array<{ name: string; value: string; options?: unknown }>) => void } };
+
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: vi.fn((_url: string, _key: string, opts: any) => {
+  createServerClient: vi.fn((_url: string, _key: string, opts: CookiesOpts) => {
     // Store the cookies config so we can test the callbacks
-    (createServerClient as any).__lastOpts = opts;
+    (createServerClient as unknown as { __lastOpts: CookiesOpts }).__lastOpts = opts;
     return { fake: "server-client" };
   }),
 }));
@@ -34,7 +36,7 @@ describe("supabase/server — createClient", () => {
     mockCookies.mockResolvedValue({
       getAll: mockGetAll,
       set: mockSet,
-    } as any);
+    } as unknown as Awaited<ReturnType<typeof cookies>>);
   });
 
   it("awaits cookies() and calls createServerClient with env vars", async () => {
@@ -62,7 +64,7 @@ describe("supabase/server — createClient", () => {
   it("cookies.getAll delegates to cookieStore.getAll", async () => {
     await createClient();
 
-    const opts = (mockCreateServerClient as any).__lastOpts;
+    const opts = (mockCreateServerClient as unknown as { __lastOpts: CookiesOpts }).__lastOpts;
     const result = opts.cookies.getAll();
 
     expect(mockGetAll).toHaveBeenCalledOnce();
@@ -72,7 +74,7 @@ describe("supabase/server — createClient", () => {
   it("cookies.setAll calls cookieStore.set for each cookie", async () => {
     await createClient();
 
-    const opts = (mockCreateServerClient as any).__lastOpts;
+    const opts = (mockCreateServerClient as unknown as { __lastOpts: CookiesOpts }).__lastOpts;
     const cookiesToSet = [
       { name: "sb-access", value: "token1", options: { path: "/" } },
       { name: "sb-refresh", value: "token2", options: { path: "/", httpOnly: true } },
@@ -92,7 +94,7 @@ describe("supabase/server — createClient", () => {
 
     await createClient();
 
-    const opts = (mockCreateServerClient as any).__lastOpts;
+    const opts = (mockCreateServerClient as unknown as { __lastOpts: CookiesOpts }).__lastOpts;
     const cookiesToSet = [
       { name: "sb-access", value: "token1", options: { path: "/" } },
     ];
@@ -104,7 +106,7 @@ describe("supabase/server — createClient", () => {
   it("cookies.setAll with empty array does nothing", async () => {
     await createClient();
 
-    const opts = (mockCreateServerClient as any).__lastOpts;
+    const opts = (mockCreateServerClient as unknown as { __lastOpts: CookiesOpts }).__lastOpts;
     opts.cookies.setAll([]);
 
     expect(mockSet).not.toHaveBeenCalled();

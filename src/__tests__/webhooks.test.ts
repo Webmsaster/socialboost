@@ -24,7 +24,7 @@ describe("fireWebhook", () => {
     await fireWebhook("https://hooks.example.com/test", "post.published", { postId: "123" });
 
     expect(fetchSpy).toHaveBeenCalledOnce();
-    const [url, opts] = fetchSpy.mock.calls[0];
+    const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://hooks.example.com/test");
     expect(opts.method).toBe("POST");
 
@@ -41,9 +41,10 @@ describe("fireWebhook", () => {
 
     await fireWebhook("https://hooks.example.com/test", "post.created", {});
 
-    const [, opts] = fetchSpy.mock.calls[0];
-    expect(opts.headers["Content-Type"]).toBe("application/json");
-    expect(opts.headers["User-Agent"]).toBe("SocialBoost-Webhook/1.0");
+    const [, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const headers = opts.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers["User-Agent"]).toBe("SocialBoost-Webhook/1.0");
 
     fetchSpy.mockRestore();
   });

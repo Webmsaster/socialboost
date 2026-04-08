@@ -540,6 +540,7 @@ export default function CreatePage() {
           {imageUrl && (
             <div className="space-y-2">
               <p className="text-sm font-medium">Generated Image</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imageUrl}
                 alt="AI generated visual"

@@ -106,7 +106,7 @@ describe("rateLimit", () => {
     const originalNodeEnv = process.env.NODE_ENV;
 
     // Set production environment
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
 
     try {
       const { rateLimit } = await import("@/lib/rate-limit");
@@ -117,7 +117,7 @@ describe("rateLimit", () => {
         expect.any(Error)
       );
     } finally {
-      process.env.NODE_ENV = originalNodeEnv;
+      (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
     }
   });
 });

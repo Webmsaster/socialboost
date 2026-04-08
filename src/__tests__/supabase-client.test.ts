@@ -29,7 +29,7 @@ describe("supabase/client — createClient", () => {
 
   it("passes through whatever createBrowserClient returns", () => {
     const customClient = { auth: {}, from: vi.fn() };
-    mockCreateBrowserClient.mockReturnValue(customClient as any);
+    mockCreateBrowserClient.mockReturnValue(customClient as unknown as ReturnType<typeof mockCreateBrowserClient>);
 
     const result = createClient();
     expect(result).toBe(customClient);

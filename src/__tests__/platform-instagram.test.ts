@@ -8,6 +8,9 @@ const mockAccount: ConnectedAccount = {
   platform_user_id: "ig-biz-123",
   platform_username: "testinsta",
   access_token: "ig-token-abc",
+  refresh_token: null,
+  token_expires_at: null,
+  page_id: null,
 };
 
 describe("instagramPublisher", () => {

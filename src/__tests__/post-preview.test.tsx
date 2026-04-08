@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, within } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
+import type { ReactNode } from "react";
 
 afterEach(() => {
   cleanup();
 });
 
 vi.mock("@/components/ui/card", () => ({
-  Card: ({ children }: any) => <div data-testid="card">{children}</div>,
-  CardContent: ({ children, className }: any) => (
+  Card: ({ children }: { children?: ReactNode }) => <div data-testid="card">{children}</div>,
+  CardContent: ({ children, className }: { children?: ReactNode; className?: string }) => (
     <div className={className}>{children}</div>
   ),
 }));

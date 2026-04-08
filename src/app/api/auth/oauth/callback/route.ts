@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
-import { type PlatformId, platformConfigs } from "@/lib/platforms";
+import { type PlatformId } from "@/lib/platforms";
 import { getPublisher } from "@/lib/platforms/registry";
 
 export async function GET(request: NextRequest) {

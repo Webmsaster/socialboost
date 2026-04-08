@@ -6,7 +6,6 @@ import { captureError } from "@/lib/logger";
 import { trackEvent } from "@/lib/analytics";
 import { isProSubscription } from "@/lib/subscription";
 
-const FREE_LIMIT = 10;
 const PRO_LIMIT = 100;
 
 export async function POST(request: NextRequest) {

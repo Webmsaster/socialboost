@@ -8,6 +8,9 @@ const mockAccount: ConnectedAccount = {
   platform_user_id: "user-li-123",
   platform_username: "John Doe",
   access_token: "li-token-abc",
+  refresh_token: null,
+  token_expires_at: null,
+  page_id: null,
 };
 
 describe("linkedinPublisher", () => {

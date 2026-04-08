@@ -8,6 +8,9 @@ const mockAccount: ConnectedAccount = {
   platform_user_id: "pin-user-1",
   platform_username: "pinner",
   access_token: "pin-token-abc",
+  refresh_token: null,
+  token_expires_at: null,
+  page_id: null,
 };
 
 describe("pinterestPublisher", () => {

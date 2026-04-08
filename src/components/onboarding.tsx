@@ -44,6 +44,7 @@ export function Onboarding() {
 
   useEffect(() => {
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDismissed(localStorage.getItem(STORAGE_KEY) === "true");
     } catch {
       // localStorage unavailable

@@ -86,6 +86,7 @@ export default function CalendarPage() {
   }, [supabase]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPosts();
   }, [loadPosts]);
 

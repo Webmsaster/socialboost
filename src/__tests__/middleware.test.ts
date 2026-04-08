@@ -12,7 +12,7 @@ const mockCreateServerClient = vi.mocked(createServerClient);
 function setupMockSupabase() {
   mockCreateServerClient.mockReturnValue({
     auth: { getUser: mockGetUser },
-  } as any);
+  } as unknown as ReturnType<typeof createServerClient>);
 }
 
 // Need to import after mocking
@@ -204,17 +204,18 @@ describe("updateSession (middleware)", () => {
   // --- getAll and setAll callback coverage (lines 58-68) ---
   it("invokes getAll and setAll callbacks for cookie handling", async () => {
     // Capture the cookies config passed to createServerClient
-    let capturedGetAll: (() => any) | undefined;
-    let capturedSetAll: ((cookies: Array<{ name: string; value: string; options?: any }>) => void) | undefined;
+    let capturedGetAll: (() => unknown) | undefined;
+    let capturedSetAll: ((cookies: Array<{ name: string; value: string; options?: unknown }>) => void) | undefined;
 
-    mockCreateServerClient.mockImplementation((_url, _key, config: any) => {
-      capturedGetAll = config.cookies.getAll;
-      capturedSetAll = config.cookies.setAll;
+    mockCreateServerClient.mockImplementation((_url, _key, config: unknown) => {
+      const cfg = config as { cookies: { getAll: () => unknown; setAll: (c: Array<{ name: string; value: string; options?: unknown }>) => void } };
+      capturedGetAll = cfg.cookies.getAll;
+      capturedSetAll = cfg.cookies.setAll;
       return {
         auth: {
           getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
         },
-      } as any;
+      } as unknown as ReturnType<typeof createServerClient>;
     });
 
     const req = makeRequest("http://localhost:3000/");

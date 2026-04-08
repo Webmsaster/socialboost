@@ -272,8 +272,9 @@ test.describe.serial("Authenticated Flows", () => {
   test("history page has export options", async ({ page }) => {
     await login(page);
     await page.goto(`${BASE}/history`);
-    const exportBtn = page.getByRole("button", { name: /export|csv|txt/i }).first();
+    const _exportBtn = page.getByRole("button", { name: /export|csv|txt/i }).first();
     // Export may only appear when posts exist — verify page loaded
+    void _exportBtn;
     await expect(page.getByText("Post History")).toBeVisible();
   });
 
@@ -537,7 +538,8 @@ test.describe.serial("Authenticated Flows", () => {
     await page.goto(`${BASE}/analytics`);
     // Status breakdown has Drafts, Scheduled, Published, Failed
     // Status breakdown categories
-    const statusSection = page.getByText("By Status").locator("..");
+    const _statusSection = page.getByText("By Status").locator("..");
+    void _statusSection;
     await expect(page.getByText("Drafts").first()).toBeVisible();
     await expect(page.getByText("Failed").first()).toBeVisible();
   });
@@ -692,7 +694,8 @@ test.describe.serial("Authenticated Flows", () => {
     await login(page);
     await page.goto(`${BASE}/team`);
     // If team exists, owner badge should be visible
-    const roleBadge = page.getByText(/owner|admin|member/i).first();
+    const _roleBadge = page.getByText(/owner|admin|member/i).first();
+    void _roleBadge;
     // Role badge only shows when team exists — verify page loaded
     await expect(page.getByText("Team").first()).toBeVisible();
   });

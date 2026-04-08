@@ -30,14 +30,14 @@ describe("Translations", () => {
 
   it("no EN values are empty strings", () => {
     const emptyEN = enKeys.filter(
-      (key) => translations.en[key as keyof typeof translations.en] === ""
+      (key) => (translations.en[key as keyof typeof translations.en] as string) === ""
     );
     expect(emptyEN).toEqual([]);
   });
 
   it("no DE values are empty strings", () => {
     const emptyDE = deKeys.filter(
-      (key) => translations.de[key as keyof typeof translations.de] === ""
+      (key) => (translations.de[key as keyof typeof translations.de] as string) === ""
     );
     expect(emptyDE).toEqual([]);
   });

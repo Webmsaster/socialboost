@@ -8,6 +8,9 @@ const mockAccount: ConnectedAccount = {
   platform_user_id: "fb-page-123",
   platform_username: "TestPage",
   access_token: "fb-token-abc",
+  refresh_token: null,
+  token_expires_at: null,
+  page_id: null,
 };
 
 describe("facebookPublisher", () => {

@@ -3,8 +3,10 @@ import { NextRequest } from "next/server";
 
 // --- Mocks ---
 
+type MockWith<T> = import("vitest").Mock<(...args: unknown[]) => unknown> & T;
+
 const mockGetUser = vi.fn();
-const mockDeleteEq2 = vi.fn();
+const mockDeleteEq2 = vi.fn() as MockWith<{ _result?: unknown }>;
 const mockUpsert = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({

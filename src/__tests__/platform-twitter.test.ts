@@ -8,6 +8,9 @@ const mockAccount: ConnectedAccount = {
   platform_user_id: "tw-user-1",
   platform_username: "testuser",
   access_token: "tw-token-abc",
+  refresh_token: null,
+  token_expires_at: null,
+  page_id: null,
 };
 
 describe("twitterPublisher", () => {
