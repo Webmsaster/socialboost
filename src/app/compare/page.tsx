@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -129,8 +130,8 @@ export default function ComparePage() {
             </thead>
             <tbody>
               {features.map((category) => (
-                <>
-                  <tr key={category.category} className="bg-muted/10">
+                <Fragment key={category.category}>
+                  <tr className="bg-muted/10">
                     <td colSpan={5} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {category.category}
                     </td>
@@ -155,7 +156,7 @@ export default function ComparePage() {
                       </td>
                     </tr>
                   ))}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
