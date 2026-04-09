@@ -41,8 +41,13 @@ export function ContactForm() {
     setErrors({});
     setStatus("sending");
 
+    const formspreeId = process.env.NEXT_PUBLIC_FORMSPREE_ID;
+    if (!formspreeId) {
+      setStatus("error");
+      return;
+    }
+
     try {
-      const formspreeId = process.env.NEXT_PUBLIC_FORMSPREE_ID || "placeholder";
       const res = await fetch(`https://formspree.io/f/${formspreeId}`, {
         method: "POST",
         body: form,

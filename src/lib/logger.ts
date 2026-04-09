@@ -8,13 +8,20 @@
  * 3. Run npx @sentry/wizard@latest -i nextjs
  */
 
+// Minimal structural type — only the two Sentry functions we call
+interface SentryLike {
+  captureException(error: Error, hint?: { extra?: Record<string, unknown> }): void;
+  captureMessage(
+    message: string,
+    hint?: { level?: string; extra?: Record<string, unknown> }
+  ): void;
+}
+
 // Sentry module reference — loaded lazily via require, overridable for tests
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _sentryOverride: any;
+let _sentryOverride: SentryLike | undefined;
 
 /** @internal Test-only: override the Sentry module used by captureError */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function _setSentry(mod: any) {
+export function _setSentry(mod: SentryLike | undefined) {
   _sentryOverride = mod;
 }
 
@@ -28,10 +35,10 @@ export function captureError(
   // Sentry integration (lazy-loaded to avoid build errors when not installed)
   if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
     try {
-      const Sentry =
+      const Sentry: SentryLike =
         _sentryOverride ??
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        require("@sentry/nextjs");
+        (require("@sentry/nextjs") as SentryLike);
       if (error instanceof Error) {
         Sentry.captureException(error, {
           extra: { ...context, message },
