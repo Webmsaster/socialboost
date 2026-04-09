@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BlogShare } from "@/components/blog-share";
+import { RelatedPosts } from "@/components/related-posts";
 
 export const metadata: Metadata = {
   title: "12 Twitter/X Growth Tips for 2026: From Zero to Engaged Audience",
@@ -272,6 +273,8 @@ export default function TwitterXGrowthTipsPage() {
             say.
           </p>
         </article>
+
+        <RelatedPosts currentSlug="twitter-x-growth-tips" currentCategory="Twitter" />
 
         <div className="mt-16 rounded-xl border bg-muted/30 p-8 text-center">
           <h2 className="text-2xl font-bold">

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BlogShare } from "@/components/blog-share";
+import { RelatedPosts } from "@/components/related-posts";
 
 export const metadata: Metadata = {
   title: "15 Instagram Caption Tips to Boost Your Engagement Rate",
@@ -274,6 +275,8 @@ export default function InstagramCaptionTipsPage() {
             will help you do exactly that.
           </p>
         </article>
+
+        <RelatedPosts currentSlug="instagram-caption-tips" currentCategory="Instagram" />
 
         <div className="mt-16 rounded-xl border bg-muted/30 p-8 text-center">
           <h2 className="text-2xl font-bold">

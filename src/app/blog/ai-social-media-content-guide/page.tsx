@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BlogShare } from "@/components/blog-share";
+import { RelatedPosts } from "@/components/related-posts";
 
 export const metadata: Metadata = {
   title: "The Complete Guide to AI-Generated Social Media Content",
@@ -328,6 +329,8 @@ export default function AiSocialMediaContentGuidePage() {
             more often and across more platforms than they ever could alone.
           </p>
         </article>
+
+        <RelatedPosts currentSlug="ai-social-media-content-guide" currentCategory="Strategy" />
 
         <div className="mt-16 rounded-xl border bg-muted/30 p-8 text-center">
           <h2 className="text-2xl font-bold">

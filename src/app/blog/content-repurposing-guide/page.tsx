@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BlogShare } from "@/components/blog-share";
+import { RelatedPosts } from "@/components/related-posts";
 
 export const metadata: Metadata = {
   title:
@@ -320,6 +321,8 @@ export default function ContentRepurposingGuidePage() {
             optimization is what tools like SocialBoost were built for.
           </p>
         </article>
+
+        <RelatedPosts currentSlug="content-repurposing-guide" currentCategory="Strategy" />
 
         <div className="mt-16 rounded-xl border bg-muted/30 p-8 text-center">
           <h2 className="text-2xl font-bold">

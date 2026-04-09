@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BlogShare } from "@/components/blog-share";
+import { RelatedPosts } from "@/components/related-posts";
 
 export const metadata: Metadata = {
   title: "YouTube Shorts Strategy: The Complete Growth Playbook for 2026",
@@ -234,6 +235,8 @@ export default function YouTubeShortsPage() {
             subscribes, and use AI to keep the script pipeline flowing.
           </p>
         </article>
+
+        <RelatedPosts currentSlug="youtube-shorts-strategy" currentCategory="YouTube" />
 
         <div className="mt-16 rounded-xl border bg-muted/30 p-8 text-center">
           <h2 className="text-2xl font-bold">Generate YouTube Shorts Scripts</h2>

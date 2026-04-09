@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BlogShare } from "@/components/blog-share";
+import { RelatedPosts } from "@/components/related-posts";
 
 export const metadata: Metadata = {
   title: "The TikTok Marketing Guide for Brands in 2026",
@@ -254,6 +255,8 @@ export default function TikTokMarketingPage() {
             curiosity, and the willingness to look a little ridiculous.
           </p>
         </article>
+
+        <RelatedPosts currentSlug="tiktok-marketing-guide" currentCategory="TikTok" />
 
         <div className="mt-16 rounded-xl border bg-muted/30 p-8 text-center">
           <h2 className="text-2xl font-bold">

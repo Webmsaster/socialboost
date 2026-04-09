@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BlogShare } from "@/components/blog-share";
+import { RelatedPosts } from "@/components/related-posts";
 
 export const metadata: Metadata = {
   title: "Threads Growth Strategy: Building an Audience on Meta's Newest Platform",
@@ -238,6 +239,8 @@ export default function ThreadsGrowthPage() {
             Start today.
           </p>
         </article>
+
+        <RelatedPosts currentSlug="threads-growth-strategy" currentCategory="Threads" />
 
         <div className="mt-16 rounded-xl border bg-muted/30 p-8 text-center">
           <h2 className="text-2xl font-bold">Generate Threads Posts in Seconds</h2>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BlogShare } from "@/components/blog-share";
+import { RelatedPosts } from "@/components/related-posts";
 
 export const metadata: Metadata = {
   title: "Pinterest SEO Guide: Drive Free Traffic in 2026",
@@ -228,6 +229,8 @@ export default function PinterestSEOPage() {
             in 2028.
           </p>
         </article>
+
+        <RelatedPosts currentSlug="pinterest-seo-guide" currentCategory="Pinterest" />
 
         <div className="mt-16 rounded-xl border bg-muted/30 p-8 text-center">
           <h2 className="text-2xl font-bold">
