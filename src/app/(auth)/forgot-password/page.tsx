@@ -82,8 +82,8 @@ export default function ForgotPasswordPage() {
             )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required aria-invalid={!!fieldErrors.email} />
-              {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
+              <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required aria-invalid={!!fieldErrors.email} aria-describedby={fieldErrors.email ? "email-error" : undefined} />
+              {fieldErrors.email && <p id="email-error" className="text-xs text-destructive">{fieldErrors.email}</p>}
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">

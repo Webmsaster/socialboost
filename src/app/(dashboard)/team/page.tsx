@@ -106,6 +106,7 @@ export default function TeamPage() {
             <div className="mt-6 flex flex-col items-center justify-center gap-2 sm:flex-row">
               <Input
                 placeholder="Team name"
+                aria-label="Team name"
                 value={newOrgName}
                 onChange={(e) => setNewOrgName(e.target.value)}
                 className="w-full max-w-xs"
@@ -136,6 +137,7 @@ export default function TeamPage() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Input
                     placeholder="Email to invite"
+                    aria-label="Email to invite"
                     type="email"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}

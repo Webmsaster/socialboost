@@ -60,9 +60,22 @@ const features = [
   },
 ];
 
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://socialboost.app" },
+    { "@type": "ListItem", position: 2, name: "Features", item: "https://socialboost.app/features" },
+  ],
+};
+
 export default function FeaturesPage() {
   return (
     <main className="mx-auto max-w-5xl px-6 py-24">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <div className="text-center mb-16">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
           Everything you need for social media

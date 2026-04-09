@@ -114,14 +114,14 @@ export default function SignupPage() {
             )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required aria-invalid={!!fieldErrors.email} />
-              {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
+              <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required aria-invalid={!!fieldErrors.email} aria-describedby={fieldErrors.email ? "email-error" : undefined} />
+              {fieldErrors.email && <p id="email-error" className="text-xs text-destructive">{fieldErrors.email}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required aria-invalid={!!fieldErrors.password} />
-              {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
-              <p className="text-xs text-muted-foreground">At least 8 characters with uppercase, lowercase, and a number</p>
+              <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required aria-invalid={!!fieldErrors.password} aria-describedby={fieldErrors.password ? "password-error" : "password-hint"} />
+              {fieldErrors.password && <p id="password-error" className="text-xs text-destructive">{fieldErrors.password}</p>}
+              <p id="password-hint" className="text-xs text-muted-foreground">At least 8 characters with uppercase, lowercase, and a number</p>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">

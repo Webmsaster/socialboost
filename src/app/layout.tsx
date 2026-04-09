@@ -81,7 +81,7 @@ export default function RootLayout({
           Skip to content
         </a>
         <ThemeProvider>
-          <div id="main-content">{children}</div>
+          <main id="main-content">{children}</main>
           <Toaster />
           <CookieConsent />
           <AnalyticsConsent />
