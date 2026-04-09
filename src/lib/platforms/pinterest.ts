@@ -1,4 +1,4 @@
-import type { ConnectedAccount, PlatformPublisher, PublishResult } from "./index";
+import type { ConnectedAccount, PlatformPublisher, PublishOptions, PublishResult } from "./index";
 
 /**
  * Pinterest Publishing via Pinterest API v5.
@@ -6,7 +6,12 @@ import type { ConnectedAccount, PlatformPublisher, PublishResult } from "./index
  * Posts are created as Pins on the user's first board (or page_id if set as board ID).
  */
 export const pinterestPublisher: PlatformPublisher = {
-  async publish(account: ConnectedAccount, content: string, hashtags?: string[]): Promise<PublishResult> {
+  async publish(
+    account: ConnectedAccount,
+    content: string,
+    hashtags?: string[],
+    options?: PublishOptions
+  ): Promise<PublishResult> {
     const description = hashtags?.length
       ? `${content}\n\n${hashtags.map((h) => `#${h}`).join(" ")}`
       : content;
@@ -40,6 +45,9 @@ export const pinterestPublisher: PlatformPublisher = {
           board_id: boardId,
           description,
           title: content.slice(0, 100),
+          ...(options?.mediaUrl && {
+            media_source: { source_type: "image_url", url: options.mediaUrl },
+          }),
         }),
       });
 

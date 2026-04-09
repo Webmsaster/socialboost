@@ -107,6 +107,24 @@ export const blogPosts: BlogPost[] = [
     category: "YouTube",
   },
   {
+    slug: "hashtag-strategy-2026",
+    title: "Hashtag Strategy in 2026: What Still Works, What Doesn't",
+    excerpt:
+      "The 2026 hashtag playbook: platform-by-platform rules, how many to use, niche vs broad tags, and the mistakes that now hurt your reach.",
+    date: "2026-04-09",
+    readTime: "6 min read",
+    category: "Strategy",
+  },
+  {
+    slug: "ai-content-voice-guide",
+    title: "How to Make AI-Generated Content Sound Like You",
+    excerpt:
+      "AI content is a tool, not a replacement. Here is how to prompt, edit, and direct AI so the output sounds unmistakably like your brand voice.",
+    date: "2026-04-09",
+    readTime: "7 min read",
+    category: "AI",
+  },
+  {
     slug: "social-media-kpis-that-matter",
     title: "Social Media KPIs That Actually Matter in 2026",
     excerpt:

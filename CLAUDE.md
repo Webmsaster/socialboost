@@ -44,7 +44,7 @@ supabase/
 - Generation counter resets monthly via Supabase
 
 ## Features
-- **Bilingual UI (EN/DE):** Dashboard i18n via LanguageProvider
+- **Bilingual UI (EN/DE):** Dashboard i18n via LanguageProvider (public content pages are EN-only)
 - **Post Generation:** AI-powered posts with 5 tones for 5 platforms
 - **History:** Post list with filter by status (draft/scheduled/published)
 - **Calendar:** View scheduled posts

@@ -3,6 +3,14 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  reactStrictMode: true,
+  compiler: {
+    // Strip console.* in production, except warnings and errors
+    removeConsole:
+      process.env.NODE_ENV === "production"
+        ? { exclude: ["error", "warn"] }
+        : false,
+  },
   headers: async () => [
     {
       source: "/:path*",

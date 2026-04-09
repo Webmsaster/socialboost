@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   // Find all posts scheduled for a time in the past that are still "scheduled"
   const { data: posts, error: fetchError } = await supabase
     .from("posts")
-    .select("id, user_id, platform, content, connected_account_id")
+    .select("id, user_id, platform, content, hashtags, media_url, connected_account_id")
     .eq("status", "scheduled")
     .lte("scheduled_for", new Date().toISOString())
     .order("scheduled_for", { ascending: true })
@@ -81,8 +81,26 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      const { getPublisher } = await import("@/lib/platforms/registry");
+      const { getPublisher, ensureFreshToken } = await import("@/lib/platforms/registry");
       const publisher = getPublisher(account.platform);
+
+      // Refresh expiring tokens before publishing
+      try {
+        const { account: freshAccount, refreshed } = await ensureFreshToken(account);
+        if (refreshed) {
+          await supabase
+            .from("connected_accounts")
+            .update({
+              access_token: freshAccount.access_token,
+              refresh_token: freshAccount.refresh_token,
+              token_expires_at: freshAccount.token_expires_at,
+            })
+            .eq("id", freshAccount.id);
+          Object.assign(account, freshAccount);
+        }
+      } catch (err) {
+        captureError("Cron: token refresh failed", err, { platform: account.platform });
+      }
 
       if (!publisher) {
         await supabase
@@ -98,7 +116,9 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      const result = await publisher.publish(account, post.content);
+      const result = await publisher.publish(account, post.content, post.hashtags ?? undefined, {
+        mediaUrl: post.media_url ?? undefined,
+      });
 
       if (result.success) {
         await supabase

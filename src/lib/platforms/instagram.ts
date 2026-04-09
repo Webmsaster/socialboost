@@ -1,4 +1,4 @@
-import type { ConnectedAccount, PlatformPublisher, PublishResult } from "./index";
+import type { ConnectedAccount, PlatformPublisher, PublishOptions, PublishResult } from "./index";
 
 /**
  * Instagram Publishing via Facebook Graph API.
@@ -7,18 +7,27 @@ import type { ConnectedAccount, PlatformPublisher, PublishResult } from "./index
  * The access_token is a Facebook Page token with IG permissions.
  */
 export const instagramPublisher: PlatformPublisher = {
-  async publish(account: ConnectedAccount, content: string, hashtags?: string[]): Promise<PublishResult> {
+  async publish(
+    account: ConnectedAccount,
+    content: string,
+    hashtags?: string[],
+    options?: PublishOptions
+  ): Promise<PublishResult> {
     const caption = hashtags?.length
       ? `${content}\n\n${hashtags.map((h) => `#${h}`).join(" ")}`
       : content;
 
     const igAccountId = account.platform_user_id;
 
+    if (!options?.mediaUrl) {
+      return {
+        success: false,
+        error: "Instagram requires an image. Attach media_url to the post before publishing.",
+      };
+    }
+
     try {
-      // Step 1: Create a media container (text-only = carousel or single image required)
-      // For text-only posts, Instagram requires an image. We create a "STORIES" or use a placeholder.
-      // Instagram API requires media_type + image_url for feed posts.
-      // For now, we support caption-only via the "content publishing" endpoint.
+      // Step 1: Create a media container with the image URL
       const containerRes = await fetch(
         `https://graph.facebook.com/v19.0/${igAccountId}/media`,
         {
@@ -26,8 +35,7 @@ export const instagramPublisher: PlatformPublisher = {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             caption,
-            // Instagram requires an image_url for feed posts.
-            // If no image is provided, this will fail — caller should attach an image.
+            image_url: options.mediaUrl,
             access_token: account.access_token,
           }),
         }

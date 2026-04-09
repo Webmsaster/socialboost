@@ -52,6 +52,7 @@ create table if not exists public.posts (
   platform_post_id text,
   connected_account_id uuid,
   error_message text,
+  media_url text,
   likes integer not null default 0,
   shares integer not null default 0,
   comments integer not null default 0,
@@ -120,6 +121,9 @@ alter table public.posts
   add constraint fk_posts_connected_account
   foreign key (connected_account_id) references public.connected_accounts(id)
   on delete set null;
+
+-- Idempotent: add media_url column for existing deployments
+alter table public.posts add column if not exists media_url text;
 
 -- ============================================
 -- 4. Indexes

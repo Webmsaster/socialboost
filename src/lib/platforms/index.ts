@@ -17,8 +17,31 @@ export interface ConnectedAccount {
   page_id: string | null;
 }
 
+export interface RefreshedTokens {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: Date;
+}
+
+export interface PostMetrics {
+  likes: number;
+  shares: number;
+  comments: number;
+  impressions: number;
+}
+
+export interface PublishOptions {
+  /** Public URL of an image to attach to the post. Required for Instagram. */
+  mediaUrl?: string;
+}
+
 export interface PlatformPublisher {
-  publish(account: ConnectedAccount, content: string, hashtags?: string[]): Promise<PublishResult>;
+  publish(
+    account: ConnectedAccount,
+    content: string,
+    hashtags?: string[],
+    options?: PublishOptions
+  ): Promise<PublishResult>;
   getAuthUrl(redirectUri: string, state: string): string;
   exchangeCode(code: string, redirectUri: string): Promise<{
     accessToken: string;
@@ -27,6 +50,10 @@ export interface PlatformPublisher {
     platformUserId: string;
     platformUsername?: string;
   }>;
+  /** Optional: refresh an expiring token using the stored refresh_token. */
+  refreshAccessToken?(refreshToken: string): Promise<RefreshedTokens>;
+  /** Optional: fetch engagement metrics for a previously published post. */
+  fetchMetrics?(account: ConnectedAccount, platformPostId: string): Promise<PostMetrics | null>;
 }
 
 export const platformConfigs: Record<PlatformId, {

@@ -85,7 +85,7 @@ const features = [
     title: "AI Image Generation",
     description: "Generate matching visuals for your posts with DALL-E 3. No stock photos needed.",
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
         <circle cx="9" cy="9" r="2" />
         <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
@@ -96,7 +96,7 @@ const features = [
     title: "Content Calendar",
     description: "Visual calendar with drag and drop. Schedule posts across all platforms at a glance.",
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M8 2v4" />
         <path d="M16 2v4" />
         <rect width="18" height="18" x="3" y="4" rx="2" />
@@ -113,7 +113,7 @@ const features = [
     title: "Post Templates",
     description: "Save your best-performing posts as templates. Reuse and adapt them in one click.",
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
         <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
         <path d="M12 11h4" />
@@ -127,7 +127,7 @@ const features = [
     title: "Bulk Generation",
     description: "Generate a full week of content in one click. Save hours of planning and writing.",
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M16 3h5v5" />
         <path d="M8 3H3v5" />
         <path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" />
@@ -141,7 +141,7 @@ const features = [
     title: "Video Script Generator",
     description: "AI-written scripts for Reels, TikTok, and YouTube Shorts. Ready to record.",
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.934a.5.5 0 0 0-.777-.416L16 11" />
         <rect x="2" y="6" width="14" height="12" rx="2" />
       </svg>
@@ -151,7 +151,7 @@ const features = [
     title: "Video Ad Storyboard",
     description: "Frame-by-frame storyboards for video ads. Visualize your campaign before production.",
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect width="7" height="7" x="3" y="3" rx="1" />
         <rect width="7" height="7" x="14" y="3" rx="1" />
         <rect width="7" height="7" x="3" y="14" rx="1" />
@@ -163,7 +163,7 @@ const features = [
     title: "Carousel Generator",
     description: "Multi-slide carousels for LinkedIn and Instagram. Boost engagement with swipeable content.",
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect width="12" height="18" x="2" y="3" rx="2" />
         <path d="M18 7h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2" />
       </svg>
@@ -173,7 +173,7 @@ const features = [
     title: "A/B Variants",
     description: "Generate multiple post variants side by side. Pick the one that fits your audience best.",
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M10 2h4" />
         <path d="M12 14v-4" />
         <path d="M4 14h16" />
@@ -205,15 +205,23 @@ export default function LandingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
+      {/* Skip link for keyboard users */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
+      >
+        Skip to main content
+      </a>
+
       {/* Header */}
       <header className="border-b" role="banner">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
+          <Link href="/" className="flex items-center gap-2" aria-label="SocialBoost home">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold" aria-hidden="true">
               S
             </div>
             <span className="text-xl font-bold">SocialBoost</span>
-          </div>
+          </Link>
           <div className="flex items-center gap-4">
             <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">
               Sign in
@@ -228,7 +236,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <main>
+      <main id="main-content">
         {/* Hero */}
         <section className="mx-auto max-w-4xl px-6 py-16 text-center md:py-24">
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">

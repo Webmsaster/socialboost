@@ -1,7 +1,12 @@
-import type { ConnectedAccount, PlatformPublisher, PublishResult } from "./index";
+import type { ConnectedAccount, PlatformPublisher, PublishOptions, PublishResult } from "./index";
 
 export const facebookPublisher: PlatformPublisher = {
-  async publish(account: ConnectedAccount, content: string, hashtags?: string[]): Promise<PublishResult> {
+  async publish(
+    account: ConnectedAccount,
+    content: string,
+    hashtags?: string[],
+    options?: PublishOptions
+  ): Promise<PublishResult> {
     const fullText = hashtags?.length
       ? `${content}\n\n${hashtags.map((h) => `#${h}`).join(" ")}`
       : content;
@@ -9,13 +14,24 @@ export const facebookPublisher: PlatformPublisher = {
     const pageId = account.page_id || account.platform_user_id;
 
     try {
-      const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed`, {
+      // With media: use /photos endpoint. Without: /feed for text-only posts.
+      const endpoint = options?.mediaUrl
+        ? `https://graph.facebook.com/v19.0/${pageId}/photos`
+        : `https://graph.facebook.com/v19.0/${pageId}/feed`;
+      const body: Record<string, string> = {
+        access_token: account.access_token,
+      };
+      if (options?.mediaUrl) {
+        body.url = options.mediaUrl;
+        body.caption = fullText;
+      } else {
+        body.message = fullText;
+      }
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: fullText,
-          access_token: account.access_token,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -64,5 +80,25 @@ export const facebookPublisher: PlatformPublisher = {
       platformUserId: user.id,
       platformUsername: user.name,
     };
+  },
+
+  async fetchMetrics(account, platformPostId) {
+    try {
+      const res = await fetch(
+        `https://graph.facebook.com/v19.0/${platformPostId}/insights?metric=post_impressions,post_reactions_like_total&access_token=${account.access_token}`
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      const findMetric = (name: string): number =>
+        data.data?.find((d: { name: string; values: { value: number }[] }) => d.name === name)?.values?.[0]?.value ?? 0;
+      return {
+        likes: findMetric("post_reactions_like_total"),
+        shares: 0,
+        comments: 0,
+        impressions: findMetric("post_impressions"),
+      };
+    } catch {
+      return null;
+    }
   },
 };

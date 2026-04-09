@@ -28,6 +28,8 @@ describe("instagramPublisher", () => {
   });
 
   describe("publish", () => {
+    const media = { mediaUrl: "https://example.com/image.jpg" };
+
     it("creates media container then publishes", async () => {
       (fetch as unknown as ReturnType<typeof vi.fn>)
         .mockResolvedValueOnce({
@@ -39,10 +41,18 @@ describe("instagramPublisher", () => {
           json: () => Promise.resolve({ id: "media-456" }),
         });
 
-      const result = await instagramPublisher.publish(mockAccount, "Hello IG!");
+      const result = await instagramPublisher.publish(mockAccount, "Hello IG!", undefined, media);
       expect(result).toEqual({ success: true, platformPostId: "media-456" });
-      // Two API calls: container creation + publish
       expect(fetch).toHaveBeenCalledTimes(2);
+      const body = JSON.parse((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+      expect(body.image_url).toBe(media.mediaUrl);
+    });
+
+    it("returns error when no mediaUrl provided", async () => {
+      const result = await instagramPublisher.publish(mockAccount, "Content");
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Instagram requires an image");
+      expect(fetch).not.toHaveBeenCalled();
     });
 
     it("appends hashtags to caption", async () => {
@@ -50,7 +60,7 @@ describe("instagramPublisher", () => {
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ id: "c-1" }) })
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ id: "m-1" }) });
 
-      await instagramPublisher.publish(mockAccount, "Caption", ["insta", "photo"]);
+      await instagramPublisher.publish(mockAccount, "Caption", ["insta", "photo"], media);
       const body = JSON.parse((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
       expect(body.caption).toBe("Caption\n\n#insta #photo");
     });
@@ -61,7 +71,7 @@ describe("instagramPublisher", () => {
         text: () => Promise.resolve("Image required"),
       });
 
-      const result = await instagramPublisher.publish(mockAccount, "Content");
+      const result = await instagramPublisher.publish(mockAccount, "Content", undefined, media);
       expect(result.success).toBe(false);
       expect(result.error).toContain("Instagram container error");
     });
@@ -74,14 +84,14 @@ describe("instagramPublisher", () => {
           text: () => Promise.resolve("Internal error"),
         });
 
-      const result = await instagramPublisher.publish(mockAccount, "Content");
+      const result = await instagramPublisher.publish(mockAccount, "Content", undefined, media);
       expect(result.success).toBe(false);
       expect(result.error).toContain("Instagram publish error");
     });
 
     it("returns error on network failure", async () => {
       (fetch as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Timeout"));
-      const result = await instagramPublisher.publish(mockAccount, "Content");
+      const result = await instagramPublisher.publish(mockAccount, "Content", undefined, media);
       expect(result.success).toBe(false);
     });
   });

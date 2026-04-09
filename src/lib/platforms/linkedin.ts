@@ -83,4 +83,45 @@ export const linkedinPublisher: PlatformPublisher = {
       platformUsername: profile.name,
     };
   },
+
+  async fetchMetrics(account, platformPostId) {
+    // LinkedIn requires socialActions endpoint for basic engagement stats
+    try {
+      const encoded = encodeURIComponent(platformPostId);
+      const res = await fetch(
+        `https://api.linkedin.com/v2/socialActions/${encoded}`,
+        { headers: { Authorization: `Bearer ${account.access_token}` } }
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      return {
+        likes: data.likesSummary?.totalLikes ?? 0,
+        shares: 0,
+        comments: data.commentsSummary?.aggregatedTotalComments ?? 0,
+        impressions: 0,
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  async refreshAccessToken(refreshToken: string) {
+    const res = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: process.env.LINKEDIN_CLIENT_ID!,
+        client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
+      }),
+    });
+    if (!res.ok) throw new Error(`LinkedIn token refresh failed: ${res.status}`);
+    const tokens = await res.json();
+    return {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token ?? refreshToken,
+      expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : undefined,
+    };
+  },
 };

@@ -523,6 +523,44 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground">{t("settings.bonusGenerations")}</p>
                 </div>
               </div>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                    "I'm loving SocialBoost for AI-powered social media content. Get 10 bonus generations:"
+                  )}&url=${encodeURIComponent(referral.referralLink)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                >
+                  Share on X
+                </a>
+                <a
+                  href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referral.referralLink)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                >
+                  Share on LinkedIn
+                </a>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(
+                    `Check out SocialBoost — AI-powered content for every platform: ${referral.referralLink}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                >
+                  Share on WhatsApp
+                </a>
+                <a
+                  href={`mailto:?subject=${encodeURIComponent("Try SocialBoost")}&body=${encodeURIComponent(
+                    `I'm using SocialBoost for AI-powered social posts. Sign up with my link and get 10 bonus generations: ${referral.referralLink}`
+                  )}`}
+                  className="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                >
+                  Share via Email
+                </a>
+              </div>
             </>
           ) : (
             <p className="text-sm text-muted-foreground italic">

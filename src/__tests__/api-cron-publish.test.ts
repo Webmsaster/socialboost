@@ -54,6 +54,7 @@ vi.mock("@/lib/email", () => ({
 
 vi.mock("@/lib/platforms/registry", () => ({
   getPublisher: vi.fn(),
+  ensureFreshToken: vi.fn(async (account: unknown) => ({ account, refreshed: false })),
 }));
 
 // Import after mocks
@@ -297,7 +298,9 @@ describe("GET /api/cron/publish", () => {
 
     expect(mockPublish).toHaveBeenCalledWith(
       expect.objectContaining({ id: "acc-3", platform: "linkedin" }),
-      "Publish me"
+      "Publish me",
+      undefined,
+      expect.objectContaining({ mediaUrl: undefined })
     );
 
     expect(mockAdminUpdate).toHaveBeenCalledWith(
