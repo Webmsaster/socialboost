@@ -109,13 +109,13 @@ describe("captureError", () => {
       expect(console.error).toHaveBeenCalledTimes(1);
     });
 
-    it("falls back to require when _sentryOverride is not set", () => {
-      // Do NOT call _setSentry — leave override as undefined
-      // This forces the ?? fallback to require("@sentry/nextjs")
-      // Since @sentry/nextjs IS installed, it returns the real SDK (which is fine)
+    it("falls back to dynamic import when _sentryOverride is not set", () => {
+      // Do NOT call _setSentry — leave override as undefined.
+      // This forces the dynamic import("@sentry/nextjs") code path.
+      // Since the real SDK loads async, the function returns immediately;
+      // we only verify it does not throw and still logs to console.
       process.env.NEXT_PUBLIC_SENTRY_DSN = "https://example@sentry.io/123";
-      // Should not throw regardless of what the real SDK does
-      expect(() => captureError("require fallback", new Error("test"))).not.toThrow();
+      expect(() => captureError("import fallback", new Error("test"))).not.toThrow();
       expect(console.error).toHaveBeenCalledTimes(1);
     });
   });
