@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BlogShare } from "@/components/blog-share";
 
 export const metadata: Metadata = {
   title: "The TikTok Marketing Guide for Brands in 2026",
@@ -70,6 +71,11 @@ export default function TikTokMarketingPage() {
           <h1 className="mt-4">
             The TikTok Marketing Guide for Brands in 2026
           </h1>
+
+          <BlogShare
+            title="The TikTok Marketing Guide for Brands in 2026"
+            slug="tiktok-marketing-guide"
+          />
 
           <p className="lead">
             TikTok is no longer the platform you can afford to ignore. With

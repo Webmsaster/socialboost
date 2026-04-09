@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -28,7 +28,23 @@ export function DashboardNav() {
   const router = useRouter();
   const supabase = createClient();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { t } = useLanguage();
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/check")
+      .then((res) => (res.ok ? res.json() : { isAdmin: false }))
+      .then((data) => {
+        if (!cancelled) setIsAdmin(data.isAdmin === true);
+      })
+      .catch(() => {
+        // Silently ignore — admin link stays hidden
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -63,6 +79,21 @@ export function DashboardNav() {
             {t(item.key)}
           </Link>
         ))}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            onClick={() => setMobileOpen(false)}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
+              pathname === "/admin"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <ShieldIcon className="h-4 w-4" />
+            Admin
+          </Link>
+        )}
       </nav>
       <div className="border-t p-4 space-y-2">
         <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground">
@@ -203,6 +234,14 @@ function LogoutIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+    </svg>
+  );
+}
+
+function ShieldIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
     </svg>
   );
 }

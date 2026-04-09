@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BlogShare } from "@/components/blog-share";
 
 export const metadata: Metadata = {
   title: "10 Best LinkedIn Post Examples That Get Engagement in 2026",
@@ -76,6 +77,11 @@ export default function BestLinkedInPostExamplesPage() {
           <h1 className="mt-4">
             10 Best LinkedIn Post Examples That Get Engagement in 2026
           </h1>
+
+          <BlogShare
+            title="10 Best LinkedIn Post Examples That Get Engagement in 2026"
+            slug="best-linkedin-post-examples"
+          />
 
           <p className="lead">
             LinkedIn has evolved far beyond a job search platform. With over 1

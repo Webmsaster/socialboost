@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BlogShare } from "@/components/blog-share";
 
 export const metadata: Metadata = {
   title: "12 Twitter/X Growth Tips for 2026: From Zero to Engaged Audience",
@@ -77,6 +78,11 @@ export default function TwitterXGrowthTipsPage() {
           <h1 className="mt-4">
             12 Twitter/X Growth Tips for 2026: From Zero to Engaged Audience
           </h1>
+
+          <BlogShare
+            title="12 Twitter/X Growth Tips for 2026: From Zero to Engaged Audience"
+            slug="twitter-x-growth-tips"
+          />
 
           <p className="lead">
             Twitter/X remains one of the most powerful platforms for building

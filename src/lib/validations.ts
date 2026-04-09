@@ -35,6 +35,10 @@ export const createPostSchema = z.object({
   language: z.enum(["English", "German", "French", "Spanish"]),
 });
 
+export const newsletterSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+});
+
 export const templateSchema = z.object({
   name: z.string().min(1, "Template name is required").max(100, "Name is too long"),
   platform: z.string().optional(),

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BlogShare } from "@/components/blog-share";
 
 export const metadata: Metadata = {
   title:
@@ -80,6 +81,11 @@ export default function ContentRepurposingGuidePage() {
             Content Repurposing: How to Turn 1 Post Into 5 Platform-Ready
             Pieces
           </h1>
+
+          <BlogShare
+            title="Content Repurposing: How to Turn 1 Post Into 5 Platform-Ready Pieces"
+            slug="content-repurposing-guide"
+          />
 
           <p className="lead">
             Creating original content for every social media platform every day

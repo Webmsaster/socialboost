@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BlogShare } from "@/components/blog-share";
 
 export const metadata: Metadata = {
   title: "Threads Growth Strategy: Building an Audience on Meta's Newest Platform",
@@ -72,6 +73,11 @@ export default function ThreadsGrowthPage() {
             Threads Growth Strategy: Building an Audience on Meta&apos;s Newest
             Platform
           </h1>
+
+          <BlogShare
+            title="Threads Growth Strategy: Building an Audience on Meta's Newest Platform"
+            slug="threads-growth-strategy"
+          />
 
           <p className="lead">
             Threads crossed 200 million monthly active users in early 2026 and

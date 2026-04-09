@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BlogShare } from "@/components/blog-share";
 
 export const metadata: Metadata = {
   title: "15 Instagram Caption Tips to Boost Your Engagement Rate",
@@ -76,6 +77,11 @@ export default function InstagramCaptionTipsPage() {
           <h1 className="mt-4">
             15 Instagram Caption Tips to Boost Your Engagement Rate
           </h1>
+
+          <BlogShare
+            title="15 Instagram Caption Tips to Boost Your Engagement Rate"
+            slug="instagram-caption-tips"
+          />
 
           <p className="lead">
             Instagram may be a visual platform, but your captions are what turn

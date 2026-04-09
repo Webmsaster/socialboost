@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BlogShare } from "@/components/blog-share";
 
 export const metadata: Metadata = {
   title: "Facebook Marketing Strategies That Actually Work in 2026",
@@ -76,6 +77,11 @@ export default function FacebookMarketingPage() {
           <h1 className="mt-4">
             Facebook Marketing Strategies That Actually Work in 2026
           </h1>
+
+          <BlogShare
+            title="Facebook Marketing Strategies That Actually Work in 2026"
+            slug="facebook-marketing-strategies"
+          />
 
           <p className="lead">
             Facebook is often dismissed as &quot;dead&quot; by marketers chasing

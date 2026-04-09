@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BlogShare } from "@/components/blog-share";
 
 export const metadata: Metadata = {
   title:
@@ -79,6 +80,11 @@ export default function SocialMediaSchedulingStrategyPage() {
           <h1 className="mt-4">
             How to Build a Social Media Scheduling Strategy That Actually Works
           </h1>
+
+          <BlogShare
+            title="How to Build a Social Media Scheduling Strategy That Actually Works"
+            slug="social-media-scheduling-strategy"
+          />
 
           <p className="lead">
             Posting consistently on social media is the single biggest predictor

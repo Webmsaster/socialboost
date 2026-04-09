@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BlogShare } from "@/components/blog-share";
 
 export const metadata: Metadata = {
   title: "The Complete Guide to AI-Generated Social Media Content",
@@ -76,6 +77,11 @@ export default function AiSocialMediaContentGuidePage() {
           <h1 className="mt-4">
             The Complete Guide to AI-Generated Social Media Content
           </h1>
+
+          <BlogShare
+            title="The Complete Guide to AI-Generated Social Media Content"
+            slug="ai-social-media-content-guide"
+          />
 
           <p className="lead">
             AI is transforming how businesses and creators produce social media

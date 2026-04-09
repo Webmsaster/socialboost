@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getSortedPosts } from "@/lib/blog-posts";
+import { NewsletterSignup } from "@/components/newsletter-signup";
 
 export const metadata: Metadata = {
   title: "Blog - SocialBoost",
@@ -7,93 +9,7 @@ export const metadata: Metadata = {
     "Tips, strategies, and insights for social media marketing with AI-powered content creation.",
 };
 
-const posts = [
-  {
-    slug: "best-linkedin-post-examples",
-    title: "10 Best LinkedIn Post Examples That Get Engagement in 2026",
-    excerpt:
-      "Discover the LinkedIn post formats that drive the most engagement, from personal stories to data-driven insights.",
-    date: "2026-03-25",
-    readTime: "6 min read",
-    category: "LinkedIn",
-  },
-  {
-    slug: "ai-social-media-content-guide",
-    title: "The Complete Guide to AI-Generated Social Media Content",
-    excerpt:
-      "How to use AI tools like SocialBoost to create authentic, engaging social media posts that sound like you.",
-    date: "2026-03-20",
-    readTime: "8 min read",
-    category: "Strategy",
-  },
-  {
-    slug: "instagram-caption-tips",
-    title: "15 Instagram Caption Tips to Boost Your Engagement Rate",
-    excerpt:
-      "Master the art of writing Instagram captions that stop the scroll and drive comments, saves, and shares.",
-    date: "2026-03-15",
-    readTime: "5 min read",
-    category: "Instagram",
-  },
-  {
-    slug: "social-media-scheduling-strategy",
-    title:
-      "How to Build a Social Media Scheduling Strategy That Actually Works",
-    excerpt:
-      "Learn optimal posting times, content batching, and consistency frameworks that drive real results across platforms.",
-    date: "2026-03-27",
-    readTime: "7 min read",
-    category: "Strategy",
-  },
-  {
-    slug: "twitter-x-growth-tips",
-    title:
-      "12 Twitter/X Growth Tips for 2026: From Zero to Engaged Audience",
-    excerpt:
-      "Actionable strategies to build an engaged Twitter/X audience from scratch with threads, engagement tactics, and content systems.",
-    date: "2026-03-27",
-    readTime: "8 min read",
-    category: "Twitter",
-  },
-  {
-    slug: "content-repurposing-guide",
-    title:
-      "Content Repurposing: How to Turn 1 Post Into 5 Platform-Ready Pieces",
-    excerpt:
-      "Master content repurposing workflows to multiply your social media output without multiplying your effort.",
-    date: "2026-03-27",
-    readTime: "8 min read",
-    category: "Strategy",
-  },
-  {
-    slug: "facebook-marketing-strategies",
-    title: "Facebook Marketing Strategies That Actually Work in 2026",
-    excerpt:
-      "Proven organic reach tactics, ad optimization, community building, and AI-powered content generation for Facebook in 2026.",
-    date: "2026-04-09",
-    readTime: "9 min read",
-    category: "Facebook",
-  },
-  {
-    slug: "tiktok-marketing-guide",
-    title: "The TikTok Marketing Guide for Brands in 2026",
-    excerpt:
-      "Complete TikTok marketing guide: algorithm insights, content formats, trending audio, hashtag strategy, and AI-powered script generation.",
-    date: "2026-04-09",
-    readTime: "10 min read",
-    category: "TikTok",
-  },
-  {
-    slug: "threads-growth-strategy",
-    title:
-      "Threads Growth Strategy: Building an Audience on Meta's Newest Platform",
-    excerpt:
-      "How to grow on Threads in 2026. Content formats, posting cadence, algorithm tips, and AI-powered content that resonates.",
-    date: "2026-04-09",
-    readTime: "7 min read",
-    category: "Threads",
-  },
-];
+const posts = getSortedPosts();
 
 export default function BlogPage() {
   return (
@@ -143,6 +59,8 @@ export default function BlogPage() {
             </article>
           ))}
         </div>
+
+        <NewsletterSignup />
       </main>
 
       <footer className="border-t py-8">
