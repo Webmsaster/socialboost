@@ -107,6 +107,15 @@ export const blogPosts: BlogPost[] = [
     category: "YouTube",
   },
   {
+    slug: "social-media-kpis-that-matter",
+    title: "Social Media KPIs That Actually Matter in 2026",
+    excerpt:
+      "Stop tracking vanity metrics. The KPIs that actually predict business growth on social media in 2026, with benchmarks and how to measure them.",
+    date: "2026-04-09",
+    readTime: "7 min read",
+    category: "Analytics",
+  },
+  {
     slug: "pinterest-seo-guide",
     title: "Pinterest SEO Guide: Drive Free Traffic in 2026",
     excerpt:

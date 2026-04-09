@@ -80,6 +80,33 @@ export default function HistoryPage() {
     }
   }
 
+  async function handleDuplicate(post: Post) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Not authenticated");
+      return;
+    }
+    const { data, error } = await supabase
+      .from("posts")
+      .insert({
+        user_id: user.id,
+        platform: post.platform,
+        topic: post.topic,
+        content: post.content,
+        hashtags: post.hashtags,
+        tone: post.tone,
+        status: "draft",
+      })
+      .select()
+      .single();
+    if (error || !data) {
+      toast.error("Failed to duplicate");
+      return;
+    }
+    setPosts((prev) => [data as Post, ...prev]);
+    toast.success("Duplicated as draft");
+  }
+
   function exportAsCSV() {
     if (posts.length === 0) return;
     const headers = ["Platform", "Topic", "Tone", "Status", "Content", "Hashtags", "Created"];
@@ -199,6 +226,13 @@ export default function HistoryPage() {
                     }}
                   >
                     Copy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDuplicate(post)}
+                  >
+                    Duplicate
                   </Button>
                   <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDelete(post.id)}>
                     {t("history.delete")}

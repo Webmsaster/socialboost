@@ -48,7 +48,7 @@ supabase/
 - **Post Generation:** AI-powered posts with 5 tones for 5 platforms
 - **History:** Post list with filter by status (draft/scheduled/published)
 - **Calendar:** View scheduled posts
-- **Accounts:** Platform connection page (OAuth — future)
+- **Accounts:** Platform OAuth (LinkedIn, Facebook, Instagram, Pinterest, Twitter/X) with real publishing via cron
 - **Dark/Light Mode:** Theme toggle with next-themes
 
 ## Important Notes
@@ -56,4 +56,5 @@ supabase/
 - All auth pages use Supabase client-side auth
 - Stripe webhooks handle subscription status updates
 - RLS policies on all tables (profiles, posts, connected_accounts)
-- Platform OAuth integration is prepared but not yet implemented
+- Platform OAuth integration is live: /api/auth/oauth/{connect,callback,disconnect}
+- Cron endpoint /api/cron/publish processes scheduled posts and pushes to connected platforms
