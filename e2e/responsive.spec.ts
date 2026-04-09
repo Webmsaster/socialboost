@@ -69,7 +69,9 @@ test.describe("Tablet Viewport", () => {
   test("landing page renders properly on tablet", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveTitle(/SocialBoost/);
-    await expect(page.getByText("AI-powered content for every platform")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /AI-powered content for every/i }),
+    ).toBeVisible();
   });
 
   test("pricing page shows plans on tablet", async ({ page }) => {
@@ -92,7 +94,9 @@ test.describe("Wide Desktop Viewport", () => {
 
   test("landing page uses full width layout", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("AI-powered content for every platform")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /AI-powered content for every/i }),
+    ).toBeVisible();
   });
 
   test("features grid displays properly", async ({ page }) => {

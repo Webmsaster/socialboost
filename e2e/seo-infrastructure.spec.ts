@@ -43,10 +43,10 @@ test.describe("Robots.txt", () => {
     expect(res.status()).toBe(200);
   });
 
-  test("robots.txt allows blog crawling", async ({ request }) => {
+  test("robots.txt allows crawling by default", async ({ request }) => {
     const res = await request.get("/robots.txt");
     const body = await res.text();
-    expect(body).toContain("Allow: /blog");
+    expect(body).toContain("Allow: /");
   });
 
   test("robots.txt blocks dashboard and API routes", async ({ request }) => {

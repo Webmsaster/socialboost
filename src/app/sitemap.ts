@@ -106,5 +106,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.7,
     },
+    {
+      url: `${baseUrl}/blog/facebook-marketing-strategies`,
+      lastModified: new Date("2026-04-09"),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
   ];
 }

@@ -20,7 +20,9 @@ test.describe("Landing Page", () => {
   });
 
   test("hero section displays value proposition", async ({ page }) => {
-    await expect(page.getByText("AI-powered content for every platform")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /AI-powered content for every/i }),
+    ).toBeVisible();
   });
 
   test("features section shows all 8 features", async ({ page }) => {
@@ -75,8 +77,9 @@ test.describe("Landing Page", () => {
   });
 
   test("has JSON-LD structured data", async ({ page }) => {
+    // Landing page has Organization + FAQ schemas
     const jsonLd = page.locator('script[type="application/ld+json"]');
-    await expect(jsonLd).toHaveCount(1);
+    await expect(jsonLd).toHaveCount(2);
   });
 
   test("shows content types section", async ({ page }) => {
@@ -86,7 +89,7 @@ test.describe("Landing Page", () => {
   test("footer shows copyright", async ({ page }) => {
     const footer = page.locator("footer");
     await expect(footer).toBeVisible();
-    await expect(footer.getByText(/SocialBoost|©|copyright/i)).toBeVisible();
+    await expect(footer.getByText(/© \d{4} SocialBoost/i)).toBeVisible();
   });
 
   test("hero CTA links to signup", async ({ page }) => {

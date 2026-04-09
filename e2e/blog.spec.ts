@@ -7,6 +7,7 @@ const BLOG_SLUGS = [
   "social-media-scheduling-strategy",
   "twitter-x-growth-tips",
   "content-repurposing-guide",
+  "facebook-marketing-strategies",
 ];
 
 // =============================================================================
@@ -18,10 +19,10 @@ test.describe("Blog Listing", () => {
     await expect(page).toHaveTitle(/Blog/);
   });
 
-  test("shows all 6 article cards", async ({ page }) => {
+  test("shows all article cards", async ({ page }) => {
     await page.goto("/blog");
     const articles = page.locator("article");
-    await expect(articles).toHaveCount(6);
+    await expect(articles).toHaveCount(BLOG_SLUGS.length);
   });
 
   test("displays known article titles", async ({ page }) => {

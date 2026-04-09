@@ -65,6 +65,15 @@ const posts = [
     readTime: "8 min read",
     category: "Strategy",
   },
+  {
+    slug: "facebook-marketing-strategies",
+    title: "Facebook Marketing Strategies That Actually Work in 2026",
+    excerpt:
+      "Proven organic reach tactics, ad optimization, community building, and AI-powered content generation for Facebook in 2026.",
+    date: "2026-04-09",
+    readTime: "9 min read",
+    category: "Facebook",
+  },
 ];
 
 export default function BlogPage() {
