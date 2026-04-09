@@ -503,22 +503,29 @@ export default function LandingPage() {
               <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
                 <li><Link href="/features" className="hover:text-foreground">Features</Link></li>
                 <li><Link href="/pricing" className="hover:text-foreground">Pricing</Link></li>
+                <li><Link href="/use-cases" className="hover:text-foreground">Use cases</Link></li>
+                <li><Link href="/compare" className="hover:text-foreground">Compare</Link></li>
+                <li><Link href="/roadmap" className="hover:text-foreground">Roadmap</Link></li>
                 <li><Link href="/changelog" className="hover:text-foreground">Changelog</Link></li>
-                <li><Link href="/blog" className="hover:text-foreground">Blog</Link></li>
               </ul>
             </div>
             <div>
-              <h3 className="text-sm font-semibold">Company</h3>
+              <h3 className="text-sm font-semibold">Resources</h3>
               <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                <li><Link href="/blog" className="hover:text-foreground">Blog</Link></li>
+                <li><Link href="/faq" className="hover:text-foreground">FAQ</Link></li>
+                <li><Link href="/testimonials" className="hover:text-foreground">Testimonials</Link></li>
+                <li><Link href="/feed.xml" className="hover:text-foreground">RSS feed</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">Company & Legal</h3>
+              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                <li><Link href="/about" className="hover:text-foreground">About</Link></li>
                 <li><Link href="/contact" className="hover:text-foreground">Contact</Link></li>
                 <li><Link href="/imprint" className="hover:text-foreground">Imprint</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold">Legal</h3>
-              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link></li>
-                <li><Link href="/terms" className="hover:text-foreground">Terms of Service</Link></li>
+                <li><Link href="/privacy" className="hover:text-foreground">Privacy</Link></li>
+                <li><Link href="/terms" className="hover:text-foreground">Terms</Link></li>
               </ul>
             </div>
           </div>
