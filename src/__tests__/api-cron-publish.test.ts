@@ -62,7 +62,7 @@ import { GET } from "@/app/api/cron/publish/route";
 function createRequest(headers: Record<string, string> = {}): NextRequest {
   return new NextRequest("http://localhost:3000/api/cron/publish", {
     method: "GET",
-    headers,
+    headers: { authorization: "Bearer test-cron-secret", ...headers },
   });
 }
 
@@ -74,8 +74,21 @@ describe("GET /api/cron/publish", () => {
     process.env = { ...originalEnv };
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
+    process.env.CRON_SECRET = "test-cron-secret";
     mockAdminResetResult.mockReturnValue({ error: null });
     (mockAdminUpdate as ReturnType<typeof vi.fn> & { _nextResult?: unknown })._nextResult = undefined;
+  });
+
+  it("returns 401 if CRON_SECRET not configured", async () => {
+    delete process.env.CRON_SECRET;
+
+    const response = await GET(
+      new NextRequest("http://localhost:3000/api/cron/publish", { method: "GET" })
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(json.error).toContain("Unauthorized");
   });
 
   it("returns 401 if CRON_SECRET set but wrong auth header", async () => {
@@ -91,7 +104,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("returns { processed: 0 } when no scheduled posts", async () => {
-    delete process.env.CRON_SECRET;
 
     mockAdminLteResult.mockReturnValueOnce({ data: [], error: null });
 
@@ -103,7 +115,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("processes and publishes scheduled posts", async () => {
-    delete process.env.CRON_SECRET;
 
     const posts = [
       {
@@ -138,7 +149,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("logs error when generation count reset fails", async () => {
-    delete process.env.CRON_SECRET;
 
     mockAdminResetResult.mockReturnValueOnce({ error: { message: "reset failed" } });
     mockAdminLteResult.mockReturnValueOnce({ data: [], error: null });
@@ -157,7 +167,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("returns 500 when fetching scheduled posts fails", async () => {
-    delete process.env.CRON_SECRET;
 
     mockAdminResetResult.mockReturnValueOnce({ error: null });
     mockAdminLteResult.mockReturnValueOnce({ data: null, error: { message: "db down" } });
@@ -170,7 +179,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("marks post as failed when connected account is not found", async () => {
-    delete process.env.CRON_SECRET;
 
     const posts = [
       {
@@ -213,7 +221,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("marks post as failed when no publisher exists for the platform", async () => {
-    delete process.env.CRON_SECRET;
 
     const posts = [
       {
@@ -258,7 +265,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("publishes successfully via platform publisher", async () => {
-    delete process.env.CRON_SECRET;
 
     const posts = [
       {
@@ -310,7 +316,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("marks post as failed when platform publisher returns failure", async () => {
-    delete process.env.CRON_SECRET;
 
     const posts = [
       {
@@ -355,7 +360,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("skips email when profile has no email (account not found path)", async () => {
-    delete process.env.CRON_SECRET;
 
     const posts = [
       {
@@ -384,7 +388,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("skips email when profile has no email (no publisher path)", async () => {
-    delete process.env.CRON_SECRET;
 
     const posts = [
       {
@@ -413,7 +416,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("handles publish success with no platformPostId (null fallback)", async () => {
-    delete process.env.CRON_SECRET;
 
     const posts = [
       {
@@ -452,7 +454,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("handles publish failure with no error message (fallback to defaults)", async () => {
-    delete process.env.CRON_SECRET;
 
     const posts = [
       {
@@ -490,7 +491,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("sends failure email with fallback message when result.error is undefined", async () => {
-    delete process.env.CRON_SECRET;
 
     const posts = [
       {
@@ -526,7 +526,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("skips email when profile has no email (manual publish success path)", async () => {
-    delete process.env.CRON_SECRET;
 
     const posts = [
       {
@@ -551,7 +550,6 @@ describe("GET /api/cron/publish", () => {
   });
 
   it("counts failure when update to mark post as published fails", async () => {
-    delete process.env.CRON_SECRET;
 
     const posts = [
       {

@@ -56,6 +56,10 @@ vi.mock("@/lib/logger", () => ({
   captureError: vi.fn(),
 }));
 
+vi.mock("@/lib/rate-limit", () => ({
+  rateLimit: vi.fn().mockResolvedValue({ success: true }),
+}));
+
 // Import after mocks
 import { GET } from "@/app/api/referral/route";
 import { POST as ClaimPost } from "@/app/api/referral/claim/route";
@@ -128,22 +132,36 @@ describe("POST /api/referral/claim", () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
   });
 
-  it("returns 400 if missing fields", async () => {
+  it("returns 401 if not authenticated", async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: null } });
+
+    const response = await ClaimPost(createRequest({ referralCode: "ABC123" }));
+    const json = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(json.error).toBe("Unauthorized");
+  });
+
+  it("returns 400 if missing referral code", async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "user-1" } } });
+
     const response = await ClaimPost(createRequest({ referralCode: "" }));
     const json = await response.json();
 
     expect(response.status).toBe(400);
-    expect(json.error).toContain("Missing fields");
+    expect(json.error).toContain("Missing referral code");
   });
 
   it("returns 400 for self-referral", async () => {
-    // Referrer found, but referrer.id === newUserId
+    // Authenticated as user-1
+    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "user-1" } } });
+    // Referrer found, but referrer.id === authenticated user's id
     mockAdminSelectSingle.mockReturnValueOnce({
       data: { id: "user-1" },
     });
 
     const response = await ClaimPost(
-      createRequest({ referralCode: "ABC123", newUserId: "user-1" })
+      createRequest({ referralCode: "ABC123" })
     );
     const json = await response.json();
 
@@ -152,6 +170,7 @@ describe("POST /api/referral/claim", () => {
   });
 
   it("returns 409 if already referred", async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "user-2" } } });
     // Referrer found
     mockAdminSelectSingle.mockReturnValueOnce({
       data: { id: "referrer-1" },
@@ -162,7 +181,7 @@ describe("POST /api/referral/claim", () => {
     });
 
     const response = await ClaimPost(
-      createRequest({ referralCode: "ABC123", newUserId: "user-2" })
+      createRequest({ referralCode: "ABC123" })
     );
     const json = await response.json();
 
@@ -171,6 +190,7 @@ describe("POST /api/referral/claim", () => {
   });
 
   it("grants bonus on success", async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "user-2" } } });
     // Referrer found
     mockAdminSelectSingle.mockReturnValueOnce({
       data: { id: "referrer-1" },
@@ -185,7 +205,7 @@ describe("POST /api/referral/claim", () => {
     mockAdminRpc.mockResolvedValueOnce({ data: null, error: null });
 
     const response = await ClaimPost(
-      createRequest({ referralCode: "ABC123", newUserId: "user-2" })
+      createRequest({ referralCode: "ABC123" })
     );
     const json = await response.json();
 
@@ -203,13 +223,14 @@ describe("POST /api/referral/claim", () => {
   });
 
   it("returns 500 when an unexpected error is thrown (catch block)", async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "user-2" } } });
     // Make the admin client throw during select (referrer lookup)
     mockAdminSelectSingle.mockImplementationOnce(() => {
       throw new Error("Unexpected crash");
     });
 
     const response = await ClaimPost(
-      createRequest({ referralCode: "ABC123", newUserId: "user-2" })
+      createRequest({ referralCode: "ABC123" })
     );
     const json = await response.json();
 

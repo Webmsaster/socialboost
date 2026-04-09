@@ -66,9 +66,11 @@ export async function POST(request: NextRequest) {
       .eq("email", email)
       .single();
 
+    // user_id is only set when the invited user already has an account;
+    // for pending invites (no profile yet) we leave it null until they accept.
     const { error: inviteError } = await supabase.from("org_members").insert({
       org_id: orgId,
-      user_id: invitedProfile?.id || user.id,
+      user_id: invitedProfile?.id ?? null,
       role: role || "member",
       invited_email: email,
       accepted: false,

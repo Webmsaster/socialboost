@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function GET() {
   try {
@@ -11,6 +12,11 @@ export async function GET() {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const limited = await rateLimit(user.id);
+    if (!limited.success) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 
     const [profileRes, postsRes, templatesRes, accountsRes] = await Promise.all([

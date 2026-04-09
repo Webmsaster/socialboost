@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
+import { rateLimit } from "@/lib/rate-limit";
 
 function getAdmin() {
   return createClient(
@@ -13,11 +15,25 @@ const BONUS_PER_REFERRAL = 10;
 
 export async function POST(request: NextRequest) {
   try {
-    const { referralCode, newUserId } = await request.json();
-    if (!referralCode || !newUserId) {
-      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    // Authenticate: the claiming user must be logged in
+    const serverClient = await createServerClient();
+    const { data: { user } } = await serverClient.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const limited = await rateLimit(user.id);
+    if (!limited.success) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
+    const { referralCode } = await request.json();
+    if (!referralCode) {
+      return NextResponse.json({ error: "Missing referral code" }, { status: 400 });
+    }
+
+    // Use the authenticated user's ID — never trust client-supplied user IDs
+    const newUserId = user.id;
     const supabase = getAdmin();
 
     // Find referrer

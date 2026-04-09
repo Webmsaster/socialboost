@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
+import { rateLimit } from "@/lib/rate-limit";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -19,6 +20,11 @@ export async function POST() {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const limited = await rateLimit(user.id);
+    if (!limited.success) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 
     const admin = getSupabaseAdmin();
