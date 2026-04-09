@@ -7,7 +7,9 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/blog", "/features", "/pricing", "/login", "/signup", "/contact", "/changelog"],
+        // Crawl everything by default; only explicitly disallow private/auth-gated routes.
+        // Auto-covers new public pages (legal, landing sections, future blog posts).
+        allow: "/",
         disallow: [
           "/api/",
           "/dashboard",
