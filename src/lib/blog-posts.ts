@@ -96,6 +96,25 @@ export const blogPosts: BlogPost[] = [
     readTime: "7 min read",
     category: "Threads",
   },
+  {
+    slug: "youtube-shorts-strategy",
+    title:
+      "YouTube Shorts Strategy: The Complete Growth Playbook for 2026",
+    excerpt:
+      "Master YouTube Shorts in 2026. Algorithm insights, content formats, monetization, and AI-powered script generation that drives views and subscribers.",
+    date: "2026-04-09",
+    readTime: "9 min read",
+    category: "YouTube",
+  },
+  {
+    slug: "pinterest-seo-guide",
+    title: "Pinterest SEO Guide: Drive Free Traffic in 2026",
+    excerpt:
+      "The complete Pinterest SEO guide for 2026. Keyword research, pin optimization, board structure, and AI-powered content for long-tail discovery traffic.",
+    date: "2026-04-09",
+    readTime: "8 min read",
+    category: "Pinterest",
+  },
 ];
 
 /** Posts sorted newest-first, for the blog index and RSS feed. */

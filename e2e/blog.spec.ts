@@ -10,6 +10,8 @@ const BLOG_SLUGS = [
   "facebook-marketing-strategies",
   "tiktok-marketing-guide",
   "threads-growth-strategy",
+  "youtube-shorts-strategy",
+  "pinterest-seo-guide",
 ];
 
 // =============================================================================

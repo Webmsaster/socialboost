@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getSortedPosts } from "@/lib/blog-posts";
 import { NewsletterSignup } from "@/components/newsletter-signup";
+import { BlogList } from "@/components/blog-list";
 
 export const metadata: Metadata = {
   title: "Blog - SocialBoost",
@@ -37,28 +38,7 @@ export default function BlogPage() {
           Tips and strategies for social media marketing.
         </p>
 
-        <div className="mt-12 space-y-8">
-          {posts.map((post) => (
-            <article key={post.slug} className="group">
-              <Link
-                href={`/blog/${post.slug}`}
-                className="block rounded-xl border p-6 transition-colors hover:bg-muted/50"
-              >
-                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                  <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                    {post.category}
-                  </span>
-                  <span>{post.date}</span>
-                  <span>{post.readTime}</span>
-                </div>
-                <h2 className="mt-3 text-xl font-semibold group-hover:text-primary transition-colors">
-                  {post.title}
-                </h2>
-                <p className="mt-2 text-muted-foreground">{post.excerpt}</p>
-              </Link>
-            </article>
-          ))}
-        </div>
+        <BlogList posts={posts} />
 
         <NewsletterSignup />
       </main>
