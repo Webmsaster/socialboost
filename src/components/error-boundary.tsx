@@ -25,13 +25,15 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("ErrorBoundary caught:", error, errorInfo);
-    // Sentry integration (if available) — package may not be installed
+    // Sentry integration — dynamic import so bundle stays lean when DSN is not set
     if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_SENTRY_DSN) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const Sentry = require("@sentry/nextjs");
-        Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
-      } catch {}
+      import("@sentry/nextjs")
+        .then((Sentry) => {
+          Sentry.captureException(error, {
+            extra: { componentStack: errorInfo.componentStack },
+          });
+        })
+        .catch(() => {});
     }
   }
 
