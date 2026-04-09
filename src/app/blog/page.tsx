@@ -74,6 +74,25 @@ const posts = [
     readTime: "9 min read",
     category: "Facebook",
   },
+  {
+    slug: "tiktok-marketing-guide",
+    title: "The TikTok Marketing Guide for Brands in 2026",
+    excerpt:
+      "Complete TikTok marketing guide: algorithm insights, content formats, trending audio, hashtag strategy, and AI-powered script generation.",
+    date: "2026-04-09",
+    readTime: "10 min read",
+    category: "TikTok",
+  },
+  {
+    slug: "threads-growth-strategy",
+    title:
+      "Threads Growth Strategy: Building an Audience on Meta's Newest Platform",
+    excerpt:
+      "How to grow on Threads in 2026. Content formats, posting cadence, algorithm tips, and AI-powered content that resonates.",
+    date: "2026-04-09",
+    readTime: "7 min read",
+    category: "Threads",
+  },
 ];
 
 export default function BlogPage() {

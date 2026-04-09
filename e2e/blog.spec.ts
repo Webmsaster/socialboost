@@ -8,6 +8,8 @@ const BLOG_SLUGS = [
   "twitter-x-growth-tips",
   "content-repurposing-guide",
   "facebook-marketing-strategies",
+  "tiktok-marketing-guide",
+  "threads-growth-strategy",
 ];
 
 // =============================================================================
