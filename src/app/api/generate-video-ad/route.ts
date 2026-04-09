@@ -67,9 +67,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const model = isProSubscription(profile.subscription_status)
-      ? (profile.preferred_model || "gpt-4o-mini")
-      : "gpt-4o-mini";
+    // Pro-only endpoint (guarded above) — always honor preferred_model
+    const model = profile.preferred_model || "gpt-4o-mini";
 
     const result = await generateVideoAd({
       topic,

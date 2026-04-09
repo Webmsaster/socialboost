@@ -19,4 +19,16 @@ describe("GET /api/health", () => {
     const date = new Date(data.timestamp);
     expect(date.toISOString()).toBe(data.timestamp);
   });
+
+  it("falls back to 1.0.0 when npm_package_version is unset", async () => {
+    const original = process.env.npm_package_version;
+    delete process.env.npm_package_version;
+    try {
+      const response = await GET();
+      const data = await response.json();
+      expect(data.version).toBe("1.0.0");
+    } finally {
+      if (original !== undefined) process.env.npm_package_version = original;
+    }
+  });
 });
