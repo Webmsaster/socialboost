@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PricingToggle } from "@/components/pricing-toggle";
+import { ABHero } from "@/components/ab-hero";
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -239,31 +240,8 @@ export default function LandingPage() {
       </header>
 
       <main id="main-content">
-        {/* Hero */}
-        <section className="mx-auto max-w-4xl px-6 py-16 text-center md:py-24">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-            AI-powered content
-            <span className="text-primary"> for every platform</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-            Generate social posts, video scripts, carousels, ad storyboards, and AI images
-            — all from a single prompt. Choose your platform, tone, and topic. Our AI handles the rest.
-          </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link
-              href="/signup"
-              className="w-full rounded-lg bg-primary px-8 py-3 text-center text-lg font-medium text-primary-foreground hover:bg-primary/90 sm:w-auto"
-            >
-              Start for free
-            </Link>
-            <Link
-              href="/login"
-              className="w-full rounded-lg border px-8 py-3 text-center text-lg font-medium hover:bg-muted sm:w-auto"
-            >
-              Sign in
-            </Link>
-          </div>
-        </section>
+        {/* Hero (A/B tested) */}
+        <ABHero />
 
         {/* What you can create */}
         <section className="border-t bg-muted/30 py-10">

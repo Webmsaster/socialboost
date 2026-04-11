@@ -134,6 +134,15 @@ export const blogPosts: BlogPost[] = [
     category: "Analytics",
   },
   {
+    slug: "linkedin-algorithm-2026",
+    title: "LinkedIn Algorithm in 2026: What Actually Drives Reach",
+    excerpt:
+      "Deep dive into LinkedIn's algorithm: dwell time, early comments, content originality, and the signals that determine reach in 2026.",
+    date: "2026-04-11",
+    readTime: "8 min read",
+    category: "LinkedIn",
+  },
+  {
     slug: "auto-scheduling-social-media",
     title: "Auto-Scheduling: Let AI Pick the Best Times for Your Posts",
     excerpt:

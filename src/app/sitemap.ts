@@ -197,6 +197,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
+      url: `${baseUrl}/blog/linkedin-algorithm-2026`,
+      lastModified: new Date("2026-04-11"),
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    },
+    {
       url: `${baseUrl}/blog/auto-scheduling-social-media`,
       lastModified: new Date("2026-04-11"),
       changeFrequency: "monthly" as const,

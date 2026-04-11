@@ -10,6 +10,7 @@ import { DashboardSkeleton } from "@/components/loading-skeleton";
 import { useLanguage } from "@/lib/i18n";
 import { Onboarding } from "@/components/onboarding";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
+import { achievements } from "@/lib/achievements";
 import { toast } from "sonner";
 
 interface Post {
@@ -35,6 +36,7 @@ export default function DashboardPage() {
   const supabase = createClient();
 
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [unlockedBadges, setUnlockedBadges] = useState<string[]>([]);
   const [allPosts, setAllPosts] = useState<Array<Pick<Post, "platform" | "status" | "created_at"> & { scheduled_for?: string }>>([]);
 
   useEffect(() => {
@@ -68,6 +70,12 @@ export default function DashboardPage() {
       } finally {
         setLoading(false);
       }
+
+      // Load achievements in background
+      fetch("/api/achievements")
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => { if (d?.unlocked) setUnlockedBadges(d.unlocked); })
+        .catch(() => {});
     }
     load();
   }, [supabase]);
@@ -150,6 +158,36 @@ export default function DashboardPage() {
             </Link>
           </Button>
         </div>
+      )}
+
+      {/* Achievements */}
+      {unlockedBadges.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("dashboard.achievements")} ({unlockedBadges.length}/{achievements.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {achievements.map((a) => {
+                const unlocked = unlockedBadges.includes(a.id);
+                return (
+                  <div
+                    key={a.id}
+                    title={unlocked ? `${a.title}: ${a.description}` : a.description}
+                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
+                      unlocked ? "bg-primary/5 border-primary/20" : "opacity-30"
+                    }`}
+                  >
+                    <span>{a.icon}</span>
+                    <span className="font-medium">{a.title}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Stats Cards */}

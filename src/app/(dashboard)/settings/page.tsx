@@ -341,9 +341,16 @@ export default function SettingsPage() {
             />
           </div>
           {isPro ? (
-            <Button variant="outline" onClick={handleManage} disabled={checkoutLoading}>
-              {t("settings.manage")}
-            </Button>
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={handleManage} disabled={checkoutLoading}>
+                  {t("settings.manage")}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("settings.portalHint")}
+              </p>
+            </div>
           ) : (
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button onClick={() => handleUpgrade("monthly")} disabled={checkoutLoading}>
