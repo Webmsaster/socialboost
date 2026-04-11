@@ -26,8 +26,10 @@ import {
   isSameDay,
   addMonths,
   subMonths,
+  addDays,
   isToday,
   parseISO,
+  getDay,
 } from "date-fns";
 
 interface Post {
@@ -67,6 +69,7 @@ export default function CalendarPage() {
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [bestTimesPlatform, setBestTimesPlatform] = useState("linkedin");
+  const [autoScheduling, setAutoScheduling] = useState(false);
   const { t } = useLanguage();
   const supabase = createClient();
 
@@ -86,7 +89,6 @@ export default function CalendarPage() {
   }, [supabase]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPosts();
   }, [loadPosts]);
 
@@ -207,6 +209,86 @@ export default function CalendarPage() {
   const getPlatformColor = (platform: string): string => {
     return PLATFORM_COLORS[platform.toLowerCase()] ?? "bg-muted text-muted-foreground";
   };
+
+  // Day name to JS day index (0=Sun, 1=Mon, ... 6=Sat)
+  const dayNameToIndex: Record<string, number> = {
+    Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3,
+    Thursday: 4, Friday: 5, Saturday: 6,
+  };
+
+  async function handleAutoSchedule() {
+    if (draftPosts.length === 0) return;
+    setAutoScheduling(true);
+
+    try {
+      const now = new Date();
+      const usedSlots = new Set<string>();
+
+      // For each draft, find the next best time based on its platform
+      const updates: Array<{ id: string; scheduled_for: string }> = [];
+
+      for (const post of draftPosts) {
+        const platformTimes = optimalPostingTimes[post.platform] || optimalPostingTimes.linkedin;
+        // Sort: high engagement first
+        const sorted = [...platformTimes].sort((a, b) =>
+          a.engagement === "high" && b.engagement !== "high" ? -1 : 1
+        );
+
+        let scheduled = false;
+        // Look ahead up to 4 weeks
+        for (let weekOffset = 0; weekOffset < 4 && !scheduled; weekOffset++) {
+          for (const slot of sorted) {
+            const targetDayIndex = dayNameToIndex[slot.day];
+            if (targetDayIndex === undefined) continue;
+
+            // Find the next occurrence of this day of week
+            const currentDayIndex = getDay(now);
+            let daysAhead = targetDayIndex - currentDayIndex;
+            if (daysAhead <= 0) daysAhead += 7;
+            daysAhead += weekOffset * 7;
+
+            const targetDate = addDays(now, daysAhead);
+            const timeStr = slot.times[0]; // Use first (best) time
+
+            // Parse time like "9:00 AM"
+            const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+            if (!match) continue;
+            let hours = parseInt(match[1]);
+            const minutes = parseInt(match[2]);
+            if (match[3].toUpperCase() === "PM" && hours !== 12) hours += 12;
+            if (match[3].toUpperCase() === "AM" && hours === 12) hours = 0;
+
+            targetDate.setHours(hours, minutes, 0, 0);
+
+            // Skip if in the past
+            if (targetDate <= now) continue;
+
+            const slotKey = `${format(targetDate, "yyyy-MM-dd")}-${hours}-${minutes}`;
+            if (usedSlots.has(slotKey)) continue;
+
+            usedSlots.add(slotKey);
+            updates.push({ id: post.id, scheduled_for: targetDate.toISOString() });
+            scheduled = true;
+          }
+        }
+      }
+
+      // Apply all updates
+      for (const update of updates) {
+        await supabase
+          .from("posts")
+          .update({ scheduled_for: update.scheduled_for, status: "scheduled" })
+          .eq("id", update.id);
+      }
+
+      toast.success(`${updates.length} ${updates.length === 1 ? "post" : "posts"} auto-scheduled!`);
+      loadPosts();
+    } catch {
+      toast.error("Auto-scheduling failed");
+    } finally {
+      setAutoScheduling(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -444,10 +526,21 @@ export default function CalendarPage() {
 
             {/* Draft Posts (Unscheduled) */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-base">
                   Unscheduled Drafts ({draftPosts.length})
                 </CardTitle>
+                {draftPosts.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAutoSchedule}
+                    disabled={autoScheduling}
+                    className="text-xs"
+                  >
+                    {autoScheduling ? "Scheduling..." : "Auto-Schedule"}
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
                 {draftPosts.length === 0 ? (

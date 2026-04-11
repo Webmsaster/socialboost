@@ -26,6 +26,27 @@ interface WeeklyStat {
   count: number;
 }
 
+interface InsightData {
+  topPosts: Array<{
+    id: string;
+    platform: string;
+    topic: string;
+    content: string;
+    tone: string;
+    likes: number;
+    shares: number;
+    comments: number;
+    impressions: number;
+    contentScore: number;
+  }>;
+  platformRanking: Array<{ platform: string; avgScore: number }>;
+  toneRanking: Array<{ tone: string; avgScore: number }>;
+  dayRanking: Array<{ day: string; avgScore: number }>;
+  topHashtags: Array<{ tag: string; avgScore: number; count: number }>;
+  lengthAnalysis: Array<{ label: string; avgScore: number; count: number }>;
+  totalAnalyzed: number;
+}
+
 interface MetricsSummary {
   totalPosts: number;
   totalLikes: number;
@@ -64,6 +85,8 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<MetricsData | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(true);
+  const [insights, setInsights] = useState<InsightData | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(true);
   const { t } = useLanguage();
   const supabase = createClient();
 
@@ -99,8 +122,23 @@ export default function AnalyticsPage() {
       }
     }
 
+    async function loadInsights() {
+      try {
+        const res = await fetch("/api/insights");
+        if (res.ok) {
+          const data = await res.json();
+          setInsights(data.insights);
+        }
+      } catch {
+        // Insights are non-critical
+      } finally {
+        setInsightsLoading(false);
+      }
+    }
+
     load();
     loadMetrics();
+    loadInsights();
   }, [supabase]);
 
   if (loading) {
@@ -411,6 +449,179 @@ export default function AnalyticsPage() {
                           <span title="Shares">{post.shares}</span>
                           <span title="Comments">{post.comments}</span>
                           <span title="Impressions">{post.impressions.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* AI Performance Insights */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t("analytics.insights")}</h2>
+
+        {insightsLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <CardSkeleton key={i} />
+            ))}
+          </div>
+        ) : !insights ? (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">{t("analytics.noInsights")}</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {/* Best Platform */}
+              {insights.platformRanking.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {t("analytics.bestPlatform")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-bold capitalize">{insights.platformRanking[0].platform}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Avg. engagement score: {insights.platformRanking[0].avgScore}
+                    </p>
+                    <div className="mt-3 space-y-1">
+                      {insights.platformRanking.map((p) => (
+                        <div key={p.platform} className="flex items-center justify-between text-xs">
+                          <span className="capitalize">{p.platform}</span>
+                          <span className="text-muted-foreground">{p.avgScore}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Best Tone */}
+              {insights.toneRanking.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {t("analytics.bestTone")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-bold capitalize">{insights.toneRanking[0].tone}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Avg. engagement score: {insights.toneRanking[0].avgScore}
+                    </p>
+                    <div className="mt-3 space-y-1">
+                      {insights.toneRanking.map((t_) => (
+                        <div key={t_.tone} className="flex items-center justify-between text-xs">
+                          <span className="capitalize">{t_.tone}</span>
+                          <span className="text-muted-foreground">{t_.avgScore}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Best Day */}
+              {insights.dayRanking.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {t("analytics.bestDay")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-bold">{insights.dayRanking[0].day}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Avg. engagement score: {insights.dayRanking[0].avgScore}
+                    </p>
+                    <div className="mt-3 space-y-1">
+                      {insights.dayRanking.map((d) => (
+                        <div key={d.day} className="flex items-center justify-between text-xs">
+                          <span>{d.day}</span>
+                          <span className="text-muted-foreground">{d.avgScore}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Content Length Analysis */}
+            {insights.lengthAnalysis.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("analytics.contentLength")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4">
+                    {insights.lengthAnalysis.map((l) => (
+                      <div key={l.label} className="rounded-lg border p-4 text-center">
+                        <p className="text-sm font-medium capitalize">{l.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {l.label === "short" ? "<150 chars" : l.label === "medium" ? "150-500 chars" : "500+ chars"}
+                        </p>
+                        <p className="text-2xl font-bold mt-2">{l.avgScore}</p>
+                        <p className="text-xs text-muted-foreground">avg score ({l.count} posts)</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Top Hashtags */}
+            {insights.topHashtags.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("analytics.topHashtags")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {insights.topHashtags.map((h) => (
+                      <div key={h.tag} className="flex items-center gap-1.5 rounded-full border px-3 py-1.5">
+                        <span className="text-sm font-medium">#{h.tag}</span>
+                        <span className="text-xs text-muted-foreground">{h.avgScore} avg</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Top Posts */}
+            {insights.topPosts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("analytics.topPosts")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {insights.topPosts.map((post, i) => (
+                      <div key={post.id} className="flex items-start gap-3 rounded-lg border p-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                          #{i + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="secondary" className="capitalize text-xs">{post.platform}</Badge>
+                            <Badge variant="outline" className="capitalize text-xs">{post.tone}</Badge>
+                          </div>
+                          <p className="text-sm truncate">{post.content}</p>
+                          <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                            <span>{post.likes} likes</span>
+                            <span>{post.shares} shares</span>
+                            <span>{post.comments} comments</span>
+                            <span>{post.impressions.toLocaleString()} views</span>
+                          </div>
                         </div>
                       </div>
                     ))}

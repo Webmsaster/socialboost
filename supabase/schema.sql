@@ -286,3 +286,98 @@ begin
   where id = p_referred_id;
 end;
 $$ language plpgsql security definer;
+
+-- ============================================
+-- 12. Content Series (recurring post templates)
+-- ============================================
+create table if not exists public.content_series (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  name text not null,
+  platform text not null
+    check (platform in ('linkedin', 'facebook', 'instagram', 'pinterest', 'twitter')),
+  tone text not null default 'professional'
+    check (tone in ('professional', 'casual', 'inspirational', 'humorous', 'educational')),
+  topic_template text not null,
+  frequency text not null default 'weekly'
+    check (frequency in ('daily', 'weekly', 'biweekly', 'monthly')),
+  day_of_week integer check (day_of_week between 0 and 6),
+  preferred_time text default '09:00',
+  is_active boolean not null default true,
+  last_generated_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table public.content_series enable row level security;
+
+create policy "Users can read own series"
+  on public.content_series for select using (auth.uid() = user_id);
+create policy "Users can insert own series"
+  on public.content_series for insert with check (auth.uid() = user_id);
+create policy "Users can update own series"
+  on public.content_series for update
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Users can delete own series"
+  on public.content_series for delete using (auth.uid() = user_id);
+create policy "Service role full access on content_series"
+  on public.content_series for all
+  using (auth.role() = 'service_role');
+
+create index if not exists idx_content_series_user on public.content_series(user_id);
+
+-- ============================================
+-- 13. Organizations & Team Members
+-- ============================================
+create table if not exists public.organizations (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  owner_id uuid references public.profiles(id) on delete cascade not null,
+  subscription_status text not null default 'inactive',
+  max_members integer not null default 5,
+  created_at timestamptz not null default now()
+);
+
+alter table public.organizations enable row level security;
+
+create policy "Org members can read org"
+  on public.organizations for select
+  using (id in (select org_id from public.org_members where user_id = auth.uid()));
+create policy "Owner can update org"
+  on public.organizations for update using (owner_id = auth.uid());
+create policy "Users can create orgs"
+  on public.organizations for insert with check (auth.uid() = owner_id);
+create policy "Service role full access on organizations"
+  on public.organizations for all
+  using (auth.role() = 'service_role');
+
+create table if not exists public.org_members (
+  id uuid default gen_random_uuid() primary key,
+  org_id uuid references public.organizations(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade,
+  role text not null default 'member'
+    check (role in ('owner', 'admin', 'member')),
+  invited_email text,
+  accepted boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table public.org_members enable row level security;
+
+create policy "Org members can read members"
+  on public.org_members for select
+  using (org_id in (select org_id from public.org_members om where om.user_id = auth.uid() and om.accepted = true));
+create policy "Admins can manage members"
+  on public.org_members for all
+  using (org_id in (select org_id from public.org_members om where om.user_id = auth.uid() and om.role in ('owner', 'admin')));
+create policy "Service role full access on org_members"
+  on public.org_members for all
+  using (auth.role() = 'service_role');
+
+create index if not exists idx_org_members_org on public.org_members(org_id);
+create index if not exists idx_org_members_user on public.org_members(user_id);
+
+-- ============================================
+-- 14. Notification Preferences
+-- ============================================
+alter table public.profiles
+  add column if not exists notification_preferences jsonb default '{}'::jsonb;

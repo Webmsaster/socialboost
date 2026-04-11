@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,7 @@ export default function HistoryPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const { t } = useLanguage();
+  const router = useRouter();
   const supabase = createClient();
 
   const filteredPosts = useMemo(() => {
@@ -233,6 +235,13 @@ export default function HistoryPage() {
                     onClick={() => handleDuplicate(post)}
                   >
                     Duplicate
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push(`/repurpose?postId=${post.id}`)}
+                  >
+                    Repurpose
                   </Button>
                   <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDelete(post.id)}>
                     {t("history.delete")}

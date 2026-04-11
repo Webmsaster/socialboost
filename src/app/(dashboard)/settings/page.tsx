@@ -57,30 +57,18 @@ export default function SettingsPage() {
   const { t } = useLanguage();
   const supabase = createClient();
 
-  useEffect(() => {
+  async function saveNotificationPrefs() {
     try {
-      const stored = localStorage.getItem("socialboost-notification-prefs");
-      if (stored) {
-        const prefs = JSON.parse(stored);
-        if (typeof prefs.digest === "boolean") setNotifyDigest(prefs.digest);
-        if (typeof prefs.publish === "boolean") setNotifyPublish(prefs.publish);
-        if (typeof prefs.marketing === "boolean") setNotifyMarketing(prefs.marketing);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-  function saveNotificationPrefs() {
-    try {
-      localStorage.setItem(
-        "socialboost-notification-prefs",
-        JSON.stringify({
-          digest: notifyDigest,
-          publish: notifyPublish,
-          marketing: notifyMarketing,
-        }),
-      );
+      const prefs = { digest: notifyDigest, publish: notifyPublish, marketing: notifyMarketing };
+      const { error } = await supabase
+        .from("profiles")
+        .update({ notification_preferences: prefs })
+        .eq("id", user.id);
+
+      if (error) throw error;
       toast.success(t("settings.preferencesSaved") || "Notification preferences saved");
     } catch {
       toast.error("Failed to save preferences");
@@ -99,7 +87,7 @@ export default function SettingsPage() {
       const { data } = await supabase
         .from("profiles")
         .select(
-          "full_name, subscription_status, generation_count, bonus_generations, brand_voice, preferred_model",
+          "full_name, subscription_status, generation_count, bonus_generations, brand_voice, preferred_model, notification_preferences",
         )
         .eq("id", user.id)
         .single();
@@ -114,6 +102,14 @@ export default function SettingsPage() {
         setFullName(data.full_name ?? "");
         setBrandVoice(data.brand_voice ?? "");
         setPreferredModel(data.preferred_model ?? "gpt-4o-mini");
+
+        // Load notification preferences from server
+        const prefs = data.notification_preferences as Record<string, boolean> | null;
+        if (prefs) {
+          if (typeof prefs.digest === "boolean") setNotifyDigest(prefs.digest);
+          if (typeof prefs.publish === "boolean") setNotifyPublish(prefs.publish);
+          if (typeof prefs.marketing === "boolean") setNotifyMarketing(prefs.marketing);
+        }
       }
 
       // Load referral data

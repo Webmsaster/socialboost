@@ -150,6 +150,10 @@ export default function CreatePage() {
   const [suggestedHashtags, setSuggestedHashtags] = useState<string[]>([]);
   const [loadingHashtags, setLoadingHashtags] = useState(false);
 
+  // Content score
+  const [contentScore, setContentScore] = useState<{ score: number; tips: string[] } | null>(null);
+  const [scoringContent, setScoringContent] = useState(false);
+
   // Copy states
   const [copied, setCopied] = useState(false);
   const [copiedVariant, setCopiedVariant] = useState<string | null>(null);
@@ -330,7 +334,11 @@ export default function CreatePage() {
       }
       const data = await res.json();
       setPostResult(data);
+      setContentScore(null);
       localStorage.removeItem("draft_create");
+
+      // Auto-score the generated content
+      fetchContentScore(data.content, platform, data.hashtags);
 
       // Generate image if enabled
       if (enableImage) {
@@ -510,6 +518,25 @@ export default function CreatePage() {
     }
   }
 
+  async function fetchContentScore(content: string, scorePlatform: string, hashtags: string[]) {
+    setScoringContent(true);
+    try {
+      const res = await fetch("/api/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, platform: scorePlatform, hashtags }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setContentScore({ score: data.score, tips: data.tips });
+      }
+    } catch {
+      // Score is non-critical
+    } finally {
+      setScoringContent(false);
+    }
+  }
+
   // --- Result Components ---
 
   function renderPostResult() {
@@ -546,6 +573,46 @@ export default function CreatePage() {
                 alt="AI generated visual"
                 className="w-full max-w-md rounded-lg border"
               />
+            </div>
+          )}
+
+          {/* Content Score */}
+          {scoringContent ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              Analyzing content...
+            </div>
+          ) : contentScore && (
+            <div className="rounded-lg border p-4 space-y-2">
+              <div className="flex items-center gap-3">
+                <div className={`text-2xl font-bold ${
+                  contentScore.score >= 80 ? "text-green-600" :
+                  contentScore.score >= 60 ? "text-yellow-600" : "text-red-500"
+                }`}>
+                  {contentScore.score}/100
+                </div>
+                <div className="flex-1">
+                  <div className="h-2 rounded-full bg-muted">
+                    <div
+                      className={`h-2 rounded-full transition-all ${
+                        contentScore.score >= 80 ? "bg-green-500" :
+                        contentScore.score >= 60 ? "bg-yellow-500" : "bg-red-500"
+                      }`}
+                      style={{ width: `${contentScore.score}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+              {contentScore.tips.length > 0 && (
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  {contentScore.tips.map((tip, i) => (
+                    <li key={i} className="flex gap-1.5">
+                      <span className="shrink-0">{contentScore.score >= 80 ? "✓" : "→"}</span>
+                      {tip}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
