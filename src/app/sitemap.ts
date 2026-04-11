@@ -178,5 +178,23 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.7,
     },
+    {
+      url: `${baseUrl}/blog/social-media-kpis-that-matter`,
+      lastModified: new Date("2026-04-10"),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/blog/hashtag-strategy-2026`,
+      lastModified: new Date("2026-04-10"),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/blog/ai-content-voice-guide`,
+      lastModified: new Date("2026-04-10"),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
   ];
 }

@@ -31,10 +31,13 @@ vi.mock("@/lib/i18n", () => ({
         "nav.create": "Create",
         "nav.bulk": "Bulk",
         "nav.templates": "Templates",
+        "nav.repurpose": "Repurpose",
+        "nav.series": "Series",
         "nav.history": "History",
         "nav.calendar": "Calendar",
         "nav.analytics": "Analytics",
         "nav.accounts": "Accounts",
+        "nav.team": "Team",
         "nav.settings": "Settings",
         "nav.signOut": "Sign Out",
       };
@@ -65,7 +68,7 @@ vi.mock("@/lib/utils", () => ({
 import { DashboardNav } from "@/components/dashboard-nav";
 
 describe("DashboardNav", () => {
-  it("renders all 9 navigation links", () => {
+  it("renders all navigation links", () => {
     render(<DashboardNav />);
     const links = screen.getAllByRole("link");
     const hrefs = links.map((l) => l.getAttribute("href"));
@@ -73,10 +76,13 @@ describe("DashboardNav", () => {
     expect(hrefs).toContain("/create");
     expect(hrefs).toContain("/bulk");
     expect(hrefs).toContain("/templates");
+    expect(hrefs).toContain("/repurpose");
+    expect(hrefs).toContain("/series");
     expect(hrefs).toContain("/history");
     expect(hrefs).toContain("/calendar");
     expect(hrefs).toContain("/analytics");
     expect(hrefs).toContain("/accounts");
+    expect(hrefs).toContain("/team");
     expect(hrefs).toContain("/settings");
   });
 
