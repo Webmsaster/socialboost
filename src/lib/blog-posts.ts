@@ -134,6 +134,15 @@ export const blogPosts: BlogPost[] = [
     category: "Analytics",
   },
   {
+    slug: "auto-scheduling-social-media",
+    title: "Auto-Scheduling: Let AI Pick the Best Times for Your Posts",
+    excerpt:
+      "Stop guessing when to post. How auto-scheduling uses platform engagement data to find optimal times for LinkedIn, Instagram, Twitter, Facebook, and Pinterest.",
+    date: "2026-04-11",
+    readTime: "6 min read",
+    category: "Strategy",
+  },
+  {
     slug: "social-media-team-workflow",
     title: "Social Media Team Workflow: From Draft to Publish in 2026",
     excerpt:

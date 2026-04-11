@@ -41,17 +41,16 @@ export function ContactForm() {
     setErrors({});
     setStatus("sending");
 
-    const formspreeId = process.env.NEXT_PUBLIC_FORMSPREE_ID;
-    if (!formspreeId) {
-      setStatus("error");
-      return;
-    }
-
     try {
-      const res = await fetch(`https://formspree.io/f/${formspreeId}`, {
+      const res = await fetch("/api/contact", {
         method: "POST",
-        body: form,
-        headers: { Accept: "application/json" },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.get("name"),
+          email: form.get("email"),
+          subject: form.get("subject"),
+          message: form.get("message"),
+        }),
       });
 
       if (res.ok) {

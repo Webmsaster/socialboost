@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -157,7 +158,7 @@ function PinterestPreview({ content, hashtags, imageUrl }: PostPreviewProps) {
   );
 }
 
-export function PostPreview({ platform, content, hashtags, imageUrl }: PostPreviewProps) {
+export const PostPreview = memo(function PostPreview({ platform, content, hashtags, imageUrl }: PostPreviewProps) {
   if (!content) return null;
 
   const props = { platform, content, hashtags, imageUrl };
@@ -176,4 +177,4 @@ export function PostPreview({ platform, content, hashtags, imageUrl }: PostPrevi
       </CardContent>
     </Card>
   );
-}
+});

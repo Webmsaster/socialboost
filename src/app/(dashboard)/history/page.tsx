@@ -19,6 +19,7 @@ interface Post {
   hashtags: string[];
   tone: string;
   status: string;
+  is_favorite: boolean;
   created_at: string;
 }
 
@@ -29,6 +30,7 @@ const POSTS_PER_PAGE = 10;
 export default function HistoryPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [filter, setFilter] = useState<FilterStatus>("all");
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -37,15 +39,21 @@ export default function HistoryPage() {
   const supabase = createClient();
 
   const filteredPosts = useMemo(() => {
-    if (!search.trim()) return posts;
-    const q = search.toLowerCase();
-    return posts.filter(
-      (p) =>
-        p.topic.toLowerCase().includes(q) ||
-        p.content.toLowerCase().includes(q) ||
-        p.platform.toLowerCase().includes(q)
-    );
-  }, [posts, search]);
+    let result = posts;
+    if (showFavoritesOnly) {
+      result = result.filter((p) => p.is_favorite);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (p) =>
+          p.topic.toLowerCase().includes(q) ||
+          p.content.toLowerCase().includes(q) ||
+          p.platform.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [posts, search, showFavoritesOnly]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPosts.length / POSTS_PER_PAGE));
   const paginatedPosts = filteredPosts.slice((page - 1) * POSTS_PER_PAGE, page * POSTS_PER_PAGE);
@@ -79,6 +87,50 @@ export default function HistoryPage() {
       toast.error("Failed to delete");
     } else {
       setPosts((prev) => prev.filter((p) => p.id !== id));
+    }
+  }
+
+  async function handleCSVImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const lines = text.split("\n").filter((l) => l.trim());
+      if (lines.length < 2) {
+        toast.error("CSV must have a header row and at least one data row");
+        return;
+      }
+      const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+      const rows = lines.slice(1).map((line) => {
+        const values = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+        const row: Record<string, string> = {};
+        headers.forEach((h, i) => { row[h] = values[i] || ""; });
+        return row;
+      });
+      const res = await fetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Imported ${data.imported} posts${data.skipped ? `, ${data.skipped} skipped` : ""}`);
+        window.location.reload();
+      } else {
+        toast.error(data.error || "Import failed");
+      }
+    } catch {
+      toast.error("Failed to parse CSV");
+    }
+    e.target.value = "";
+  }
+
+  async function handleToggleFavorite(id: string, current: boolean) {
+    const { error } = await supabase.from("posts").update({ is_favorite: !current }).eq("id", id);
+    if (error) {
+      toast.error("Failed to update");
+    } else {
+      setPosts((prev) => prev.map((p) => p.id === id ? { ...p, is_favorite: !current } : p));
     }
   }
 
@@ -176,20 +228,39 @@ export default function HistoryPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">{t("history.title")}</h1>
-        {posts.length > 0 && (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={exportAsCSV}>
-              Export CSV
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportAsText}>
-              Export TXT
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => document.getElementById("csv-import")?.click()}>
+            Import CSV
+          </Button>
+          <input
+            id="csv-import"
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={handleCSVImport}
+          />
+          {posts.length > 0 && (
+            <>
+              <Button variant="outline" size="sm" onClick={exportAsCSV}>
+                Export CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportAsText}>
+                Export TXT
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant={showFavoritesOnly ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+          >
+            {showFavoritesOnly ? "★" : "☆"} Favorites
+          </Button>
           {filters.map((f) => (
             <Button
               key={f}
@@ -236,7 +307,15 @@ export default function HistoryPage() {
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-3">
                   {post.content}
                 </p>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleToggleFavorite(post.id, post.is_favorite)}
+                    className={post.is_favorite ? "text-yellow-500" : ""}
+                  >
+                    {post.is_favorite ? "★" : "☆"}
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"

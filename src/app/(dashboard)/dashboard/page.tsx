@@ -35,7 +35,7 @@ export default function DashboardPage() {
   const supabase = createClient();
 
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [allPosts, setAllPosts] = useState<Pick<Post, "platform" | "status" | "created_at">[]>([]);
+  const [allPosts, setAllPosts] = useState<Array<Pick<Post, "platform" | "status" | "created_at"> & { scheduled_for?: string }>>([]);
 
   useEffect(() => {
     async function load() {
@@ -45,7 +45,7 @@ export default function DashboardPage() {
 
         const [postsRes, allPostsRes, profileRes] = await Promise.all([
           supabase.from("posts").select("*").order("created_at", { ascending: false }).limit(5),
-          supabase.from("posts").select("platform, status, created_at"),
+          supabase.from("posts").select("platform, status, created_at, scheduled_for"),
           supabase.from("profiles").select("generation_count, subscription_status").eq("id", user.id).single(),
         ]);
 
@@ -179,6 +179,56 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Streak & Next Post Widgets */}
+      {allPosts.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">{t("dashboard.streak")}</p>
+              <p className="text-3xl font-bold">
+                {(() => {
+                  const published = allPosts
+                    .filter((p) => p.status === "published")
+                    .map((p) => new Date(p.created_at).toDateString());
+                  const uniqueDays = [...new Set(published)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+                  let streak = 0;
+                  const today = new Date();
+                  for (let i = 0; i < uniqueDays.length; i++) {
+                    const expected = new Date(today);
+                    expected.setDate(today.getDate() - i);
+                    if (uniqueDays[i] === expected.toDateString()) {
+                      streak++;
+                    } else break;
+                  }
+                  return streak;
+                })()}
+                <span className="text-lg font-normal text-muted-foreground"> {t("dashboard.days")}</span>
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">{t("dashboard.nextPost")}</p>
+              {(() => {
+                const next = allPosts
+                  .filter((p) => p.status === "scheduled" && p.scheduled_for)
+                  .sort((a, b) => new Date(a.scheduled_for!).getTime() - new Date(b.scheduled_for!).getTime())[0];
+                if (!next) return <p className="text-sm text-muted-foreground mt-1">{t("dashboard.noScheduled")}</p>;
+                const date = new Date(next.scheduled_for!);
+                return (
+                  <div className="mt-1">
+                    <p className="text-lg font-bold">{next.platform}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {profile && (
         <Card>

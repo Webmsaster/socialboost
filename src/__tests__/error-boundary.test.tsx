@@ -55,16 +55,16 @@ describe("ErrorBoundary", () => {
     expect(screen.getByText("Test error")).toBeInTheDocument();
   });
 
-  it('shows "Try again" button', () => {
+  it('shows "Try Again" button', () => {
     render(
       <ErrorBoundary>
         <ThrowingComponent />
       </ErrorBoundary>
     );
-    expect(screen.getByText("Try again")).toBeInTheDocument();
+    expect(screen.getByText("Try Again")).toBeInTheDocument();
   });
 
-  it('"Try again" resets error state and re-renders children', () => {
+  it('"Try Again" resets error state and re-renders children', () => {
     let shouldThrow = true;
 
     function ConditionalThrower() {
@@ -81,7 +81,7 @@ describe("ErrorBoundary", () => {
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
 
     shouldThrow = false;
-    fireEvent.click(screen.getByText("Try again"));
+    fireEvent.click(screen.getByText("Try Again"));
 
     expect(screen.getByText("Recovered")).toBeInTheDocument();
   });

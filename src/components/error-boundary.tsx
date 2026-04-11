@@ -11,21 +11,21 @@ interface Props {
 interface State {
   hasError: boolean;
   error?: Error;
+  retryCount: number;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, retryCount: 0 };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("ErrorBoundary caught:", error, errorInfo);
-    // Sentry integration — dynamic import so bundle stays lean when DSN is not set
     if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_SENTRY_DSN) {
       import("@sentry/nextjs")
         .then((Sentry) => {
@@ -37,9 +37,24 @@ export class ErrorBoundary extends Component<Props, State> {
     }
   }
 
+  handleRetry = () => {
+    this.setState((prev) => ({
+      hasError: false,
+      error: undefined,
+      retryCount: prev.retryCount + 1,
+    }));
+  };
+
+  handleReload = () => {
+    window.location.reload();
+  };
+
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
+
+      const maxRetries = this.state.retryCount >= 2;
+
       return (
         <div className="flex min-h-[300px] flex-col items-center justify-center gap-4 rounded-xl border bg-background p-8 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
@@ -51,11 +66,27 @@ export class ErrorBoundary extends Component<Props, State> {
           </div>
           <h3 className="text-lg font-semibold">Something went wrong</h3>
           <p className="max-w-sm text-sm text-muted-foreground">
-            {this.state.error?.message || "An unexpected error occurred. Please try again."}
+            {this.state.error?.message || "An unexpected error occurred."}
           </p>
-          <Button onClick={() => this.setState({ hasError: false, error: undefined })} variant="outline">
-            Try again
-          </Button>
+          {maxRetries ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                This error persists after retrying. Try reloading the page.
+              </p>
+              <Button onClick={this.handleReload} variant="default">
+                Reload Page
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button onClick={this.handleRetry} variant="outline">
+                Try Again
+              </Button>
+              <Button onClick={this.handleReload} variant="ghost">
+                Reload Page
+              </Button>
+            </div>
+          )}
         </div>
       );
     }

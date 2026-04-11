@@ -296,6 +296,15 @@ export default function CalendarPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold">{t("calendar.title")}</h1>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              window.open("/api/calendar/export", "_blank");
+            }}
+          >
+            Export .ics
+          </Button>
           <Button variant="outline" size="sm" onClick={goToPrevMonth}>
             <ChevronLeftIcon />
           </Button>

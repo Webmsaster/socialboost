@@ -61,6 +61,30 @@ const faqs = [
     a: "Yes. Agencies and freelancers use SocialBoost to streamline content production for multiple clients. You can create templates per client and switch brand voices between generations.",
   },
   {
+    q: "What are Content Series?",
+    a: "Content Series let you set up recurring post themes — like 'Monday Motivation' or 'Friday Tips.' You define the topic template, platform, tone, and schedule, and SocialBoost generates fresh posts automatically on your chosen cadence (daily, weekly, biweekly, or monthly).",
+  },
+  {
+    q: "How does content repurposing work?",
+    a: "Select any existing post or paste your content, choose which platforms you want to target, and SocialBoost's AI adapts the content for each platform — adjusting length, style, hashtags, and formatting automatically.",
+  },
+  {
+    q: "What is the AI Content Score?",
+    a: "After every post generation, SocialBoost scores your content from 1-100 based on platform best practices: post length, hook strength, CTA presence, hashtag optimization, and readability. You also get specific tips to improve the score.",
+  },
+  {
+    q: "How does auto-scheduling work?",
+    a: "Click 'Auto-Schedule' in your content calendar, and SocialBoost distributes your unscheduled drafts to optimal time slots based on platform engagement data. Each platform has different best times, and the system avoids scheduling conflicts.",
+  },
+  {
+    q: "What is the review/approval workflow?",
+    a: "Team members can submit drafts for review. Team admins and owners see pending posts in the Review queue and can approve (moving to scheduling) or send back with feedback notes. Email notifications are sent for both actions.",
+  },
+  {
+    q: "Can I import posts from a CSV file?",
+    a: "Yes. Go to History and click 'Import CSV.' Your CSV should have columns for platform, topic, content, tone, and hashtags. Up to 100 posts can be imported at once.",
+  },
+  {
     q: "What if I need help?",
     a: "Reach out via the Contact page or email support@socialboost.app. We typically respond within 24 hours on business days.",
   },

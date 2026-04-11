@@ -115,6 +115,76 @@ export async function sendLimitReachedEmail(
   });
 }
 
+export async function sendReviewApprovedEmail(
+  to: string,
+  postTopic: string,
+  reviewerName: string,
+  note?: string
+): Promise<boolean> {
+  return sendEmail({
+    to,
+    subject: "Your post was approved!",
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #7c3aed, #6d28d9); padding: 24px; border-radius: 12px 12px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 20px;">SocialBoost</h1>
+        </div>
+        <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+          <h2 style="margin-top: 0; color: #16a34a;">Post Approved</h2>
+          <p style="color: #374151;">
+            <strong>${reviewerName}</strong> approved your post: <em>${postTopic}</em>
+          </p>
+          ${note ? `<div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 3px solid #16a34a;">
+            <p style="margin: 0; color: #166534; font-size: 14px;">${note}</p>
+          </div>` : ""}
+          <p style="color: #374151; font-size: 14px;">
+            Your post is now ready to be scheduled and published.
+          </p>
+          <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://socialboost.app"}/history"
+             style="display: inline-block; background: #7c3aed; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px;">
+            View Post
+          </a>
+        </div>
+      </div>
+    `,
+  });
+}
+
+export async function sendReviewRejectedEmail(
+  to: string,
+  postTopic: string,
+  reviewerName: string,
+  note?: string
+): Promise<boolean> {
+  return sendEmail({
+    to,
+    subject: "Your post needs changes",
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #7c3aed, #6d28d9); padding: 24px; border-radius: 12px 12px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 20px;">SocialBoost</h1>
+        </div>
+        <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+          <h2 style="margin-top: 0; color: #d97706;">Changes Requested</h2>
+          <p style="color: #374151;">
+            <strong>${reviewerName}</strong> sent back your post: <em>${postTopic}</em>
+          </p>
+          ${note ? `<div style="background: #fffbeb; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 3px solid #d97706;">
+            <p style="margin: 0; color: #92400e; font-size: 14px;">${note}</p>
+          </div>` : ""}
+          <p style="color: #374151; font-size: 14px;">
+            Your post has been moved back to drafts. Edit it and resubmit when ready.
+          </p>
+          <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://socialboost.app"}/history"
+             style="display: inline-block; background: #7c3aed; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px;">
+            Edit Post
+          </a>
+        </div>
+      </div>
+    `,
+  });
+}
+
 export async function sendPublishFailedEmail(
   to: string,
   platform: string,

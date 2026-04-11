@@ -78,6 +78,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})})}`
+          }}
+        />
+      </head>
       <body className={`${geistSans.variable} antialiased`}>
         <a
           href="#main-content"

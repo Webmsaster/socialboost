@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
+import { sendReviewApprovedEmail, sendReviewRejectedEmail } from "@/lib/email";
 
 // GET: List posts pending review for user's organizations
 export async function GET() {
@@ -162,6 +163,30 @@ export async function PATCH(request: NextRequest) {
     if (error) {
       captureError("Review action error", error);
       return NextResponse.json({ error: "Failed to update" }, { status: 500 });
+    }
+
+    // Send notification email to post author
+    const { data: authorProfile } = await supabase
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", post.user_id)
+      .single();
+
+    const { data: reviewerProfile } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", user.id)
+      .single();
+
+    const reviewerName = reviewerProfile?.full_name || reviewerProfile?.email || "A team member";
+
+    if (authorProfile?.email) {
+      const postTopic = "your post";
+      if (action === "approve") {
+        sendReviewApprovedEmail(authorProfile.email, postTopic, reviewerName, note);
+      } else {
+        sendReviewRejectedEmail(authorProfile.email, postTopic, reviewerName, note);
+      }
     }
 
     return NextResponse.json({ success: true, newStatus });
