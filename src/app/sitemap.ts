@@ -197,6 +197,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
+      url: `${baseUrl}/blog/social-media-team-workflow`,
+      lastModified: new Date("2026-04-11"),
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    },
+    {
       url: `${baseUrl}/blog/ai-content-scoring-guide`,
       lastModified: new Date("2026-04-11"),
       changeFrequency: "monthly" as const,

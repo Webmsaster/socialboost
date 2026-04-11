@@ -22,7 +22,7 @@ interface Post {
   created_at: string;
 }
 
-type FilterStatus = "all" | "draft" | "scheduled" | "published";
+type FilterStatus = "all" | "draft" | "pending_review" | "approved" | "scheduled" | "published";
 
 const POSTS_PER_PAGE = 10;
 
@@ -79,6 +79,24 @@ export default function HistoryPage() {
       toast.error("Failed to delete");
     } else {
       setPosts((prev) => prev.filter((p) => p.id !== id));
+    }
+  }
+
+  async function handleSubmitForReview(id: string) {
+    try {
+      const res = await fetch("/api/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: id }),
+      });
+      if (res.ok) {
+        setPosts((prev) => prev.map((p) => p.id === id ? { ...p, status: "pending_review" } : p));
+        toast.success("Submitted for review");
+      } else {
+        toast.error("Failed to submit for review");
+      }
+    } catch {
+      toast.error("Failed to submit for review");
     }
   }
 
@@ -152,7 +170,7 @@ export default function HistoryPage() {
     toast.success("Posts exported as text");
   }
 
-  const filters: FilterStatus[] = ["all", "draft", "scheduled", "published"];
+  const filters: FilterStatus[] = ["all", "draft", "pending_review", "approved", "scheduled", "published"];
 
   return (
     <div className="space-y-8">
@@ -243,6 +261,15 @@ export default function HistoryPage() {
                   >
                     Repurpose
                   </Button>
+                  {post.status === "draft" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSubmitForReview(post.id)}
+                    >
+                      Submit for Review
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDelete(post.id)}>
                     {t("history.delete")}
                   </Button>

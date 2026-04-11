@@ -10,6 +10,7 @@ const shortcuts: { key: string; label: string; href: string }[] = [
   { key: "t", label: "Templates", href: "/templates" },
   { key: "r", label: "Repurpose", href: "/repurpose" },
   { key: "e", label: "Series", href: "/series" },
+  { key: "v", label: "Review", href: "/review" },
   { key: "h", label: "History", href: "/history" },
   { key: "c", label: "Calendar", href: "/calendar" },
   { key: "a", label: "Analytics", href: "/analytics" },

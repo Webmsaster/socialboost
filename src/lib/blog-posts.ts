@@ -134,6 +134,15 @@ export const blogPosts: BlogPost[] = [
     category: "Analytics",
   },
   {
+    slug: "social-media-team-workflow",
+    title: "Social Media Team Workflow: From Draft to Publish in 2026",
+    excerpt:
+      "Build a social media team workflow that scales. Content approval processes, role management, and maintaining brand consistency across platforms.",
+    date: "2026-04-11",
+    readTime: "7 min read",
+    category: "Strategy",
+  },
+  {
     slug: "ai-content-scoring-guide",
     title: "AI Content Scoring: How to Optimize Posts Before You Publish",
     excerpt:

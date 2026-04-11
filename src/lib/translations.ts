@@ -115,6 +115,21 @@ export const translations = {
     "platform.twitter": "Twitter / X",
 
     // History
+    // Review
+    "nav.review": "Review",
+    "review.title": "Content Review",
+    "review.description": "Review and approve posts from your team before publishing",
+    "review.empty": "No posts pending review.",
+    "review.startReview": "Review",
+    "review.approve": "Approve",
+    "review.reject": "Send Back",
+    "review.cancel": "Cancel",
+    "review.approved": "Post approved!",
+    "review.rejected": "Post sent back to draft",
+    "review.notePlaceholder": "Optional note for the author...",
+    "history.filter.pending_review": "In Review",
+    "history.filter.approved": "Approved",
+
     // Series
     "nav.series": "Series",
     "series.title": "Content Series",
@@ -495,6 +510,21 @@ export const translations = {
     "platform.twitter": "Twitter / X",
 
     // History
+    // Review
+    "nav.review": "Freigabe",
+    "review.title": "Inhalts-Freigabe",
+    "review.description": "Pruefe und genehmige Posts deines Teams vor der Veroeffentlichung",
+    "review.empty": "Keine Posts zur Freigabe.",
+    "review.startReview": "Pruefen",
+    "review.approve": "Genehmigen",
+    "review.reject": "Zurueckweisen",
+    "review.cancel": "Abbrechen",
+    "review.approved": "Post genehmigt!",
+    "review.rejected": "Post zurueck an Entwurf",
+    "review.notePlaceholder": "Optionaler Hinweis fuer den Autor...",
+    "history.filter.pending_review": "In Pruefung",
+    "history.filter.approved": "Genehmigt",
+
     // Series
     "nav.series": "Serien",
     "series.title": "Inhalts-Serien",

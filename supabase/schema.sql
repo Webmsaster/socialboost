@@ -46,7 +46,10 @@ create table if not exists public.posts (
   hashtags text[] default '{}',
   is_favorite boolean not null default false,
   status text not null default 'draft'
-    check (status in ('draft', 'scheduled', 'published', 'failed')),
+    check (status in ('draft', 'pending_review', 'approved', 'scheduled', 'published', 'failed')),
+  reviewed_by uuid references public.profiles(id),
+  reviewed_at timestamptz,
+  review_note text,
   scheduled_for timestamptz,
   published_at timestamptz,
   platform_post_id text,
