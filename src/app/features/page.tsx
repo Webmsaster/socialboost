@@ -54,6 +54,36 @@ const features = [
       "Track your content performance with breakdowns by platform, tone, and status. Weekly activity charts and insights.",
   },
   {
+    title: "Content Repurposing",
+    description:
+      "Adapt any post for different platforms with one click. AI adjusts the style, length, and hashtags for each target platform.",
+  },
+  {
+    title: "Content Series",
+    description:
+      "Set up recurring content themes like Monday Motivation or Friday Tips. Define the schedule and let AI generate fresh posts automatically.",
+  },
+  {
+    title: "AI Content Score",
+    description:
+      "Get instant feedback on your posts with a 1-100 score. Platform-specific tips for hooks, CTAs, length, and hashtag optimization.",
+  },
+  {
+    title: "Performance Insights",
+    description:
+      "Discover which platforms, tones, and posting days drive the most engagement. AI-analyzed recommendations based on your data.",
+  },
+  {
+    title: "Auto-Scheduling",
+    description:
+      "Let SocialBoost distribute your drafts to optimal time slots. Uses platform-specific engagement data for best results.",
+  },
+  {
+    title: "Team Collaboration",
+    description:
+      "Create teams, invite members, and manage roles. Collaborate with colleagues on content creation and approvals.",
+  },
+  {
     title: "Dark Mode",
     description:
       "Full dark mode support throughout the app. Easy on the eyes during late-night content creation sessions.",

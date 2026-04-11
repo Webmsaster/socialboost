@@ -114,6 +114,44 @@ export default function DashboardPage() {
       {/* Onboarding for new users */}
       {allPosts.length === 0 && <Onboarding />}
 
+      {/* Quick Actions */}
+      {allPosts.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Button variant="outline" asChild className="justify-start gap-2 h-auto py-3">
+            <Link href="/repurpose">
+              <span className="text-left">
+                <span className="block text-sm font-medium">{t("dashboard.quickRepurpose")}</span>
+                <span className="block text-xs text-muted-foreground">{t("dashboard.quickRepurposeDesc")}</span>
+              </span>
+            </Link>
+          </Button>
+          <Button variant="outline" asChild className="justify-start gap-2 h-auto py-3">
+            <Link href="/series">
+              <span className="text-left">
+                <span className="block text-sm font-medium">{t("dashboard.quickSeries")}</span>
+                <span className="block text-xs text-muted-foreground">{t("dashboard.quickSeriesDesc")}</span>
+              </span>
+            </Link>
+          </Button>
+          <Button variant="outline" asChild className="justify-start gap-2 h-auto py-3">
+            <Link href="/bulk">
+              <span className="text-left">
+                <span className="block text-sm font-medium">{t("dashboard.quickBulk")}</span>
+                <span className="block text-xs text-muted-foreground">{t("dashboard.quickBulkDesc")}</span>
+              </span>
+            </Link>
+          </Button>
+          <Button variant="outline" asChild className="justify-start gap-2 h-auto py-3">
+            <Link href="/analytics">
+              <span className="text-left">
+                <span className="block text-sm font-medium">{t("dashboard.quickAnalytics")}</span>
+                <span className="block text-xs text-muted-foreground">{t("dashboard.quickAnalyticsDesc")}</span>
+              </span>
+            </Link>
+          </Button>
+        </div>
+      )}
+
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>

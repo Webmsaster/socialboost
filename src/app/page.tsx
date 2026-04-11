@@ -192,6 +192,8 @@ const contentTypes = [
   "Video Ads",
   "Carousels",
   "AI Images",
+  "Content Series",
+  "Repurposing",
 ];
 
 export default function LandingPage() {
@@ -353,7 +355,7 @@ export default function LandingPage() {
               {[
                 { value: "10K+", label: "Posts generated" },
                 { value: "5", label: "Platforms supported" },
-                { value: "8", label: "Content types" },
+                { value: "10+", label: "Content types" },
                 { value: "99.9%", label: "Uptime" },
               ].map((stat) => (
                 <div key={stat.label} className="text-center">
