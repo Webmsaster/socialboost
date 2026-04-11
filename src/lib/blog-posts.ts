@@ -134,6 +134,15 @@ export const blogPosts: BlogPost[] = [
     category: "Analytics",
   },
   {
+    slug: "content-series-strategy",
+    title: "Content Series Strategy: How Recurring Themes 10x Your Engagement",
+    excerpt:
+      "Learn how to build a content series strategy. Discover how recurring post themes like Monday Motivation drive consistent engagement and save time.",
+    date: "2026-04-11",
+    readTime: "7 min read",
+    category: "Strategy",
+  },
+  {
     slug: "pinterest-seo-guide",
     title: "Pinterest SEO Guide: Drive Free Traffic in 2026",
     excerpt:

@@ -196,5 +196,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.7,
     },
+    {
+      url: `${baseUrl}/blog/content-series-strategy`,
+      lastModified: new Date("2026-04-11"),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
   ];
 }
