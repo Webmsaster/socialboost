@@ -9,6 +9,32 @@ export const metadata: Metadata = {
 
 const releases = [
   {
+    version: "1.7.0",
+    date: "2026-04-11",
+    title: "Content Intelligence & Automation",
+    changes: [
+      "Content Series: set up recurring posts (daily, weekly, biweekly, monthly) with custom schedules",
+      "Content Repurposing UI: adapt posts for different platforms with one click",
+      "AI Content Score: instant 1-100 scoring with platform-specific optimization tips",
+      "Performance Insights: discover best platform, tone, posting day, and top hashtags",
+      "Auto-Schedule: distribute drafts to optimal time slots based on engagement data",
+      "Dashboard quick actions for fast navigation to key features",
+    ],
+  },
+  {
+    version: "1.6.0",
+    date: "2026-04-11",
+    title: "Team Management & Admin",
+    changes: [
+      "Team member list with avatars, roles, and join dates",
+      "Pending invites view with revoke option",
+      "Remove team members (admin/owner only)",
+      "Admin user management: search, browse, and view user details",
+      "Server-side notification preferences (no more localStorage dependency)",
+      "Updated features page with 16 features",
+    ],
+  },
+  {
     version: "1.5.0",
     date: "2026-04-01",
     title: "Team Collaboration & Referrals",

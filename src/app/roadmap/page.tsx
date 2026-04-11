@@ -28,11 +28,18 @@ const shipped: RoadmapItem[] = [
   { title: "Team collaboration", description: "Invite colleagues to organizations with role-based access." },
   { title: "Referral program", description: "Earn bonus generations for every friend you bring to SocialBoost." },
   { title: "Stripe billing", description: "Monthly and annual Pro plans with billing portal, checkout, and webhooks." },
-  { title: "Blog with SEO articles", description: "11 in-depth posts on social media strategy with JSON-LD and OG images." },
+  { title: "Blog with SEO articles", description: "14 in-depth posts on social media strategy with JSON-LD and OG images." },
   { title: "RSS feed", description: "Subscribe to blog updates via any RSS reader." },
-  { title: "Admin dashboard", description: "Internal admin view with MRR, user counts, and activity metrics." },
+  { title: "Admin dashboard", description: "Internal admin view with MRR, user counts, activity metrics, and user management." },
   { title: "Cookie consent + GDPR data export", description: "Full GDPR compliance with opt-in analytics and data portability." },
   { title: "Dark mode, i18n (EN/DE), keyboard shortcuts", description: "Polished UX for power users." },
+  { title: "Content Series", description: "Set up recurring content themes (daily, weekly, biweekly, monthly) that generate automatically." },
+  { title: "Content Repurposing UI", description: "Full dashboard page for adapting posts to multiple platforms with AI." },
+  { title: "AI Content Score", description: "Instant 1-100 scoring with platform-specific tips after every generation." },
+  { title: "Performance Insights", description: "Best platform, tone, day, top hashtags, and content length analysis from your data." },
+  { title: "Auto-Scheduling", description: "One-click distribution of drafts to optimal time slots per platform." },
+  { title: "Team member management", description: "Member list, pending invites, remove/revoke, role badges." },
+  { title: "Server-side notification preferences", description: "Preferences sync across devices, no more localStorage dependency." },
 ];
 
 const inProgress: RoadmapItem[] = [
