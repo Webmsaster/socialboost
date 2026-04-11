@@ -64,4 +64,16 @@ describe("KeyboardShortcuts", () => {
     fireEvent.keyDown(document, { key: "d", ctrlKey: true });
     expect(mockPush).not.toHaveBeenCalled();
   });
+
+  it("navigates to repurpose on R key press", () => {
+    render(<KeyboardShortcuts />);
+    fireEvent.keyDown(document, { key: "r" });
+    expect(mockPush).toHaveBeenCalledWith("/repurpose");
+  });
+
+  it("navigates to series on E key press", () => {
+    render(<KeyboardShortcuts />);
+    fireEvent.keyDown(document, { key: "e" });
+    expect(mockPush).toHaveBeenCalledWith("/series");
+  });
 });
