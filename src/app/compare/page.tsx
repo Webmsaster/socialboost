@@ -19,6 +19,7 @@ const features = [
       { feature: "Video ad storyboard", socialBoost: true, buffer: false, hootsuite: false, later: false },
       { feature: "Content repurposing", socialBoost: true, buffer: false, hootsuite: false, later: false },
       { feature: "AI image generation (DALL-E)", socialBoost: true, buffer: false, hootsuite: false, later: false },
+      { feature: "AI content score & tips", socialBoost: true, buffer: false, hootsuite: false, later: false },
     ],
   },
   {
@@ -27,6 +28,8 @@ const features = [
       { feature: "5 platform support", socialBoost: true, buffer: true, hootsuite: true, later: true },
       { feature: "Drag-and-drop calendar", socialBoost: true, buffer: true, hootsuite: true, later: true },
       { feature: "Bulk scheduling", socialBoost: true, buffer: "Pro", hootsuite: "Pro", later: "Pro" },
+      { feature: "Auto-scheduling (optimal times)", socialBoost: true, buffer: false, hootsuite: "Pro", later: false },
+      { feature: "Content series (recurring posts)", socialBoost: true, buffer: false, hootsuite: false, later: false },
       { feature: "OAuth connections", socialBoost: true, buffer: true, hootsuite: true, later: true },
     ],
   },
@@ -36,6 +39,8 @@ const features = [
       { feature: "Team workspaces", socialBoost: true, buffer: "Pro", hootsuite: "Pro", later: "Pro" },
       { feature: "Role-based access", socialBoost: true, buffer: "Pro", hootsuite: "Pro", later: "Pro" },
       { feature: "Templates library", socialBoost: true, buffer: false, hootsuite: "Pro", later: false },
+      { feature: "Member management & invites", socialBoost: true, buffer: "Pro", hootsuite: "Pro", later: "Pro" },
+      { feature: "Performance insights & analytics", socialBoost: true, buffer: "Pro", hootsuite: true, later: "Pro" },
     ],
   },
   {

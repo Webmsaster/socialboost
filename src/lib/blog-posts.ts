@@ -134,6 +134,15 @@ export const blogPosts: BlogPost[] = [
     category: "Analytics",
   },
   {
+    slug: "ai-content-scoring-guide",
+    title: "AI Content Scoring: How to Optimize Posts Before You Publish",
+    excerpt:
+      "Learn how AI content scoring analyzes post length, hooks, CTAs, and hashtags to optimize your social media content before publishing.",
+    date: "2026-04-11",
+    readTime: "6 min read",
+    category: "AI",
+  },
+  {
     slug: "content-series-strategy",
     title: "Content Series Strategy: How Recurring Themes 10x Your Engagement",
     excerpt:

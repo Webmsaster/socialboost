@@ -95,6 +95,18 @@ export function PricingToggle() {
               {checkIcon}
               Templates &amp; calendar scheduling
             </li>
+            <li className="flex items-start gap-2">
+              {checkIcon}
+              Content series &amp; auto-scheduling
+            </li>
+            <li className="flex items-start gap-2">
+              {checkIcon}
+              AI content score &amp; performance insights
+            </li>
+            <li className="flex items-start gap-2">
+              {checkIcon}
+              Cross-platform repurposing
+            </li>
           </ul>
           <Link
             href={`/signup?plan=${annual ? "annual" : "monthly"}`}
