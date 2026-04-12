@@ -223,9 +223,16 @@ export default function TemplatesPage() {
       )}
 
       {templates.length === 0 ? (
-        <p className="text-muted-foreground">
-          No templates yet. Create your first template to speed up content creation.
-        </p>
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+          <p className="text-muted-foreground">
+            No templates yet. Create your first template to speed up content creation.
+          </p>
+          {!showForm && (
+            <Button className="mt-4" onClick={() => setShowForm(true)}>
+              Create template
+            </Button>
+          )}
+        </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {templates.map((template) => (

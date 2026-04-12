@@ -82,12 +82,45 @@ export default function HistoryPage() {
   }, [supabase, filter]);
 
   async function handleDelete(id: string) {
+    const deleted = posts.find((p) => p.id === id);
+    if (!deleted) return;
+
+    // Optimistic removal
+    setPosts((prev) => prev.filter((p) => p.id !== id));
+
     const { error } = await supabase.from("posts").delete().eq("id", id);
     if (error) {
       toast.error("Failed to delete");
-    } else {
-      setPosts((prev) => prev.filter((p) => p.id !== id));
+      setPosts((prev) => [deleted, ...prev]);
+      return;
     }
+
+    toast.success("Post deleted", {
+      action: {
+        label: "Undo",
+        onClick: async () => {
+          // Re-insert with the same id. RLS will enforce ownership.
+          const { error: restoreError } = await supabase.from("posts").insert({
+            id: deleted.id,
+            platform: deleted.platform,
+            topic: deleted.topic,
+            content: deleted.content,
+            hashtags: deleted.hashtags,
+            tone: deleted.tone,
+            status: deleted.status,
+            is_favorite: deleted.is_favorite,
+            created_at: deleted.created_at,
+          });
+          if (restoreError) {
+            toast.error("Could not restore post");
+            return;
+          }
+          setPosts((prev) => [deleted, ...prev]);
+          toast.success("Post restored");
+        },
+      },
+      duration: 8000,
+    });
   }
 
   async function handleCSVImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -283,9 +316,16 @@ export default function HistoryPage() {
       {loading ? (
         <TableSkeleton rows={6} />
       ) : filteredPosts.length === 0 ? (
-        <p className="text-muted-foreground">
-          {search ? "No posts matching your search." : t("history.empty")}
-        </p>
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+          <p className="text-muted-foreground">
+            {search ? "No posts matching your search." : t("history.empty")}
+          </p>
+          {!search && (
+            <Button className="mt-4" onClick={() => router.push("/create")}>
+              Create your first post
+            </Button>
+          )}
+        </div>
       ) : (
         <div className="space-y-4">
           {paginatedPosts.map((post) => (

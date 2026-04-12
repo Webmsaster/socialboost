@@ -950,9 +950,15 @@ export default function CreatePage() {
             <div className="space-y-2">
               <Label>Topic</Label>
               <Textarea
-                placeholder="Describe what you want to create content about..."
+                placeholder="Describe what you want to create content about... (Ctrl/⌘ + Enter to generate)"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !loading && topic.trim()) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
                 rows={4}
                 required
               />

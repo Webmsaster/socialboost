@@ -268,6 +268,11 @@ export default function SeriesPage() {
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">{t("series.empty")}</p>
+            {!showForm && (
+              <Button className="mt-4" onClick={() => setShowForm(true)}>
+                {t("series.create")}
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
