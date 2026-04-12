@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { captureError } from "./logger";
 
 function getAdmin() {
   return createClient(
@@ -34,12 +35,15 @@ export async function logAudit(
 ): Promise<void> {
   try {
     const supabase = getAdmin();
-    await supabase.from("audit_log").insert({
+    const { error } = await supabase.from("audit_log").insert({
       user_id: userId,
       action,
       details: details || {},
     });
-  } catch {
-    // Audit logging is non-critical — fail silently
+    if (error) {
+      captureError("Audit log insert failed", error, { userId, action });
+    }
+  } catch (err) {
+    captureError("Audit log unexpected error", err, { userId, action });
   }
 }
