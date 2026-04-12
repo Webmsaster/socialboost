@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateApiKey, hashApiKey } from "@/lib/api-keys";
 import { captureError } from "@/lib/logger";
 import { logAudit } from "@/lib/audit-log";
+import { rateLimit } from "@/lib/rate-limit";
 
 // GET: List user's API keys (without the actual key)
 export async function GET() {
@@ -36,6 +37,11 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const limited = await rateLimit(user.id, "/api/keys");
+    if (!limited.success) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
 
     const { name } = await request.json();
 
@@ -86,6 +92,11 @@ export async function DELETE(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const limited = await rateLimit(user.id, "/api/keys");
+    if (!limited.success) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
 
     const { id } = await request.json();
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
