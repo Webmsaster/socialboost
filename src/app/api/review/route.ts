@@ -186,11 +186,10 @@ export async function PATCH(request: NextRequest) {
 
     if (authorProfile?.email) {
       const postTopic = "your post";
-      if (action === "approve") {
-        sendReviewApprovedEmail(authorProfile.email, postTopic, reviewerName, note);
-      } else {
-        sendReviewRejectedEmail(authorProfile.email, postTopic, reviewerName, note);
-      }
+      const emailPromise = action === "approve"
+        ? sendReviewApprovedEmail(authorProfile.email, postTopic, reviewerName, note)
+        : sendReviewRejectedEmail(authorProfile.email, postTopic, reviewerName, note);
+      emailPromise.catch((err) => captureError("Review email send failed", err));
     }
 
     await logAudit(user.id, action === "approve" ? "post.approved" : "post.rejected", {

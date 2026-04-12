@@ -65,6 +65,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
+  // Idempotency: reject if this event id was already processed.
+  // Insert first; a duplicate PK means we've already handled it.
+  const { error: dedupeError } = await supabaseAdmin
+    .from("stripe_events")
+    .insert({ id: event.id, type: event.type });
+  if (dedupeError) {
+    const code = (dedupeError as { code?: string }).code;
+    if (code === "23505") {
+      // Duplicate — already processed. Ack success so Stripe stops retrying.
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+    // If the stripe_events table doesn't exist yet (pre-migration), continue
+    // without idempotency instead of failing webhook delivery entirely.
+    if (code !== "42P01") {
+      captureError("stripe_events insert failed", dedupeError, { eventId: event.id });
+    }
+  }
+
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;

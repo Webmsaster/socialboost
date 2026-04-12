@@ -384,3 +384,16 @@ create index if not exists idx_org_members_user on public.org_members(user_id);
 -- ============================================
 alter table public.profiles
   add column if not exists notification_preferences jsonb default '{}'::jsonb;
+
+-- ============================================
+-- 15. Stripe webhook idempotency
+-- ============================================
+create table if not exists public.stripe_events (
+  id text primary key,
+  type text not null,
+  received_at timestamptz not null default now()
+);
+alter table public.stripe_events enable row level security;
+create policy "Service role full access on stripe_events"
+  on public.stripe_events for all
+  using (auth.role() = 'service_role');

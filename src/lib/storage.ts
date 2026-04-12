@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { captureError } from "./logger";
 
 const BUCKET = "generated-images";
 
@@ -44,7 +45,7 @@ export async function persistImage(
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
     return data.publicUrl;
   } catch (error) {
-    console.error("Image persistence failed, using temporary URL:", error);
+    captureError("Image persistence failed, falling back to temporary URL", error, { userId });
     return temporaryUrl;
   }
 }

@@ -108,11 +108,21 @@ export async function POST(request: NextRequest) {
     const successful = successfulImages + voiceoverOk;
 
     if (successful > 0) {
-      for (let i = 0; i < successful; i++) {
-        await supabase.rpc("increment_generation_count", {
-          p_user_id: user.id,
-          p_limit: limit,
-        });
+      const results = await Promise.all(
+        Array.from({ length: successful }, () =>
+          supabase.rpc("increment_generation_count", {
+            p_user_id: user.id,
+            p_limit: limit,
+          })
+        )
+      );
+      for (const { error: incError } of results) {
+        if (incError) {
+          captureError("Failed to increment generation count (video assets)", incError, {
+            userId: user.id,
+          });
+          break;
+        }
       }
     }
 

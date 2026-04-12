@@ -78,7 +78,9 @@ export async function GET(request: NextRequest) {
 
         const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
         if (profile?.email) {
-          sendPublishFailedEmail(profile.email, post.platform, "Connected account not found");
+          sendPublishFailedEmail(profile.email, post.platform, "Connected account not found").catch(
+            (err) => captureError("Cron: sendPublishFailedEmail failed", err)
+          );
         }
         continue;
       }
@@ -113,7 +115,9 @@ export async function GET(request: NextRequest) {
 
         const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
         if (profile?.email) {
-          sendPublishFailedEmail(profile.email, post.platform, `Publishing to ${account.platform} is not yet supported`);
+          sendPublishFailedEmail(profile.email, post.platform, `Publishing to ${account.platform} is not yet supported`).catch(
+            (err) => captureError("Cron: sendPublishFailedEmail failed", err)
+          );
         }
         continue;
       }
@@ -142,7 +146,9 @@ export async function GET(request: NextRequest) {
 
         const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
         if (profile?.email) {
-          sendPostPublishedEmail(profile.email, post.content, post.platform);
+          sendPostPublishedEmail(profile.email, post.content, post.platform).catch(
+            (err) => captureError("Cron: sendPostPublishedEmail failed", err)
+          );
         }
       } else {
         captureError("Cron: platform publish failed", new Error(result.error || "Unknown error"), { postId: post.id, platform: account.platform });
@@ -154,7 +160,9 @@ export async function GET(request: NextRequest) {
 
         const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
         if (profile?.email) {
-          sendPublishFailedEmail(profile.email, post.platform, result.error || "Publishing failed");
+          sendPublishFailedEmail(profile.email, post.platform, result.error || "Publishing failed").catch(
+            (err) => captureError("Cron: sendPublishFailedEmail failed", err)
+          );
         }
       }
     } else {
@@ -182,7 +190,9 @@ export async function GET(request: NextRequest) {
         // Send notification email
         const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
         if (profile?.email) {
-          sendPostPublishedEmail(profile.email, post.content, post.platform);
+          sendPostPublishedEmail(profile.email, post.content, post.platform).catch(
+            (err) => captureError("Cron: sendPostPublishedEmail failed", err)
+          );
         }
       }
     }

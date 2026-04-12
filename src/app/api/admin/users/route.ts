@@ -43,19 +43,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
     }
 
-    // Get post counts for these users
+    // Get post counts for these users (parallel head counts — avoids
+    // loading every post row just to count them).
     const userIds = (data || []).map((u) => u.id);
     const postCounts: Record<string, number> = {};
 
     if (userIds.length > 0) {
-      const { data: posts } = await admin
-        .from("posts")
-        .select("user_id")
-        .in("user_id", userIds);
-
-      for (const post of posts || []) {
-        postCounts[post.user_id] = (postCounts[post.user_id] || 0) + 1;
-      }
+      const counts = await Promise.all(
+        userIds.map((uid) =>
+          admin
+            .from("posts")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", uid)
+            .then(({ count }) => [uid, count || 0] as const)
+        )
+      );
+      for (const [uid, c] of counts) postCounts[uid] = c;
     }
 
     const users = (data || []).map((u) => ({

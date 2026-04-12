@@ -43,20 +43,17 @@ export async function POST() {
       );
     }
 
-    // Delete connected accounts
-    await admin
-      .from("connected_accounts")
-      .delete()
-      .eq("user_id", user.id);
-
-    // Delete templates
-    await admin
-      .from("templates")
-      .delete()
-      .eq("user_id", user.id);
-
-    // Delete profile (cascades from auth.users delete, but explicit for safety)
-    await admin.from("profiles").delete().eq("id", user.id);
+    // Delete connected accounts, templates, and profile in parallel.
+    // Errors are logged but don't block the auth-user deletion below, which
+    // is the definitive action (profile cascades anyway).
+    const cleanup = await Promise.all([
+      admin.from("connected_accounts").delete().eq("user_id", user.id),
+      admin.from("templates").delete().eq("user_id", user.id),
+      admin.from("profiles").delete().eq("id", user.id),
+    ]);
+    for (const { error } of cleanup) {
+      if (error) captureError("Account delete: cleanup step failed", error, { userId: user.id });
+    }
 
     // Delete the auth user (this is the definitive action)
     const { error: authError } = await admin.auth.admin.deleteUser(user.id);

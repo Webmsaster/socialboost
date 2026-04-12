@@ -62,7 +62,9 @@ export async function POST(request: NextRequest) {
 
     if (profile.generation_count >= limit) {
       // Notify user (fire-and-forget, don't block response)
-      sendLimitReachedEmail(profile.email || user.email!, profile.subscription_status, limit);
+      sendLimitReachedEmail(profile.email || user.email!, profile.subscription_status, limit).catch(
+        (err) => captureError("Failed to send limit reached email", err)
+      );
       return NextResponse.json(
         { error: `Monthly limit reached (${limit}). Upgrade to Pro for more.` },
         { status: 403 }
@@ -83,10 +85,13 @@ export async function POST(request: NextRequest) {
     });
 
     // Increment generation count
-    await supabase.rpc("increment_generation_count", {
+    const { error: incError } = await supabase.rpc("increment_generation_count", {
       p_user_id: user.id,
       p_limit: limit,
     });
+    if (incError) {
+      captureError("Failed to increment generation count", incError, { userId: user.id });
+    }
 
     trackEvent({ event: "generate_post", userId: user.id, properties: { platform, tone, language: language || "English" } });
 

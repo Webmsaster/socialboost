@@ -15,10 +15,15 @@ vi.mock("@/lib/stripe", () => ({
 const mockAdminUpdate = vi.fn();
 const mockAdminSelectSingle = vi.fn();
 const mockAdminUpdateResult = vi.fn();
+const mockAdminInsertResult = vi.fn();
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
     from: (table: string) => ({
+      insert: (_data: unknown) => {
+        const result = mockAdminInsertResult(table);
+        return Promise.resolve(result ?? { data: null, error: null });
+      },
       update: (data: unknown) => ({
         eq: (...args: unknown[]) => {
           mockAdminUpdate({ table, data, eq: args });
@@ -311,6 +316,33 @@ describe("POST /api/stripe/webhook", () => {
     // Without userId the whole checkout block is skipped, returns received: true
     expect(response.status).toBe(200);
     expect(json.received).toBe(true);
+    expect(mockAdminUpdate).not.toHaveBeenCalled();
+  });
+
+  it("dedupes duplicate events via stripe_events PK conflict", async () => {
+    mockConstructEvent.mockReturnValueOnce({
+      id: "evt_dup",
+      type: "customer.subscription.updated",
+      data: { object: { customer: "cus_dup", status: "active" } },
+    });
+    // Simulate duplicate PK (23505) on stripe_events insert
+    mockAdminInsertResult.mockReturnValueOnce({
+      data: null,
+      error: { code: "23505", message: "duplicate key" },
+    });
+
+    const { POST } = await import("@/app/api/stripe/webhook/route");
+
+    const request = createWebhookRequest(
+      JSON.stringify({ type: "customer.subscription.updated" }),
+      "sig_valid"
+    );
+    const response = await POST(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json).toEqual({ received: true, duplicate: true });
+    // The downstream update should NOT have been called for a duplicate
     expect(mockAdminUpdate).not.toHaveBeenCalled();
   });
 

@@ -38,8 +38,24 @@ ALTER TABLE public.content_series
   ADD COLUMN IF NOT EXISTS website_scraped_at timestamptz;
 
 -- -------------------------------------------------------------
+-- 3. Stripe webhook idempotency (dedupe retried events)
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.stripe_events (
+  id text PRIMARY KEY,
+  type text NOT NULL,
+  received_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.stripe_events ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  CREATE POLICY "Service role full access on stripe_events"
+    ON public.stripe_events FOR ALL
+    USING (auth.role() = 'service_role');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- -------------------------------------------------------------
 -- Done. Verify with:
 --   SELECT column_name FROM information_schema.columns
 --     WHERE table_name = 'content_series'
 --     AND column_name IN ('website_url', 'website_context', 'website_scraped_at');
+--   SELECT 1 FROM information_schema.tables WHERE table_name = 'stripe_events';
 -- -------------------------------------------------------------

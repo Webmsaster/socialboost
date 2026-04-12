@@ -52,7 +52,7 @@ vi.mock("@/lib/subscription", () => ({
 
 // Email mock
 vi.mock("@/lib/email", () => ({
-  sendLimitReachedEmail: vi.fn(),
+  sendLimitReachedEmail: vi.fn().mockResolvedValue(true),
 }));
 
 // Analytics mock

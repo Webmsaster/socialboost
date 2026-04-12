@@ -48,8 +48,8 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/lib/email", () => ({
-  sendPostPublishedEmail: vi.fn(),
-  sendPublishFailedEmail: vi.fn(),
+  sendPostPublishedEmail: vi.fn().mockResolvedValue(true),
+  sendPublishFailedEmail: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("@/lib/platforms/registry", () => ({
