@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -88,7 +88,7 @@ export default function BulkPage() {
   const STORAGE_KEY = "socialboost_bulk_progress";
 
   // Restore previous results from localStorage on mount
-  useState(() => {
+  useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -99,7 +99,8 @@ export default function BulkPage() {
         }
       }
     } catch { /* ignore parse errors */ }
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const totalPosts = selectedPlatforms.size * variations;
 
