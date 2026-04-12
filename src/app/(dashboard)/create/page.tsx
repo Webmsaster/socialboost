@@ -84,6 +84,11 @@ export default function CreatePage() {
   const [suggestedHashtags, setSuggestedHashtags] = useState<string[]>([]);
   const [loadingHashtags, setLoadingHashtags] = useState(false);
   const [loadingVoiceover, setLoadingVoiceover] = useState(false);
+  const [loadingVideoAssets, setLoadingVideoAssets] = useState(false);
+  const [videoAssets, setVideoAssets] = useState<{
+    images: Array<{ sceneNumber: number; url: string | null; error: string | null }>;
+    voiceover: { dataUrl: string | null; error: string | null };
+  } | null>(null);
 
   // Content score
   const [contentScore, setContentScore] = useState<{ score: number; tips: string[] } | null>(null);
@@ -722,7 +727,94 @@ export default function CreatePage() {
             >
               {loadingVoiceover ? "Generating..." : "Generate Voiceover (Pro)"}
             </Button>
+            <Button
+              variant="outline"
+              disabled={loadingVideoAssets}
+              onClick={async () => {
+                setLoadingVideoAssets(true);
+                setVideoAssets(null);
+                try {
+                  const res = await fetch("/api/generate-video-assets", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      hook: videoScriptResult.hook,
+                      cta: videoScriptResult.cta,
+                      scenes: videoScriptResult.scenes.map((s) => ({
+                        sceneNumber: s.sceneNumber,
+                        visual: s.visual,
+                        narration: s.narration,
+                        textOverlay: s.textOverlay,
+                      })),
+                    }),
+                  });
+                  if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    toast.error(err.error || "Failed to generate assets");
+                    return;
+                  }
+                  const data = await res.json();
+                  setVideoAssets({ images: data.images, voiceover: data.voiceover });
+                  toast.success("Video assets ready");
+                } catch {
+                  toast.error("Failed to generate assets");
+                } finally {
+                  setLoadingVideoAssets(false);
+                }
+              }}
+            >
+              {loadingVideoAssets ? "Generating..." : "Generate Full Video Assets (Pro)"}
+            </Button>
           </div>
+
+          {videoAssets && (
+            <div className="mt-4 space-y-4 rounded-lg border border-dashed p-4">
+              <p className="text-sm font-semibold">
+                Video assets — import into CapCut, InShot, or any video editor
+              </p>
+
+              {videoAssets.voiceover.dataUrl && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Voiceover (full narration)</p>
+                  <audio controls src={videoAssets.voiceover.dataUrl} className="w-full" />
+                  <a
+                    href={videoAssets.voiceover.dataUrl}
+                    download={`voiceover-${Date.now()}.mp3`}
+                    className="inline-block text-xs text-primary hover:underline"
+                  >
+                    Download MP3
+                  </a>
+                </div>
+              )}
+
+              {videoAssets.images.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Scene images</p>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {videoAssets.images.map((img) => (
+                      <div key={img.sceneNumber} className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Scene {img.sceneNumber}</p>
+                        {img.url ? (
+                          <a href={img.url} target="_blank" rel="noreferrer">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={img.url}
+                              alt={`Scene ${img.sceneNumber}`}
+                              className="w-full rounded-md border"
+                            />
+                          </a>
+                        ) : (
+                          <p className="text-xs text-destructive">
+                            {img.error || "Image failed"}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     );
