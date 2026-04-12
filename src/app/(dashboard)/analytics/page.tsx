@@ -103,7 +103,10 @@ export default function AnalyticsPage() {
     "analytics:metrics",
     async () => {
       const res = await fetch("/api/metrics");
-      if (!res.ok) return null;
+      if (!res.ok) {
+        toast.error("Failed to load metrics");
+        return null;
+      }
       return (await res.json()) as MetricsData;
     },
   );
@@ -112,7 +115,10 @@ export default function AnalyticsPage() {
     "analytics:insights",
     async () => {
       const res = await fetch("/api/insights");
-      if (!res.ok) return null;
+      if (!res.ok) {
+        toast.error("Failed to load insights");
+        return null;
+      }
       const data = await res.json();
       return data.insights as InsightData;
     },
