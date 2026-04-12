@@ -99,7 +99,6 @@ export default function BulkPage() {
         }
       }
     } catch { /* ignore parse errors */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const totalPosts = selectedPlatforms.size * variations;
