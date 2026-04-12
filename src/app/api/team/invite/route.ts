@@ -18,6 +18,15 @@ export async function POST(request: NextRequest) {
     if (!orgId || !email) {
       return NextResponse.json({ error: "Missing orgId or email" }, { status: 400 });
     }
+    if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
+    }
+    const normalizedRole = typeof role === "string" ? role : "member";
+    if (!["owner", "admin", "member"].includes(normalizedRole)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+    // Only an owner can grant owner role — prevent an admin from escalating.
+    // We check the caller's role after the membership lookup below.
 
     // Check if user is owner or admin of the org
     const { data: membership } = await supabase
@@ -29,6 +38,14 @@ export async function POST(request: NextRequest) {
 
     if (!membership || !["owner", "admin"].includes(membership.role)) {
       return NextResponse.json({ error: "Not authorized to invite" }, { status: 403 });
+    }
+
+    // An admin cannot promote someone to owner — only an owner can.
+    if (normalizedRole === "owner" && membership.role !== "owner") {
+      return NextResponse.json(
+        { error: "Only the owner can grant owner role" },
+        { status: 403 }
+      );
     }
 
     // Check member limit
@@ -71,7 +88,7 @@ export async function POST(request: NextRequest) {
     const { error: inviteError } = await supabase.from("org_members").insert({
       org_id: orgId,
       user_id: invitedProfile?.id ?? null,
-      role: role || "member",
+      role: normalizedRole,
       invited_email: email,
       accepted: false,
     });

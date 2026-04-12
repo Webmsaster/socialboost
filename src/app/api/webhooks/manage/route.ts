@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
 import { logAudit } from "@/lib/audit-log";
+import { rateLimit } from "@/lib/rate-limit";
 
 // GET: List user's webhooks
 export async function GET() {
@@ -34,6 +35,11 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const limited = await rateLimit(user.id, "/api/webhooks/manage");
+    if (!limited.success) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
 
     const { url, events } = await request.json() as { url: string; events: string[] };
 

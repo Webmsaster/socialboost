@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const limited = await rateLimit(user.id);
+    const limited = await rateLimit(user.id, "/api/referral/claim");
     if (!limited.success) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
