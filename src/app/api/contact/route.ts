@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { captureError } from "@/lib/logger";
+import { rateLimit } from "@/lib/rate-limit";
 
 function escapeHtml(str: string): string {
   return str
@@ -20,6 +21,20 @@ function getAdmin() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Per-IP rate limit on an unauthenticated public endpoint to prevent
+    // spam and admin-inbox flooding.
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "anon";
+    const limited = await rateLimit(ip, "/api/contact");
+    if (!limited.success) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const { name, email, subject, message } = await request.json();
 
     if (!name?.trim() || !email?.trim() || !subject?.trim() || !message?.trim()) {
