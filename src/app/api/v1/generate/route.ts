@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { validateApiKey } from "@/lib/api-keys";
 import { generatePost, type Platform, type Tone } from "@/lib/openai";
 import { captureError } from "@/lib/logger";
+import { rateLimit } from "@/lib/rate-limit";
 
 function getAdmin() {
   return createClient(
@@ -29,6 +30,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid or revoked API key" }, { status: 401 });
     }
 
+    const limited = await rateLimit(userId, "/api/v1/generate");
+    if (!limited.success) {
+      return NextResponse.json(
+        { error: "Too many requests. Please slow down." },
+        {
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": String(limited.limit),
+            "X-RateLimit-Remaining": String(limited.remaining),
+          },
+        }
+      );
+    }
+
     const { platform, topic, tone, language } = await request.json() as {
       platform: string;
       topic: string;
@@ -38,6 +53,9 @@ export async function POST(request: NextRequest) {
 
     if (!platform || !topic) {
       return NextResponse.json({ error: "Missing platform or topic" }, { status: 400 });
+    }
+    if (typeof topic !== "string" || topic.length > 2000) {
+      return NextResponse.json({ error: "Topic too long (max 2000 chars)" }, { status: 400 });
     }
 
     const validPlatforms = ["linkedin", "facebook", "instagram", "pinterest", "twitter"];
@@ -73,7 +91,13 @@ export async function POST(request: NextRequest) {
         : "gpt-4o-mini",
     });
 
-    await supabase.rpc("increment_generation_count", { p_user_id: userId, p_limit: limit });
+    const { error: incError } = await supabase.rpc("increment_generation_count", {
+      p_user_id: userId,
+      p_limit: limit,
+    });
+    if (incError) {
+      captureError("v1 generate: increment_generation_count failed", incError, { userId });
+    }
 
     return NextResponse.json({
       content: result.content,
