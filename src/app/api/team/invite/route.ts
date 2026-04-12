@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
+import { rateLimit } from "@/lib/rate-limit";
 
 // POST: Invite a member to an organization
 export async function POST(request: NextRequest) {
@@ -8,6 +9,11 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const limited = await rateLimit(user.id, "/api/team/invite");
+    if (!limited.success) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
 
     const { orgId, email, role } = await request.json() as {
       orgId: string;
