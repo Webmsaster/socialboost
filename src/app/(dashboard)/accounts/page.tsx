@@ -35,9 +35,13 @@ export default function AccountsPage() {
 
   async function loadAccounts() {
     const supabase = createClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("connected_accounts")
       .select("id, platform, platform_username, created_at");
+    if (error) {
+      toast.error("Failed to load connected accounts");
+      return;
+    }
     if (data) setAccounts(data);
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 interface BlogShareProps {
@@ -10,6 +10,10 @@ interface BlogShareProps {
 
 export function BlogShare({ title, slug }: BlogShareProps) {
   const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+  }, []);
   const url = `${
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://socialboost.app"
   }/blog/${slug}`;
@@ -21,7 +25,8 @@ export function BlogShare({ title, slug }: BlogShareProps) {
       await navigator.clipboard.writeText(url);
       setCopied(true);
       toast.success("Link copied to clipboard");
-      setTimeout(() => setCopied(false), 2000);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Couldn't copy link");
     }
