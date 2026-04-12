@@ -59,7 +59,7 @@ export async function generatePost(input: GeneratePostInput): Promise<GeneratePo
   const openai = getOpenAI();
 
   const brandVoiceSection = input.brandVoice
-    ? `\n\nBrand voice guidelines from the user:\n${input.brandVoice}`
+    ? `\n\nBrand voice guidelines from the user:\n${sanitizeInput(input.brandVoice, 1000)}`
     : "";
 
   const response = await openai.chat.completions.create({
@@ -151,7 +151,7 @@ export async function generateVideoScript(input: VideoScriptInput): Promise<Vide
   const openai = getOpenAI();
 
   const brandVoiceSection = input.brandVoice
-    ? `\n\nBrand voice guidelines from the user:\n${input.brandVoice}`
+    ? `\n\nBrand voice guidelines from the user:\n${sanitizeInput(input.brandVoice, 1000)}`
     : "";
 
   const response = await openai.chat.completions.create({
@@ -230,7 +230,7 @@ export async function generateVideoAd(input: VideoAdInput): Promise<VideoAdOutpu
   const openai = getOpenAI();
 
   const brandVoiceSection = input.brandVoice
-    ? `\n\nBrand voice guidelines from the user:\n${input.brandVoice}`
+    ? `\n\nBrand voice guidelines from the user:\n${sanitizeInput(input.brandVoice, 1000)}`
     : "";
 
   const response = await openai.chat.completions.create({
@@ -308,7 +308,7 @@ export async function generateCarousel(input: CarouselInput): Promise<CarouselOu
   const openai = getOpenAI();
 
   const brandVoiceSection = input.brandVoice
-    ? `\n\nBrand voice guidelines from the user:\n${input.brandVoice}`
+    ? `\n\nBrand voice guidelines from the user:\n${sanitizeInput(input.brandVoice, 1000)}`
     : "";
 
   const response = await openai.chat.completions.create({
@@ -379,7 +379,7 @@ export async function generateVariants(input: VariantsInput): Promise<PostVarian
   const openai = getOpenAI();
 
   const brandVoiceSection = input.brandVoice
-    ? `\n\nBrand voice guidelines from the user:\n${input.brandVoice}`
+    ? `\n\nBrand voice guidelines from the user:\n${sanitizeInput(input.brandVoice, 1000)}`
     : "";
 
   const response = await openai.chat.completions.create({
