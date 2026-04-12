@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,15 +29,42 @@ type FilterStatus = "all" | "draft" | "pending_review" | "approved" | "scheduled
 const POSTS_PER_PAGE = 10;
 
 export default function HistoryPage() {
-  const [posts, setPosts] = useState<Post[]>([]);
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
   const { t } = useLanguage();
   const router = useRouter();
   const supabase = createClient();
+
+  const { data: fetchedPosts, isLoading: loading, error: fetchError, mutate } = useSWR(
+    ["history:posts", filter],
+    async () => {
+      let query = supabase
+        .from("posts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (filter !== "all") {
+        query = query.eq("status", filter);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as Post[];
+    },
+  );
+
+  useEffect(() => {
+    if (fetchError) {
+      toast.error(fetchError instanceof Error ? fetchError.message : "Failed to load posts");
+    }
+  }, [fetchError]);
+
+  const posts = useMemo(() => fetchedPosts ?? [], [fetchedPosts]);
+
+  const updatePosts = (updater: (prev: Post[]) => Post[]) => {
+    mutate((prev) => updater(prev ?? []), { revalidate: false });
+  };
 
   const filteredPosts = useMemo(() => {
     let result = posts;
@@ -56,47 +84,24 @@ export default function HistoryPage() {
   }, [posts, search, showFavoritesOnly]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPosts.length / POSTS_PER_PAGE));
-  const paginatedPosts = filteredPosts.slice((page - 1) * POSTS_PER_PAGE, page * POSTS_PER_PAGE);
-
-  // Reset page when filter or search changes
-  useEffect(() => { setPage(1); }, [filter, search]);
-
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        // Cap server-side load; client paginates from here.
-        let query = supabase
-          .from("posts")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(200);
-        if (filter !== "all") {
-          query = query.eq("status", filter);
-        }
-        const { data, error } = await query;
-        if (error) throw error;
-        if (data) setPosts(data);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to load posts");
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [supabase, filter]);
+  // Clamp the page instead of resetting via an effect — pure derivation avoids cascading renders.
+  const effectivePage = Math.min(page, totalPages);
+  const paginatedPosts = filteredPosts.slice(
+    (effectivePage - 1) * POSTS_PER_PAGE,
+    effectivePage * POSTS_PER_PAGE,
+  );
 
   async function handleDelete(id: string) {
     const deleted = posts.find((p) => p.id === id);
     if (!deleted) return;
 
     // Optimistic removal
-    setPosts((prev) => prev.filter((p) => p.id !== id));
+    updatePosts((prev) => prev.filter((p) => p.id !== id));
 
     const { error } = await supabase.from("posts").delete().eq("id", id);
     if (error) {
       toast.error("Failed to delete");
-      setPosts((prev) => [deleted, ...prev]);
+      updatePosts((prev) => [deleted, ...prev]);
       return;
     }
 
@@ -120,7 +125,7 @@ export default function HistoryPage() {
             toast.error("Could not restore post");
             return;
           }
-          setPosts((prev) => [deleted, ...prev]);
+          updatePosts((prev) => [deleted, ...prev]);
           toast.success("Post restored");
         },
       },
@@ -168,7 +173,7 @@ export default function HistoryPage() {
     if (error) {
       toast.error("Failed to update");
     } else {
-      setPosts((prev) => prev.map((p) => p.id === id ? { ...p, is_favorite: !current } : p));
+      updatePosts((prev) => prev.map((p) => p.id === id ? { ...p, is_favorite: !current } : p));
     }
   }
 
@@ -180,7 +185,7 @@ export default function HistoryPage() {
         body: JSON.stringify({ postId: id }),
       });
       if (res.ok) {
-        setPosts((prev) => prev.map((p) => p.id === id ? { ...p, status: "pending_review" } : p));
+        updatePosts((prev) => prev.map((p) => p.id === id ? { ...p, status: "pending_review" } : p));
         toast.success("Submitted for review");
       } else {
         toast.error("Failed to submit for review");
@@ -213,7 +218,7 @@ export default function HistoryPage() {
       toast.error("Failed to duplicate");
       return;
     }
-    setPosts((prev) => [data as Post, ...prev]);
+    updatePosts((prev) => [data as Post, ...prev]);
     toast.success("Duplicated as draft");
   }
 
@@ -425,19 +430,19 @@ export default function HistoryPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
+                  disabled={effectivePage <= 1}
+                  onClick={() => setPage(effectivePage - 1)}
                 >
                   Previous
                 </Button>
                 <span className="text-sm text-muted-foreground">
-                  {page} / {totalPages}
+                  {effectivePage} / {totalPages}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
+                  disabled={effectivePage >= totalPages}
+                  onClick={() => setPage(effectivePage + 1)}
                 >
                   Next
                 </Button>

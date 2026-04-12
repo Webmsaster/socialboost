@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,72 +29,72 @@ interface Profile {
 }
 
 export default function DashboardPage() {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { t } = useLanguage();
   const supabase = createClient();
 
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [unlockedBadges, setUnlockedBadges] = useState<string[]>([]);
-  const [allPosts, setAllPosts] = useState<Array<Pick<Post, "platform" | "status" | "created_at"> & { scheduled_for?: string }>>([]);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+
+  const { data, error, isLoading } = useSWR("dashboard:init", async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const [postsRes, allPostsRes, profileRes] = await Promise.all([
+      supabase.from("posts").select("*").order("created_at", { ascending: false }).limit(5),
+      supabase
+        .from("posts")
+        .select("platform, status, created_at, scheduled_for")
+        .gte("created_at", ninetyDaysAgo)
+        .limit(500),
+      supabase.from("profiles").select("generation_count, subscription_status").eq("id", user.id).single(),
+    ]);
+
+    if (postsRes.error) throw postsRes.error;
+    if (profileRes.error) throw profileRes.error;
+
+    return {
+      posts: (postsRes.data || []) as Post[],
+      allPosts: (allPostsRes.data || []) as Array<
+        Pick<Post, "platform" | "status" | "created_at"> & { scheduled_for?: string }
+      >,
+      profile: profileRes.data as Profile | null,
+    };
+  });
+
+  const { data: achievementsData } = useSWR("dashboard:achievements", async () => {
+    const r = await fetch("/api/achievements");
+    if (!r.ok) return null;
+    return r.json() as Promise<{ unlocked: string[] }>;
+  });
 
   useEffect(() => {
-    async function load() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Only look back 90 days for stats — dashboard doesn't need ancient history.
-        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-        const [postsRes, allPostsRes, profileRes] = await Promise.all([
-          supabase.from("posts").select("*").order("created_at", { ascending: false }).limit(5),
-          supabase
-            .from("posts")
-            .select("platform, status, created_at, scheduled_for")
-            .gte("created_at", ninetyDaysAgo)
-            .limit(500),
-          supabase.from("profiles").select("generation_count, subscription_status").eq("id", user.id).single(),
-        ]);
-
-        if (postsRes.error) throw postsRes.error;
-        if (profileRes.error) throw profileRes.error;
-
-        if (postsRes.data) setPosts(postsRes.data);
-        if (allPostsRes.data) setAllPosts(allPostsRes.data);
-        if (profileRes.data) {
-          setProfile(profileRes.data);
-          // Show onboarding wizard for first-time users
-          if (profileRes.data.generation_count === 0 && !localStorage.getItem("onboarding_done")) {
-            setShowOnboarding(true);
-          }
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to load dashboard";
-        setError(message);
-        toast.error(message);
-      } finally {
-        setLoading(false);
-      }
-
-      // Load achievements in background
-      fetch("/api/achievements")
-        .then((r) => r.ok ? r.json() : null)
-        .then((d) => { if (d?.unlocked) setUnlockedBadges(d.unlocked); })
-        .catch(() => {});
+    if (error) {
+      const msg = error instanceof Error ? error.message : "Failed to load dashboard";
+      toast.error(msg);
     }
-    load();
-  }, [supabase]);
+  }, [error]);
+
+  const showOnboarding =
+    !onboardingDismissed &&
+    data?.profile?.generation_count === 0 &&
+    typeof window !== "undefined" &&
+    !localStorage.getItem("onboarding_done");
+
+  const posts = data?.posts || [];
+  const allPosts = data?.allPosts || [];
+  const profile = data?.profile || null;
+  const unlockedBadges = achievementsData?.unlocked || [];
+  const loading = isLoading;
+  const errorMessage = error ? (error instanceof Error ? error.message : "Failed to load dashboard") : null;
 
   const limit = profile?.subscription_status === "active" ? 100 : 10;
 
-  if (error) {
+  if (errorMessage) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center space-y-4">
-            <p className="text-destructive font-medium">{error}</p>
+            <p className="text-destructive font-medium">{errorMessage}</p>
             <Button onClick={() => window.location.reload()}>{t("dashboard.tryAgain")}</Button>
           </CardContent>
         </Card>
@@ -110,7 +111,7 @@ export default function DashboardPage() {
       {showOnboarding && (
         <OnboardingWizard
           onComplete={() => {
-            setShowOnboarding(false);
+            setOnboardingDismissed(true);
             localStorage.setItem("onboarding_done", "1");
           }}
         />

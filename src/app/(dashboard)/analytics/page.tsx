@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -81,68 +81,42 @@ const PLATFORM_COLORS: Record<string, string> = {
 };
 
 export default function AnalyticsPage() {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState<MetricsData | null>(null);
-  const [metricsLoading, setMetricsLoading] = useState(true);
-  const [insights, setInsights] = useState<InsightData | null>(null);
-  const [insightsLoading, setInsightsLoading] = useState(true);
   const { t } = useLanguage();
   const supabase = createClient();
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-        const { data, error } = await supabase
-          .from("posts")
-          .select("platform, status, tone, created_at")
-          .gte("created_at", ninetyDaysAgo)
-          .order("created_at", { ascending: false })
-          .limit(1000);
-
-        if (error) throw error;
-        setPosts(data ?? []);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to load analytics";
-        toast.error(msg);
-      } finally {
-        setLoading(false);
-      }
+  const { data: posts = [], isLoading: loading } = useSWR("analytics:posts", async () => {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from("posts")
+      .select("platform, status, tone, created_at")
+      .gte("created_at", ninetyDaysAgo)
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (error) {
+      toast.error(error.message);
+      return [] as Post[];
     }
+    return (data || []) as Post[];
+  });
 
-    async function loadMetrics() {
-      try {
-        const res = await fetch("/api/metrics");
-        if (res.ok) {
-          const data = await res.json();
-          setMetrics(data);
-        }
-      } catch {
-        // Metrics are non-critical, fail silently
-      } finally {
-        setMetricsLoading(false);
-      }
-    }
+  const { data: metrics = null, isLoading: metricsLoading } = useSWR<MetricsData | null>(
+    "analytics:metrics",
+    async () => {
+      const res = await fetch("/api/metrics");
+      if (!res.ok) return null;
+      return (await res.json()) as MetricsData;
+    },
+  );
 
-    async function loadInsights() {
-      try {
-        const res = await fetch("/api/insights");
-        if (res.ok) {
-          const data = await res.json();
-          setInsights(data.insights);
-        }
-      } catch {
-        // Insights are non-critical
-      } finally {
-        setInsightsLoading(false);
-      }
-    }
-
-    load();
-    loadMetrics();
-    loadInsights();
-  }, [supabase]);
+  const { data: insights = null, isLoading: insightsLoading } = useSWR<InsightData | null>(
+    "analytics:insights",
+    async () => {
+      const res = await fetch("/api/insights");
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.insights as InsightData;
+    },
+  );
 
   if (loading) {
     return (
