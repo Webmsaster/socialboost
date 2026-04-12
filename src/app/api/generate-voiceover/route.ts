@@ -39,6 +39,9 @@ export async function POST(request: NextRequest) {
     if (!text.trim()) {
       return NextResponse.json({ error: "Missing text" }, { status: 400 });
     }
+    if (text.length > 4000) {
+      return NextResponse.json({ error: "Text too long (max 4000 chars)" }, { status: 400 });
+    }
 
     const audio = await generateVoiceover({ text, voice });
 

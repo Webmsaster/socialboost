@@ -37,6 +37,32 @@ export async function GET(request: NextRequest) {
   let sent = 0;
   let skipped = 0;
 
+  // Batch-fetch all posts from the last 7 days across all users in a single
+  // query, then group by user_id. Avoids N+1 (one query per profile).
+  const eligibleUserIds = profiles
+    .filter((p) => {
+      const prefs = p.notification_preferences as Record<string, boolean> | null;
+      return prefs?.digest !== false;
+    })
+    .map((p) => p.id);
+
+  const postsByUser = new Map<
+    string,
+    Array<{ platform: string; status: string; created_at: string }>
+  >();
+  if (eligibleUserIds.length > 0) {
+    const { data: allPosts } = await supabase
+      .from("posts")
+      .select("user_id, platform, status, created_at")
+      .in("user_id", eligibleUserIds)
+      .gte("created_at", sevenDaysAgo);
+    for (const p of allPosts || []) {
+      const bucket = postsByUser.get(p.user_id) || [];
+      bucket.push({ platform: p.platform, status: p.status, created_at: p.created_at });
+      postsByUser.set(p.user_id, bucket);
+    }
+  }
+
   for (const profile of profiles) {
     try {
       // Check if user opted out of digest emails
@@ -46,12 +72,7 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // Get user's posts from last 7 days
-      const { data: posts } = await supabase
-        .from("posts")
-        .select("platform, status, created_at")
-        .eq("user_id", profile.id)
-        .gte("created_at", sevenDaysAgo);
+      const posts = postsByUser.get(profile.id);
 
       if (!posts || posts.length === 0) {
         skipped++;
@@ -80,14 +101,15 @@ export async function GET(request: NextRequest) {
         } else if (i > 0) break;
       }
 
-      await sendWeeklyDigestEmail(profile.email, {
+      const ok = await sendWeeklyDigestEmail(profile.email, {
         postsCreated,
         postsPublished,
         topPlatform,
         streak,
       });
 
-      sent++;
+      if (ok) sent++;
+      else skipped++;
     } catch (err) {
       captureError("Weekly digest: send error", err, { userId: profile.id });
     }

@@ -34,6 +34,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (typeof prompt !== "string" || prompt.length > 1000) {
+      return NextResponse.json(
+        { error: "Prompt too long (max 1000 chars)" },
+        { status: 400 }
+      );
+    }
 
     // Check generation limit
     const { data: profile } = await supabase

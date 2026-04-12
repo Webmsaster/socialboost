@@ -46,6 +46,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (typeof topic !== "string" || topic.length > 2000) {
+      return NextResponse.json(
+        { error: "Topic too long (max 2000 chars)" },
+        { status: 400 }
+      );
+    }
 
     // Check generation limit
     const { data: profile } = await supabase

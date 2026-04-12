@@ -40,6 +40,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (typeof topic !== "string" || topic.length > 2000) {
+      return NextResponse.json(
+        { error: "Topic too long (max 2000 chars)" },
+        { status: 400 }
+      );
+    }
 
     const validCount = Math.min(5, Math.max(2, count || 3));
 
