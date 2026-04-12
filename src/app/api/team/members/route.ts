@@ -30,7 +30,8 @@ export async function GET(request: NextRequest) {
       .from("org_members")
       .select("id, user_id, role, accepted, invited_email, created_at, profiles(id, email, full_name)")
       .eq("org_id", orgId)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .limit(500);
 
     if (error) {
       captureError("List members error", error);

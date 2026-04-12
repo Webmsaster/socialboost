@@ -26,7 +26,8 @@ export async function GET() {
         .eq("user_id", user.id)
         .eq("status", "published")
         .gte("created_at", sixtyDaysAgo)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(500),
       supabase.from("content_series").select("id", { count: "exact", head: true }).eq("user_id", user.id),
       supabase.from("org_members").select("id", { count: "exact", head: true }).eq("user_id", user.id),
       supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("is_favorite", true),

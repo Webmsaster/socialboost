@@ -27,7 +27,7 @@ vi.mock("@/lib/supabase/server", () => ({
                       single: () => mockSingle(),
                     };
                   },
-                  order: () => mockOrder(),
+                  order: () => ({ limit: () => mockOrder() }),
                   single: () => mockSingle(),
                 };
               },
