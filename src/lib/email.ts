@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { captureError } from "./logger";
 
 let _resend: Resend | null = null;
 
@@ -33,12 +34,12 @@ async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<boole
       html,
     });
     if (error) {
-      console.error("[Email] Send failed:", error);
+      captureError("Resend send failed", error, { to, subject });
       return false;
     }
     return true;
   } catch (error) {
-    console.error("[Email] Send error:", error);
+    captureError("Resend send threw", error, { to, subject });
     return false;
   }
 }
