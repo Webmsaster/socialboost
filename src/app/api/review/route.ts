@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
 import { sendReviewApprovedEmail, sendReviewRejectedEmail } from "@/lib/email";
+import { logAudit } from "@/lib/audit-log";
+import { dispatchWebhooks } from "@/lib/webhook-dispatcher";
 
 // GET: List posts pending review for user's organizations
 export async function GET() {
@@ -89,6 +91,8 @@ export async function POST(request: NextRequest) {
       captureError("Submit review error", error);
       return NextResponse.json({ error: "Failed to submit for review" }, { status: 500 });
     }
+
+    await logAudit(user.id, "post.submitted_for_review", { postId });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -188,6 +192,19 @@ export async function PATCH(request: NextRequest) {
         sendReviewRejectedEmail(authorProfile.email, postTopic, reviewerName, note);
       }
     }
+
+    await logAudit(user.id, action === "approve" ? "post.approved" : "post.rejected", {
+      postId,
+      authorId: post.user_id,
+      note: note || null,
+    });
+
+    // Notify the post author's webhooks (fire-and-forget)
+    dispatchWebhooks(post.user_id, action === "approve" ? "post.approved" : "post.rejected", {
+      postId,
+      reviewedBy: reviewerName,
+      note: note || null,
+    }).catch(() => { /* handled inside */ });
 
     return NextResponse.json({ success: true, newStatus });
   } catch (error) {

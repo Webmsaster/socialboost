@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateApiKey, hashApiKey } from "@/lib/api-keys";
 import { captureError } from "@/lib/logger";
+import { logAudit } from "@/lib/audit-log";
 
 // GET: List user's API keys (without the actual key)
 export async function GET() {
@@ -68,6 +69,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create key" }, { status: 500 });
     }
 
+    await logAudit(user.id, "api_key.created", { keyId: data.id, name: data.name });
+
     // Return the raw key ONCE — it cannot be retrieved again
     return NextResponse.json({ ...data, key: rawKey });
   } catch (error) {
@@ -96,6 +99,8 @@ export async function DELETE(request: NextRequest) {
       captureError("API key delete error", error);
       return NextResponse.json({ error: "Failed" }, { status: 500 });
     }
+
+    await logAudit(user.id, "api_key.revoked", { keyId: id });
 
     return NextResponse.json({ success: true });
   } catch (error) {

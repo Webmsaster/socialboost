@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
+import { logAudit } from "@/lib/audit-log";
 
 // GET: List user's webhooks
 export async function GET() {
@@ -79,6 +80,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create webhook" }, { status: 500 });
     }
 
+    await logAudit(user.id, "webhook.created", { webhookId: data.id, url: data.url, events: filteredEvents });
+
     return NextResponse.json(data);
   } catch (error) {
     captureError("Webhook create error", error);
@@ -106,6 +109,8 @@ export async function DELETE(request: NextRequest) {
       captureError("Webhook delete error", error);
       return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
     }
+
+    await logAudit(user.id, "webhook.deleted", { webhookId: id });
 
     return NextResponse.json({ success: true });
   } catch (error) {

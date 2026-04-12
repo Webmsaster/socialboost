@@ -19,90 +19,24 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { PostPreview } from "@/components/post-preview";
-
-// --- Platform character limits ---
-
-const PLATFORM_LIMITS = {
-  twitter: 280,
-  linkedin: 3000,
-  facebook: 63206,
-  instagram: 2200,
-  pinterest: 500,
-} as const satisfies Record<string, number>;
-
-type PlatformKey = keyof typeof PLATFORM_LIMITS;
-
-// --- Types ---
-
-type ContentType = "post" | "video-script" | "video-ad" | "carousel";
-
-const platforms = [
-  "linkedin",
-  "facebook",
-  "instagram",
-  "pinterest",
-  "twitter",
-] as const;
-const tones = [
-  "professional",
-  "casual",
-  "inspirational",
-  "humorous",
-  "educational",
-] as const;
-
-interface PostResult {
-  content: string;
-  hashtags: string[];
-}
-
-interface PostVariant {
-  variantLabel: string;
-  content: string;
-  hashtags: string[];
-  approach: string;
-}
-
-interface VideoScriptResult {
-  hook: string;
-  scenes: Array<{
-    sceneNumber: number;
-    duration: string;
-    visual: string;
-    narration: string;
-    textOverlay: string;
-  }>;
-  cta: string;
-  totalDuration: string;
-  musicSuggestion: string;
-}
-
-interface VideoAdResult {
-  concept: string;
-  frames: Array<{
-    frameNumber: number;
-    duration: string;
-    background: string;
-    headline: string;
-    subtext: string;
-    animation: string;
-  }>;
-  cta: string;
-  targetAudience: string;
-  adFormat: string;
-}
-
-interface CarouselResult {
-  title: string;
-  slides: Array<{
-    slideNumber: number;
-    heading: string;
-    body: string;
-    visualSuggestion: string;
-    speakerNotes: string;
-  }>;
-  hashtags: string[];
-}
+import {
+  PLATFORM_LIMITS,
+  platforms,
+  tones,
+  type PlatformKey,
+  type ContentType,
+  type PostResult,
+  type PostVariant,
+  type VideoScriptResult,
+  type VideoAdResult,
+  type CarouselResult,
+} from "./create-types";
+import {
+  formatPostText,
+  formatVideoScriptText,
+  formatVideoAdText,
+  formatCarouselText,
+} from "./create-helpers";
 
 // --- Component ---
 
@@ -425,56 +359,6 @@ export default function CreatePage() {
     await navigator.clipboard.writeText(fullText);
     setCopiedVariant(variant.variantLabel);
     setTimeout(() => setCopiedVariant(null), 2000);
-  }
-
-  function formatPostText(content: string, hashtags: string[]): string {
-    return hashtags.length > 0
-      ? `${content}\n\n${hashtags.map((h) => `#${h}`).join(" ")}`
-      : content;
-  }
-
-  function formatVideoScriptText(script: VideoScriptResult): string {
-    let text = `HOOK: ${script.hook}\n\n`;
-    for (const scene of script.scenes) {
-      text += `SCENE ${scene.sceneNumber} (${scene.duration})\n`;
-      text += `Visual: ${scene.visual}\n`;
-      text += `Narration: ${scene.narration}\n`;
-      text += `Text Overlay: ${scene.textOverlay}\n\n`;
-    }
-    text += `CTA: ${script.cta}\n`;
-    text += `Total Duration: ${script.totalDuration}\n`;
-    text += `Music: ${script.musicSuggestion}`;
-    return text;
-  }
-
-  function formatVideoAdText(ad: VideoAdResult): string {
-    let text = `CONCEPT: ${ad.concept}\n\n`;
-    for (const frame of ad.frames) {
-      text += `FRAME ${frame.frameNumber} (${frame.duration})\n`;
-      text += `Background: ${frame.background}\n`;
-      text += `Headline: ${frame.headline}\n`;
-      text += `Subtext: ${frame.subtext}\n`;
-      text += `Animation: ${frame.animation}\n\n`;
-    }
-    text += `CTA: ${ad.cta}\n`;
-    text += `Target Audience: ${ad.targetAudience}\n`;
-    text += `Ad Format: ${ad.adFormat}`;
-    return text;
-  }
-
-  function formatCarouselText(carousel: CarouselResult): string {
-    let text = `TITLE: ${carousel.title}\n\n`;
-    for (const slide of carousel.slides) {
-      text += `SLIDE ${slide.slideNumber}\n`;
-      text += `Heading: ${slide.heading}\n`;
-      text += `Body: ${slide.body}\n`;
-      text += `Visual: ${slide.visualSuggestion}\n`;
-      text += `Notes: ${slide.speakerNotes}\n\n`;
-    }
-    if (carousel.hashtags.length > 0) {
-      text += carousel.hashtags.map((h) => `#${h}`).join(" ");
-    }
-    return text;
   }
 
   // --- Save Helper ---

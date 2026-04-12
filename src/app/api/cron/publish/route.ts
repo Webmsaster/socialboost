@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { captureError } from "@/lib/logger";
 import { sendPostPublishedEmail, sendPublishFailedEmail } from "@/lib/email";
+import { logAudit } from "@/lib/audit-log";
+import { dispatchWebhooks } from "@/lib/webhook-dispatcher";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -131,6 +133,13 @@ export async function GET(request: NextRequest) {
           .eq("id", post.id);
         published++;
 
+        await logAudit(post.user_id, "post.published", { postId: post.id, platform: post.platform });
+        dispatchWebhooks(post.user_id, "post.published", {
+          postId: post.id,
+          platform: post.platform,
+          platformPostId: result.platformPostId || null,
+        }).catch(() => { /* handled inside */ });
+
         const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
         if (profile?.email) {
           sendPostPublishedEmail(profile.email, post.content, post.platform);
@@ -163,6 +172,12 @@ export async function GET(request: NextRequest) {
         failed++;
       } else {
         published++;
+
+        await logAudit(post.user_id, "post.published", { postId: post.id, platform: post.platform });
+        dispatchWebhooks(post.user_id, "post.published", {
+          postId: post.id,
+          platform: post.platform,
+        }).catch(() => { /* handled inside */ });
 
         // Send notification email
         const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();

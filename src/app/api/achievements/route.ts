@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { achievements, type UserStats } from "@/lib/achievements";
+import {
+  achievements,
+  getUnlockedAchievements,
+  getLockedAchievements,
+  type UserStats,
+} from "@/lib/achievements";
 import { captureError } from "@/lib/logger";
 
 export async function GET() {
@@ -48,11 +53,13 @@ export async function GET() {
       favoriteCount: favRes.count || 0,
     };
 
-    const unlocked = achievements.filter((a) => a.check(stats)).map((a) => a.id);
+    const unlocked = getUnlockedAchievements(stats).map((a) => a.id);
+    const locked = getLockedAchievements(stats).map((a) => a.id);
 
     return NextResponse.json({
       stats,
       unlocked,
+      locked,
       total: achievements.length,
     });
   } catch (error) {

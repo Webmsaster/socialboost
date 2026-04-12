@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
+import { logAudit } from "@/lib/audit-log";
 
 // GET: List user's content series
 export async function GET() {
@@ -61,6 +62,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create series" }, { status: 500 });
     }
 
+    await logAudit(user.id, "series.created", { seriesId: data.id, name: data.name, platform });
+
     return NextResponse.json(data);
   } catch (error) {
     captureError("Series create error", error);
@@ -88,6 +91,8 @@ export async function DELETE(request: NextRequest) {
       captureError("Series delete error", error);
       return NextResponse.json({ error: "Failed to delete series" }, { status: 500 });
     }
+
+    await logAudit(user.id, "series.deleted", { seriesId: id });
 
     return NextResponse.json({ success: true });
   } catch (error) {
