@@ -389,6 +389,19 @@ export default function HistoryPage() {
                       Submit for Review
                     </Button>
                   )}
+                  {post.status === "published" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async () => {
+                        const url = `${window.location.origin}/p/${post.id}`;
+                        await navigator.clipboard.writeText(url);
+                        toast.success("Share link copied");
+                      }}
+                    >
+                      Share link
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDelete(post.id)}>
                     {t("history.delete")}
                   </Button>
