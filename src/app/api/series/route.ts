@@ -36,10 +36,23 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const { name, platform, tone, topicTemplate, frequency, dayOfWeek, preferredTime } = body;
+    const { name, platform, tone, topicTemplate, frequency, dayOfWeek, preferredTime, websiteUrl } = body;
 
     if (!name?.trim() || !platform || !topicTemplate?.trim()) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    let normalizedWebsiteUrl: string | null = null;
+    if (typeof websiteUrl === "string" && websiteUrl.trim()) {
+      try {
+        const parsed = new URL(websiteUrl.trim());
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          return NextResponse.json({ error: "Website URL must be http or https" }, { status: 400 });
+        }
+        normalizedWebsiteUrl = parsed.toString();
+      } catch {
+        return NextResponse.json({ error: "Invalid website URL" }, { status: 400 });
+      }
     }
 
     const { data, error } = await supabase
@@ -53,6 +66,7 @@ export async function POST(request: NextRequest) {
         frequency: frequency || "weekly",
         day_of_week: dayOfWeek ?? null,
         preferred_time: preferredTime || "09:00",
+        website_url: normalizedWebsiteUrl,
       })
       .select()
       .single();

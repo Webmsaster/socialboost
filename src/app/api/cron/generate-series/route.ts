@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { generatePost, type Platform, type Tone } from "@/lib/openai";
 import { captureError } from "@/lib/logger";
+import {
+  scrapeWebsite,
+  buildPromptBlockFromContext,
+  type WebsiteContext,
+} from "@/lib/website-scraper";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -71,10 +76,35 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // If the series targets a website, refresh scraped context once per day.
+      let websiteContext: WebsiteContext | null =
+        (series.website_context as WebsiteContext | null) ?? null;
+      if (series.website_url) {
+        const lastScraped = series.website_scraped_at ? new Date(series.website_scraped_at) : null;
+        const stale = !lastScraped || now.getTime() - lastScraped.getTime() > 24 * 60 * 60 * 1000;
+        if (stale) {
+          const fresh = await scrapeWebsite(series.website_url);
+          if (fresh) {
+            websiteContext = fresh;
+            await supabase
+              .from("content_series")
+              .update({
+                website_context: fresh,
+                website_scraped_at: now.toISOString(),
+              })
+              .eq("id", series.id);
+          }
+        }
+      }
+
+      const topic = websiteContext
+        ? `${series.topic_template}\n\n${buildPromptBlockFromContext(websiteContext)}\n\nWrite a post that naturally ties the topic above to this website and ends with a soft call to action pointing readers there.`
+        : series.topic_template;
+
       // Generate the post
       const result = await generatePost({
         platform: series.platform as Platform,
-        topic: series.topic_template,
+        topic,
         tone: (series.tone || "professional") as Tone,
         language: "English",
         brandVoice: profile.brand_voice || undefined,

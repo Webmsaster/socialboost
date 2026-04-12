@@ -53,6 +53,7 @@ export default function SeriesPage() {
   const [frequency, setFrequency] = useState<string>("weekly");
   const [dayOfWeek, setDayOfWeek] = useState<string>("1");
   const [preferredTime, setPreferredTime] = useState("09:00");
+  const [websiteUrl, setWebsiteUrl] = useState("");
 
   useEffect(() => {
     loadSeries();
@@ -81,6 +82,7 @@ export default function SeriesPage() {
     setFrequency("weekly");
     setDayOfWeek("1");
     setPreferredTime("09:00");
+    setWebsiteUrl("");
     setShowForm(false);
   }
 
@@ -103,6 +105,7 @@ export default function SeriesPage() {
           frequency,
           dayOfWeek: parseInt(dayOfWeek),
           preferredTime,
+          websiteUrl: websiteUrl.trim() || undefined,
         }),
       });
 
@@ -208,6 +211,19 @@ export default function SeriesPage() {
                 rows={3}
               />
               <p className="text-xs text-muted-foreground">{t("series.topicHint")}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Website URL (optional)</Label>
+              <Input
+                type="url"
+                placeholder="https://yoursite.com"
+                value={websiteUrl}
+                onChange={(e) => setWebsiteUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                If set, each generated post is tailored to this site: we scrape title, description, and headings once per day and feed them to the AI so every post ends with a natural CTA back to your site.
+              </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-4">

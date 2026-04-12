@@ -83,6 +83,7 @@ export default function CreatePage() {
   // Hashtag suggestions
   const [suggestedHashtags, setSuggestedHashtags] = useState<string[]>([]);
   const [loadingHashtags, setLoadingHashtags] = useState(false);
+  const [loadingVoiceover, setLoadingVoiceover] = useState(false);
 
   // Content score
   const [contentScore, setContentScore] = useState<{ score: number; tips: string[] } | null>(null);
@@ -668,7 +669,7 @@ export default function CreatePage() {
             {videoScriptResult.musicSuggestion}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
               onClick={() =>
@@ -676,6 +677,50 @@ export default function CreatePage() {
               }
             >
               {copied ? "Copied!" : "Copy Script"}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={loadingVoiceover}
+              onClick={async () => {
+                setLoadingVoiceover(true);
+                try {
+                  const narration = [
+                    videoScriptResult.hook,
+                    ...videoScriptResult.scenes.map((s) => s.narration),
+                    videoScriptResult.cta,
+                  ]
+                    .filter(Boolean)
+                    .join("\n\n")
+                    .slice(0, 4000);
+
+                  const res = await fetch("/api/generate-voiceover", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text: narration }),
+                  });
+
+                  if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    toast.error(err.error || "Failed to generate voiceover");
+                    return;
+                  }
+
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = `voiceover-${Date.now()}.mp3`;
+                  link.click();
+                  URL.revokeObjectURL(url);
+                  toast.success("Voiceover downloaded");
+                } catch {
+                  toast.error("Failed to generate voiceover");
+                } finally {
+                  setLoadingVoiceover(false);
+                }
+              }}
+            >
+              {loadingVoiceover ? "Generating..." : "Generate Voiceover (Pro)"}
             </Button>
           </div>
         </CardContent>
