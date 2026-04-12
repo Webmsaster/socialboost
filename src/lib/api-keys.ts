@@ -35,11 +35,16 @@ export async function validateApiKey(key: string): Promise<string | null> {
 
     if (!data) return null;
 
-    // Update last_used_at
-    await supabase
+    // Update last_used_at best-effort: we don't want to add a DB round-trip
+    // to the hot path of every API request, and a dropped update here just
+    // means the "last used" display is slightly stale.
+    void supabase
       .from("api_keys")
       .update({ last_used_at: new Date().toISOString() })
-      .eq("key_hash", hash);
+      .eq("key_hash", hash)
+      .then(({ error }) => {
+        if (error) captureError("API key last_used_at update failed", error);
+      });
 
     return data.user_id;
   } catch (err) {
