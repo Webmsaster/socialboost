@@ -39,11 +39,14 @@ export default function ReviewPage() {
     setLoading(true);
     try {
       const res = await fetch("/api/review");
-      if (res.ok) {
-        const data = await res.json();
-        setPosts(data.posts || []);
-        setCanReview(data.canReview || false);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to load reviews");
+        return;
       }
+      const data = await res.json();
+      setPosts(data.posts || []);
+      setCanReview(data.canReview || false);
     } catch {
       toast.error("Failed to load reviews");
     } finally {

@@ -63,10 +63,13 @@ export default function SeriesPage() {
     setLoading(true);
     try {
       const res = await fetch("/api/series");
-      if (res.ok) {
-        const data = await res.json();
-        setSeriesList(data.series || []);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to load series");
+        return;
       }
+      const data = await res.json();
+      setSeriesList(data.series || []);
     } catch {
       toast.error("Failed to load series");
     } finally {
