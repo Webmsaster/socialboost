@@ -1,4 +1,5 @@
 import { captureError } from "@/lib/logger";
+import { parseSafeUrl } from "@/lib/ssrf";
 
 interface WebhookPayload {
   event: string;
@@ -17,6 +18,12 @@ export async function fireWebhook(
 ): Promise<void> {
   if (!webhookUrl) return;
 
+  const safe = parseSafeUrl(webhookUrl);
+  if (!safe) {
+    captureError("Webhook URL rejected (invalid or private host)", null, { webhookUrl, event });
+    return;
+  }
+
   const payload: WebhookPayload = {
     event,
     data,
@@ -24,7 +31,7 @@ export async function fireWebhook(
   };
 
   try {
-    const res = await fetch(webhookUrl, {
+    const res = await fetch(safe.toString(), {
       method: "POST",
       headers: { "Content-Type": "application/json", "User-Agent": "SocialBoost-Webhook/1.0" },
       body: JSON.stringify(payload),

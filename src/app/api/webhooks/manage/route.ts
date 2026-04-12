@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
 import { logAudit } from "@/lib/audit-log";
 import { rateLimit } from "@/lib/rate-limit";
+import { isBlockedHostname } from "@/lib/ssrf";
 
 // GET: List user's webhooks
 export async function GET() {
@@ -48,14 +49,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing URL" }, { status: 400 });
     }
 
+    let parsedUrl: URL;
     try {
-      new URL(url);
+      parsedUrl = new URL(url);
     } catch {
       return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
     }
 
-    if (!url.startsWith("https://")) {
+    if (parsedUrl.protocol !== "https:") {
       return NextResponse.json({ error: "Webhook URL must use HTTPS" }, { status: 400 });
+    }
+    if (isBlockedHostname(parsedUrl.hostname)) {
+      return NextResponse.json(
+        { error: "Webhook URL cannot target a private or loopback address" },
+        { status: 400 }
+      );
     }
 
     const validEvents = ["post.created", "post.published", "post.approved", "post.rejected", "series.generated"];

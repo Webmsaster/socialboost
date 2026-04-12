@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { captureError } from "./logger";
+import { parseSafeUrl } from "./ssrf";
 
 function getAdmin() {
   return createClient(
@@ -35,10 +36,18 @@ export async function dispatchWebhooks(
     });
 
     for (const webhook of webhooks) {
+      const safe = parseSafeUrl(webhook.url);
+      if (!safe) {
+        captureError("Webhook URL rejected at dispatch (invalid or private host)", null, {
+          webhookId: webhook.id,
+          event,
+        });
+        continue;
+      }
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
       try {
-        const res = await fetch(webhook.url, {
+        const res = await fetch(safe.toString(), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

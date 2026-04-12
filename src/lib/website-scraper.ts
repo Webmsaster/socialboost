@@ -1,4 +1,5 @@
 import { captureError } from "./logger";
+import { isBlockedHostname } from "./ssrf";
 
 export interface WebsiteContext {
   url: string;
@@ -55,33 +56,6 @@ function extractHeadings(html: string, tag: "h1" | "h2", limit = 5): string[] {
  * Fetch a public web page and extract a compact context bundle usable as
  * additional prompt input. Best-effort — returns null on any failure.
  */
-/**
- * Reject hostnames that clearly point at loopback, link-local, or private
- * network ranges to reduce SSRF exposure. DNS rebinding is still possible
- * (we don't resolve + re-check), but this blocks the obvious direct cases
- * an attacker would register from the UI.
- */
-function isBlockedHostname(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  if (h === "localhost" || h.endsWith(".localhost")) return true;
-  if (h === "metadata.google.internal") return true;
-  // IPv6 loopback / unspecified
-  if (h === "::1" || h === "[::1]" || h === "::" || h === "[::]") return true;
-  // IPv6 unique-local (fc00::/7) and link-local (fe80::/10) — crude prefix check
-  if (/^\[?fc|^\[?fd/.test(h) || /^\[?fe8|^\[?fe9|^\[?fea|^\[?feb/.test(h)) return true;
-  // IPv4 literal checks
-  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (v4) {
-    const [a, b] = [parseInt(v4[1]), parseInt(v4[2])];
-    if (a === 0 || a === 10 || a === 127) return true;
-    if (a === 169 && b === 254) return true; // link-local (incl. AWS metadata)
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a >= 224) return true; // multicast / reserved
-  }
-  return false;
-}
-
 export async function scrapeWebsite(url: string): Promise<WebsiteContext | null> {
   try {
     const parsed = new URL(url);
