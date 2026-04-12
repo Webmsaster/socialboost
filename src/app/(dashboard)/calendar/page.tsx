@@ -75,10 +75,15 @@ export default function CalendarPage() {
 
   const loadPosts = useCallback(async () => {
     setLoading(true);
+    // Load a rolling 120-day window: recent past (for completed posts) + near future (for scheduled).
+    const from = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    const to = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from("posts")
       .select("*")
-      .order("created_at", { ascending: false });
+      .or(`and(created_at.gte.${from},created_at.lte.${to}),and(scheduled_for.gte.${from},scheduled_for.lte.${to})`)
+      .order("created_at", { ascending: false })
+      .limit(500);
 
     if (error) {
       toast.error("Failed to load posts");

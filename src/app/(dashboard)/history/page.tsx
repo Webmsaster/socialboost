@@ -65,7 +65,12 @@ export default function HistoryPage() {
     async function load() {
       setLoading(true);
       try {
-        let query = supabase.from("posts").select("*").order("created_at", { ascending: false });
+        // Cap server-side load; client paginates from here.
+        let query = supabase
+          .from("posts")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(200);
         if (filter !== "all") {
           query = query.eq("status", filter);
         }

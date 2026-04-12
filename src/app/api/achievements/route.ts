@@ -14,23 +14,31 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // Gather stats
-    const [postsRes, seriesRes, membersRes, favRes] = await Promise.all([
-      supabase.from("posts").select("platform, status, created_at, is_favorite").eq("user_id", user.id),
+    // Gather stats with count queries + a narrow streak window (last 60 days).
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    const [totalRes, publishedRes, platformsRes, streakRes, seriesRes, membersRes, favRes] = await Promise.all([
+      supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+      supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "published"),
+      supabase.from("posts").select("platform").eq("user_id", user.id).limit(1000),
+      supabase
+        .from("posts")
+        .select("created_at")
+        .eq("user_id", user.id)
+        .eq("status", "published")
+        .gte("created_at", sixtyDaysAgo)
+        .order("created_at", { ascending: false }),
       supabase.from("content_series").select("id", { count: "exact", head: true }).eq("user_id", user.id),
       supabase.from("org_members").select("id", { count: "exact", head: true }).eq("user_id", user.id),
       supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("is_favorite", true),
     ]);
 
-    const posts = postsRes.data || [];
-    const totalPosts = posts.length;
-    const publishedPosts = posts.filter((p) => p.status === "published").length;
-    const platforms = new Set(posts.map((p) => p.platform)).size;
+    const totalPosts = totalRes.count || 0;
+    const publishedPosts = publishedRes.count || 0;
+    const platforms = new Set((platformsRes.data || []).map((p) => p.platform)).size;
 
-    // Calculate streak
+    // Calculate streak from the last 60 days of published posts.
     const publishDates = [...new Set(
-      posts.filter((p) => p.status === "published")
-        .map((p) => new Date(p.created_at).toDateString())
+      (streakRes.data || []).map((p) => new Date(p.created_at).toDateString())
     )].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
     let streak = 0;

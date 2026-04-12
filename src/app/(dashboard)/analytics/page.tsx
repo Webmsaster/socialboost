@@ -93,10 +93,13 @@ export default function AnalyticsPage() {
   useEffect(() => {
     async function load() {
       try {
+        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
         const { data, error } = await supabase
           .from("posts")
           .select("platform, status, tone, created_at")
-          .order("created_at", { ascending: false });
+          .gte("created_at", ninetyDaysAgo)
+          .order("created_at", { ascending: false })
+          .limit(1000);
 
         if (error) throw error;
         setPosts(data ?? []);

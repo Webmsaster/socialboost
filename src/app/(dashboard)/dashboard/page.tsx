@@ -45,9 +45,15 @@ export default function DashboardPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        // Only look back 90 days for stats — dashboard doesn't need ancient history.
+        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
         const [postsRes, allPostsRes, profileRes] = await Promise.all([
           supabase.from("posts").select("*").order("created_at", { ascending: false }).limit(5),
-          supabase.from("posts").select("platform, status, created_at, scheduled_for"),
+          supabase
+            .from("posts")
+            .select("platform, status, created_at, scheduled_for")
+            .gte("created_at", ninetyDaysAgo)
+            .limit(500),
           supabase.from("profiles").select("generation_count, subscription_status").eq("id", user.id).single(),
         ]);
 
