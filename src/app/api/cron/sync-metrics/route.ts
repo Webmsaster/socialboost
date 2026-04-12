@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { captureError } from "@/lib/logger";
 import { getPublisher, ensureFreshToken } from "@/lib/platforms/registry";
+import type { ConnectedAccount } from "@/lib/platforms";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -47,13 +48,24 @@ export async function GET(request: NextRequest) {
   let synced = 0;
   let skipped = 0;
 
+  // Batch-load connected accounts for all posts in one query.
+  const accountIds = Array.from(
+    new Set(posts.map((p) => p.connected_account_id).filter(Boolean))
+  ) as string[];
+  const accountMap = new Map<string, ConnectedAccount>();
+  if (accountIds.length > 0) {
+    const { data: accounts } = await supabase
+      .from("connected_accounts")
+      .select("*")
+      .in("id", accountIds);
+    for (const a of (accounts || []) as ConnectedAccount[]) accountMap.set(a.id, a);
+  }
+
   for (const post of posts) {
     try {
-      const { data: account } = await supabase
-        .from("connected_accounts")
-        .select("*")
-        .eq("id", post.connected_account_id)
-        .single();
+      const account = post.connected_account_id
+        ? accountMap.get(post.connected_account_id)
+        : undefined;
 
       if (!account) {
         skipped++;

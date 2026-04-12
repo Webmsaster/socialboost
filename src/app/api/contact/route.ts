@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { captureError } from "@/lib/logger";
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function getAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,11 +56,11 @@ export async function POST(request: NextRequest) {
             html: `
               <div style="font-family: sans-serif; max-width: 560px;">
                 <h2>New Contact Form Submission</h2>
-                <p><strong>Name:</strong> ${name}</p>
-                <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Subject:</strong> ${subject}</p>
+                <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+                <p><strong>Email:</strong> ${escapeHtml(email)}</p>
+                <p><strong>Subject:</strong> ${escapeHtml(subject)}</p>
                 <hr />
-                <p style="white-space: pre-wrap;">${message}</p>
+                <p style="white-space: pre-wrap;">${escapeHtml(message)}</p>
               </div>
             `,
             replyTo: email,

@@ -26,6 +26,12 @@ export async function POST(request: NextRequest) {
     if (!content || !targetPlatforms?.length) {
       return NextResponse.json({ error: "Missing content or targetPlatforms" }, { status: 400 });
     }
+    if (typeof content !== "string" || content.length > 5000) {
+      return NextResponse.json({ error: "Content too long (max 5000 chars)" }, { status: 400 });
+    }
+    if (!Array.isArray(targetPlatforms) || targetPlatforms.length > 5) {
+      return NextResponse.json({ error: "Too many target platforms (max 5)" }, { status: 400 });
+    }
 
     // Check limits
     const { data: profile } = await supabase

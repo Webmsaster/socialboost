@@ -16,6 +16,9 @@ export async function POST(request: NextRequest) {
 
     const { topic, platform } = await request.json() as { topic: string; platform: string };
     if (!topic) return NextResponse.json({ error: "Missing topic" }, { status: 400 });
+    if (typeof topic !== "string" || topic.length > 2000) {
+      return NextResponse.json({ error: "Topic too long (max 2000 chars)" }, { status: 400 });
+    }
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await openai.chat.completions.create({
