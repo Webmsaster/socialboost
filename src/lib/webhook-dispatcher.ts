@@ -35,11 +35,10 @@ export async function dispatchWebhooks(
     });
 
     for (const webhook of webhooks) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
-
-        await fetch(webhook.url, {
+        const res = await fetch(webhook.url, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -48,10 +47,17 @@ export async function dispatchWebhooks(
           body,
           signal: controller.signal,
         });
-
-        clearTimeout(timeout);
+        if (!res.ok) {
+          captureError("Webhook delivery non-2xx", new Error(`HTTP ${res.status}`), {
+            webhookId: webhook.id,
+            event,
+            status: res.status,
+          });
+        }
       } catch (err) {
         captureError("Webhook delivery failed", err, { webhookId: webhook.id, event });
+      } finally {
+        clearTimeout(timeout);
       }
     }
   } catch (err) {
