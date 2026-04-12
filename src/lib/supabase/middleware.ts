@@ -8,8 +8,13 @@ export async function updateSession(request: NextRequest) {
   const isMutationMethod = method === "POST" || method === "PATCH" || method === "DELETE";
   const isApiRoute = pathname.startsWith("/api/");
   const isWebhook = pathname === "/api/stripe/webhook";
+  // The public v1 API is authenticated via Bearer API keys and is meant to
+  // be called from external clients (curl, server-to-server), which never
+  // send an Origin header. Skipping CSRF here is safe because the API key
+  // itself is the credential and cookie-based auth is not used on /api/v1.
+  const isPublicApi = pathname.startsWith("/api/v1/");
 
-  if (isApiRoute && isMutationMethod && !isWebhook) {
+  if (isApiRoute && isMutationMethod && !isWebhook && !isPublicApi) {
     const origin = request.headers.get("origin");
     const referer = request.headers.get("referer");
     const requestOrigin = request.nextUrl.origin;
