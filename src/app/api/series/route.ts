@@ -15,7 +15,8 @@ export async function GET() {
       .from("content_series")
       .select("*")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(100);
 
     if (error) {
       captureError("Series fetch error", error);

@@ -15,7 +15,8 @@ export async function GET() {
       .from("user_webhooks")
       .select("*")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(50);
 
     if (error) {
       captureError("Webhook list error", error);

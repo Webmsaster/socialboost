@@ -21,7 +21,10 @@ vi.mock("@/lib/supabase/server", () => ({
           eq: () => ({
             single: () => mockExportSingle(table),
           }),
-          order: () => mockExportSelect._orderResult?.[table] ?? { data: [] },
+          order: () => {
+            const result = mockExportSelect._orderResult?.[table] ?? { data: [] };
+            return { ...result, limit: () => result };
+          },
         };
       },
     }),

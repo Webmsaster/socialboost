@@ -16,7 +16,8 @@ export async function GET() {
     const { data, error } = await supabase
       .from("templates")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(200);
 
     if (error) {
       captureError("List templates error", error);

@@ -22,7 +22,8 @@ vi.mock("@/lib/supabase/server", () => ({
             return {
               order: (...orderArgs: unknown[]) => {
                 mockOrder(...orderArgs);
-                return mockOrder.mock.results[mockOrder.mock.calls.length - 1]?.value ?? { data: [], error: null };
+                const result = mockOrder.mock.results[mockOrder.mock.calls.length - 1]?.value ?? { data: [], error: null };
+                return { ...result, limit: () => result };
               },
             };
           },

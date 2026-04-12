@@ -22,10 +22,15 @@ vi.mock("@/lib/supabase/server", () => ({
         return {
           select: (...args: unknown[]) => {
             mockSelectChain(...args);
+            const orderResult = {
+              get data() { return mockOrder._result?.data ?? []; },
+              get error() { return mockOrder._result?.error ?? null; },
+              limit: () => orderResult,
+            };
             return {
               order: (...oArgs: unknown[]) => {
                 mockOrder(...oArgs);
-                return mockOrder._result ?? { data: [], error: null };
+                return orderResult;
               },
             };
           },

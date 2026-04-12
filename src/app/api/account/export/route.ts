@@ -14,15 +14,27 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const limited = await rateLimit(user.id);
+    const limited = await rateLimit(user.id, "/api/account/export");
     if (!limited.success) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 
+    // Cap total rows per table so the endpoint cannot time out or OOM
+    // on heavy accounts. 10k is well above the typical user; heavier
+    // users can email support for a streamed export.
+    const EXPORT_ROW_CAP = 10_000;
     const [profileRes, postsRes, templatesRes, accountsRes] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", user.id).single(),
-      supabase.from("posts").select("*").order("created_at", { ascending: false }),
-      supabase.from("templates").select("*").order("created_at", { ascending: false }),
+      supabase
+        .from("posts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(EXPORT_ROW_CAP),
+      supabase
+        .from("templates")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(EXPORT_ROW_CAP),
       supabase.from("connected_accounts").select("*"),
     ]);
 
