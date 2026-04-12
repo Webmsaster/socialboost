@@ -11,7 +11,7 @@ const useCases = [
   {
     persona: "Founders",
     headline: "Build in public without burning out",
-    pain: "You&apos;re building a product and customers expect you to post regularly, but every minute spent writing is a minute not building.",
+    pain: "You’re building a product and customers expect you to post regularly, but every minute spent writing is a minute not building.",
     solution:
       "Batch-generate a week of posts in 30 minutes. Share milestones, lessons learned, and product updates across LinkedIn, Twitter, and Threads without context-switching.",
     features: [
@@ -50,7 +50,7 @@ const useCases = [
   {
     persona: "Small Businesses",
     headline: "Professional content without a marketing hire",
-    pain: "You need a social media presence to compete, but you can&apos;t justify the cost of an agency or in-house marketer. DIY is inconsistent and takes time away from running the business.",
+    pain: "You need a social media presence to compete, but you can’t justify the cost of an agency or in-house marketer. DIY is inconsistent and takes time away from running the business.",
     solution:
       "Generate professional-quality posts in minutes per day. Schedule a month in advance and focus on what you actually do. Analytics show what resonates so you can do more of it.",
     features: [
@@ -113,10 +113,7 @@ export default function UseCasesPage() {
                 {uc.persona}
               </div>
               <h2 className="mt-3 text-2xl font-bold">{uc.headline}</h2>
-              <p
-                className="mt-4 text-muted-foreground"
-                dangerouslySetInnerHTML={{ __html: uc.pain }}
-              />
+              <p className="mt-4 text-muted-foreground">{uc.pain}</p>
               <p className="mt-3">{uc.solution}</p>
               <div className="mt-6">
                 <h3 className="text-sm font-semibold">Key features</h3>

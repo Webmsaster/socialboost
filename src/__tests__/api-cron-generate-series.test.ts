@@ -25,7 +25,7 @@ vi.mock("@supabase/supabase-js", () => ({
       }
       return {
         update: () => ({
-          eq: () => { _updateCalled = true; return { error: null }; },
+          eq: () => ({ error: null }),
         }),
       };
     },
