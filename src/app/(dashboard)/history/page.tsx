@@ -8,6 +8,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { TableSkeleton } from "@/components/loading-skeleton";
 import { useLanguage } from "@/lib/i18n";
 import { toast } from "sonner";
@@ -28,10 +35,27 @@ type FilterStatus = "all" | "draft" | "pending_review" | "approved" | "scheduled
 
 const POSTS_PER_PAGE = 10;
 
+const URL_ALL = "__all__";
+
+function isUrl(topic: string): boolean {
+  return /^https?:\/\//i.test(topic);
+}
+
+function shortUrl(u: string): string {
+  try {
+    const parsed = new URL(u);
+    const tail = parsed.pathname === "/" ? "" : parsed.pathname;
+    return `${parsed.host}${tail}`.replace(/\/$/, "");
+  } catch {
+    return u;
+  }
+}
+
 export default function HistoryPage() {
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [search, setSearch] = useState("");
+  const [websiteFilter, setWebsiteFilter] = useState<string>(URL_ALL);
   const [page, setPage] = useState(1);
   const { t } = useLanguage();
   const router = useRouter();
@@ -66,10 +90,25 @@ export default function HistoryPage() {
     mutate((prev) => updater(prev ?? []), { revalidate: false });
   };
 
+  const websiteOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of posts) {
+      if (isUrl(p.topic)) {
+        counts.set(p.topic, (counts.get(p.topic) ?? 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([url, count]) => ({ url, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [posts]);
+
   const filteredPosts = useMemo(() => {
     let result = posts;
     if (showFavoritesOnly) {
       result = result.filter((p) => p.is_favorite);
+    }
+    if (websiteFilter !== URL_ALL) {
+      result = result.filter((p) => p.topic === websiteFilter);
     }
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -81,7 +120,7 @@ export default function HistoryPage() {
       );
     }
     return result;
-  }, [posts, search, showFavoritesOnly]);
+  }, [posts, search, showFavoritesOnly, websiteFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPosts.length / POSTS_PER_PAGE));
   // Clamp the page instead of resetting via an effect — pure derivation avoids cascading renders.
@@ -323,6 +362,36 @@ export default function HistoryPage() {
         />
       </div>
 
+      {websiteOptions.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground shrink-0">Website:</span>
+          <Select value={websiteFilter} onValueChange={setWebsiteFilter}>
+            <SelectTrigger className="max-w-md">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={URL_ALL}>
+                All websites ({posts.length})
+              </SelectItem>
+              {websiteOptions.map((opt) => (
+                <SelectItem key={opt.url} value={opt.url}>
+                  {shortUrl(opt.url)} ({opt.count})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {websiteFilter !== URL_ALL && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setWebsiteFilter(URL_ALL)}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <TableSkeleton rows={6} />
       ) : filteredPosts.length === 0 ? (
@@ -353,7 +422,19 @@ export default function HistoryPage() {
                     {new Date(post.created_at).toLocaleDateString()}
                   </span>
                 </div>
-                <p className="text-sm font-medium">{post.topic}</p>
+                {isUrl(post.topic) ? (
+                  <a
+                    href={post.topic}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-sm font-medium text-primary hover:underline break-all"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {shortUrl(post.topic)}
+                  </a>
+                ) : (
+                  <p className="text-sm font-medium">{post.topic}</p>
+                )}
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-3">
                   {post.content}
                 </p>
