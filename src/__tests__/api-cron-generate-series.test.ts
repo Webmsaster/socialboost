@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 // Mock state
 let mockSeriesData: unknown[] = [];
 let insertCalled = false;
+let lastInsertedRow: Record<string, unknown> | null = null;
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(() => ({
@@ -20,8 +21,9 @@ vi.mock("@supabase/supabase-js", () => ({
       }
       if (table === "posts") {
         return {
-          insert: () => {
+          insert: (row: Record<string, unknown>) => {
             insertCalled = true;
+            lastInsertedRow = row;
             return {
               select: () => ({
                 single: () => ({ data: { id: "post-xyz" }, error: null }),
@@ -41,8 +43,10 @@ vi.mock("@supabase/supabase-js", () => ({
 }));
 
 const mockGeneratePost = vi.fn();
+const mockGenerateVideoScript = vi.fn();
 vi.mock("@/lib/openai", () => ({
   generatePost: (...args: unknown[]) => mockGeneratePost(...args),
+  generateVideoScript: (...args: unknown[]) => mockGenerateVideoScript(...args),
 }));
 
 vi.mock("@/lib/logger", () => ({ captureError: vi.fn() }));
@@ -62,7 +66,8 @@ describe("GET /api/cron/generate-series", () => {
     vi.clearAllMocks();
     mockSeriesData = [];
     insertCalled = false;
-        process.env.CRON_SECRET = CRON_SECRET;
+    lastInsertedRow = null;
+    process.env.CRON_SECRET = CRON_SECRET;
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
   });
@@ -153,6 +158,62 @@ describe("GET /api/cron/generate-series", () => {
     expect(json.generated).toBe(0);
     expect(json.skipped).toBe(1);
     expect(mockGeneratePost).not.toHaveBeenCalled();
+  });
+
+  it("generates a video script when post_type=video", async () => {
+    const yesterday = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+
+    mockSeriesData = [{
+      id: "s-video",
+      user_id: "u1",
+      name: "Daily Reels",
+      platform: "instagram",
+      tone: "casual",
+      topic_template: "Behind the scenes of our product",
+      frequency: "daily",
+      day_of_week: null,
+      preferred_time: "12:00",
+      is_active: true,
+      last_generated_at: yesterday,
+      post_type: "video",
+      profiles: {
+        brand_voice: null,
+        preferred_model: null,
+        subscription_status: "active",
+        generation_count: 5,
+      },
+    }];
+
+    mockGenerateVideoScript.mockResolvedValueOnce({
+      hook: "Wait until you see this",
+      scenes: [
+        {
+          sceneNumber: 1,
+          duration: "5s",
+          visual: "Factory floor pan",
+          narration: "Every Reel starts with a hook.",
+          textOverlay: "THE SECRET",
+        },
+      ],
+      cta: "Follow for more",
+      totalDuration: "20s",
+      musicSuggestion: "Upbeat electronic",
+    });
+
+    const res = await GET(createRequest());
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.generated).toBe(1);
+    expect(mockGenerateVideoScript).toHaveBeenCalledTimes(1);
+    expect(mockGeneratePost).not.toHaveBeenCalled();
+    expect(insertCalled).toBe(true);
+    const inserted = lastInsertedRow as Record<string, unknown> | null;
+    expect(inserted).not.toBeNull();
+    expect(typeof inserted!.content).toBe("string");
+    const content = inserted!.content as string;
+    expect(content).toContain("Wait until you see this");
+    expect(content).toContain("CTA: Follow for more");
+    expect(content).toContain("Music: Upbeat electronic");
   });
 
   it("skips series that was generated recently (weekly not due)", async () => {
