@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -79,6 +80,8 @@ export default function BulkPage() {
   const [mode, setMode] = useState<BulkMode>("topic");
   const [topic, setTopic] = useState("");
   const [urlsInput, setUrlsInput] = useState("");
+  const [sitemapInput, setSitemapInput] = useState("");
+  const [loadingSitemap, setLoadingSitemap] = useState(false);
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<PlatformId>>(
     new Set()
   );
@@ -156,6 +159,59 @@ export default function BulkPage() {
     }
 
     return res.json();
+  }
+
+  async function handleLoadSitemap() {
+    const input = sitemapInput.trim();
+    if (!input) {
+      toast.error("Enter a site URL first");
+      return;
+    }
+    setLoadingSitemap(true);
+    try {
+      const res = await fetch("/api/sitemap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: input }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to fetch sitemap");
+        return;
+      }
+      const data = (await res.json()) as {
+        urls: string[];
+        truncated: boolean;
+      };
+      const existing = new Set(
+        urlsInput
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean)
+      );
+      const added: string[] = [];
+      for (const u of data.urls) {
+        if (!existing.has(u)) {
+          existing.add(u);
+          added.push(u);
+        }
+      }
+      if (added.length === 0) {
+        toast.info("Sitemap loaded — no new URLs to add");
+        return;
+      }
+      setUrlsInput((prev) => {
+        const sep = prev && !prev.endsWith("\n") ? "\n" : "";
+        return prev + sep + added.join("\n");
+      });
+      toast.success(
+        `${added.length} URL${added.length === 1 ? "" : "s"} added${data.truncated ? " (list was truncated)" : ""}`
+      );
+    } catch {
+      toast.error("Failed to fetch sitemap");
+    } finally {
+      setLoadingSitemap(false);
+    }
   }
 
   function validateUrls(lines: string[]): { valid: string[]; invalid: string[] } {
@@ -473,26 +529,54 @@ export default function BulkPage() {
             />
           </div>
         ) : (
-          <div className="space-y-2">
-            <Label>Website URLs (one per line)</Label>
-            <Textarea
-              placeholder={"https://example.com\nhttps://another-site.com/landing\nhttps://blog.example.com/post"}
-              value={urlsInput}
-              onChange={(e) => setUrlsInput(e.target.value)}
-              rows={6}
-              disabled={generating}
-            />
-            <p className="text-xs text-muted-foreground">
-              We scrape title + description + headings for each URL and weave them into a post tailored to each site.
-              {parsedUrls.length > 0 && (
-                <>
-                  {" "}
-                  <span className="font-medium text-foreground">
-                    {parsedUrls.length} URL{parsedUrls.length === 1 ? "" : "s"} detected.
-                  </span>
-                </>
-              )}
-            </p>
+          <div className="space-y-4">
+            {/* Sitemap loader */}
+            <div className="space-y-2 rounded-lg border border-dashed p-3">
+              <Label className="text-xs">Load URLs from a sitemap</Label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  type="url"
+                  placeholder="https://yoursite.com (or https://yoursite.com/sitemap.xml)"
+                  value={sitemapInput}
+                  onChange={(e) => setSitemapInput(e.target.value)}
+                  disabled={generating || loadingSitemap}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={generating || loadingSitemap || !sitemapInput.trim()}
+                  onClick={handleLoadSitemap}
+                >
+                  {loadingSitemap ? "Loading..." : "Load sitemap"}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                We try /sitemap.xml and /sitemap_index.xml on the given host, then append the found URLs below (max 200, deduplicated against what&apos;s already there).
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Website URLs (one per line)</Label>
+              <Textarea
+                placeholder={"https://example.com\nhttps://another-site.com/landing\nhttps://blog.example.com/post"}
+                value={urlsInput}
+                onChange={(e) => setUrlsInput(e.target.value)}
+                rows={6}
+                disabled={generating}
+              />
+              <p className="text-xs text-muted-foreground">
+                We scrape title + description + headings for each URL and weave them into a post tailored to each site.
+                {parsedUrls.length > 0 && (
+                  <>
+                    {" "}
+                    <span className="font-medium text-foreground">
+                      {parsedUrls.length} URL{parsedUrls.length === 1 ? "" : "s"} detected.
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
           </div>
         )}
 
