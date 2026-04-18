@@ -90,6 +90,10 @@ export default function CreatePage() {
     voiceover: { dataUrl: string | null; error: string | null };
   } | null>(null);
 
+  // Website → full video (video-script tab)
+  const [siteUrl, setSiteUrl] = useState("");
+  const [loadingSiteVideo, setLoadingSiteVideo] = useState(false);
+
   // Content score
   const [contentScore, setContentScore] = useState<{ score: number; tips: string[] } | null>(null);
   const [scoringContent, setScoringContent] = useState(false);
@@ -312,6 +316,46 @@ export default function CreatePage() {
     const data = await res.json();
     setVideoScriptResult(data);
     localStorage.removeItem("draft_create");
+  }
+
+  async function handleGenerateVideoFromSite() {
+    if (!siteUrl.trim()) {
+      toast.error("Enter a website URL first");
+      return;
+    }
+    setLoadingSiteVideo(true);
+    clearAllResults();
+    setVideoAssets(null);
+    try {
+      const res = await fetch("/api/generate-video-from-site", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          websiteUrl: siteUrl.trim(),
+          tone,
+          language,
+          platform,
+          topicHint: topic.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Generation failed");
+        return;
+      }
+      const data = await res.json();
+      setVideoScriptResult(data.script);
+      setVideoAssets({ images: data.images, voiceover: data.voiceover });
+      if (data.assetsSkipped) {
+        toast.warning(data.assetsSkipped);
+      } else {
+        toast.success("Full video generated for your site");
+      }
+    } catch {
+      toast.error("Failed to generate video from site");
+    } finally {
+      setLoadingSiteVideo(false);
+    }
   }
 
   async function handleGenerateVideoAd() {
@@ -1140,6 +1184,37 @@ export default function CreatePage() {
             </div>
 
             {/* Type-specific inputs */}
+            {contentType === "video-script" && (
+              <div className="space-y-3 rounded-lg border border-dashed p-4">
+                <div>
+                  <Label>Generate complete video for your website (Pro)</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Paste a URL — we scrape the page, write the script, and generate scene images + voiceover in one step. Uses ~1 + scenes + 1 of your monthly quota.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    type="url"
+                    placeholder="https://yoursite.com"
+                    value={siteUrl}
+                    onChange={(e) => setSiteUrl(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={loadingSiteVideo || !siteUrl.trim()}
+                    onClick={handleGenerateVideoFromSite}
+                  >
+                    {loadingSiteVideo ? "Generating..." : "Generate video for my site"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Tip: the Topic field above, if filled, is used as an extra focus hint.
+                </p>
+              </div>
+            )}
+
             {contentType === "video-ad" && (
               <div className="space-y-2">
                 <Label>Product / Brand Name</Label>
