@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/loading-skeleton";
 import { useLanguage } from "@/lib/i18n";
+import { useRecentWebsites } from "@/lib/use-recent-websites";
 import { toast } from "sonner";
 
 interface ContentSeries {
@@ -45,6 +46,7 @@ export default function SeriesPage() {
   const [creating, setCreating] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
+  const recentWebsites = useRecentWebsites();
   const { t } = useLanguage();
 
   // Form state
@@ -255,7 +257,15 @@ export default function SeriesPage() {
                 placeholder="https://yoursite.com"
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
+                list="recent-websites-series"
               />
+              {recentWebsites.length > 0 && (
+                <datalist id="recent-websites-series">
+                  {recentWebsites.map((u) => (
+                    <option key={u} value={u} />
+                  ))}
+                </datalist>
+              )}
               <p className="text-xs text-muted-foreground">
                 If set, each generated post is tailored to this site: we scrape title, description, and headings once per day and feed them to the AI so every post ends with a natural CTA back to your site.
               </p>
