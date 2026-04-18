@@ -6,6 +6,7 @@ import { captureError } from "@/lib/logger";
 import { trackEvent } from "@/lib/analytics";
 import { sendLimitReachedEmail } from "@/lib/email";
 import { isProSubscription } from "@/lib/subscription";
+import { scrapeWebsite, buildPromptBlockFromContext } from "@/lib/website-scraper";
 
 const FREE_LIMIT = 10;
 const PRO_LIMIT = 100;
@@ -33,11 +34,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { platform, topic, tone, language } = body as {
+    const { platform, topic, tone, language, websiteUrl } = body as {
       platform: Platform;
       topic: string;
       tone: Tone;
       language: string;
+      websiteUrl?: string;
     };
 
     if (!platform || !topic || !tone) {
@@ -51,6 +53,22 @@ export async function POST(request: NextRequest) {
         { error: "Topic too long (max 2000 chars)" },
         { status: 400 }
       );
+    }
+
+    let normalizedWebsiteUrl: string | null = null;
+    if (typeof websiteUrl === "string" && websiteUrl.trim()) {
+      try {
+        const parsed = new URL(websiteUrl.trim());
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          return NextResponse.json(
+            { error: "Website URL must be http or https" },
+            { status: 400 }
+          );
+        }
+        normalizedWebsiteUrl = parsed.toString();
+      } catch {
+        return NextResponse.json({ error: "Invalid website URL" }, { status: 400 });
+      }
     }
 
     // Check generation limit
@@ -81,9 +99,17 @@ export async function POST(request: NextRequest) {
       ? (profile.preferred_model || "gpt-4o-mini")
       : "gpt-4o-mini";
 
+    let effectiveTopic = topic;
+    if (normalizedWebsiteUrl) {
+      const ctx = await scrapeWebsite(normalizedWebsiteUrl);
+      if (ctx) {
+        effectiveTopic = `${topic}\n\n${buildPromptBlockFromContext(ctx)}\n\nWrite a post that naturally ties the topic above to this website and ends with a soft call to action pointing readers there.`;
+      }
+    }
+
     const result = await generatePost({
       platform,
-      topic,
+      topic: effectiveTopic,
       tone,
       language: language || "English",
       brandVoice: profile.brand_voice || undefined,

@@ -94,6 +94,9 @@ export default function CreatePage() {
   const [siteUrl, setSiteUrl] = useState("");
   const [loadingSiteVideo, setLoadingSiteVideo] = useState(false);
 
+  // Website URL for website-aware Social Post generation
+  const [postWebsiteUrl, setPostWebsiteUrl] = useState("");
+
   // Content score
   const [contentScore, setContentScore] = useState<{ score: number; tips: string[] } | null>(null);
   const [scoringContent, setScoringContent] = useState(false);
@@ -270,7 +273,13 @@ export default function CreatePage() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ platform, topic, tone, language }),
+        body: JSON.stringify({
+          platform,
+          topic,
+          tone,
+          language,
+          websiteUrl: postWebsiteUrl.trim() || undefined,
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -1242,6 +1251,22 @@ export default function CreatePage() {
                   <span>3</span>
                   <span>10</span>
                 </div>
+              </div>
+            )}
+
+            {/* Post-specific: website URL */}
+            {contentType === "post" && (
+              <div className="space-y-2">
+                <Label>Website URL (optional)</Label>
+                <Input
+                  type="url"
+                  placeholder="https://yoursite.com"
+                  value={postWebsiteUrl}
+                  onChange={(e) => setPostWebsiteUrl(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  If set, we scrape title, description, and headings and weave them into the post with a soft CTA back to your site.
+                </p>
               </div>
             )}
 
