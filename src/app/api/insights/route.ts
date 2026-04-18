@@ -106,28 +106,35 @@ export async function GET() {
       .map(([label, data]) => ({ label, avgScore: data.count > 0 ? Math.round(data.total / data.count) : 0, count: data.count }))
       .filter((l) => l.count > 0);
 
-    return NextResponse.json({
-      insights: {
-        topPosts: topPosts.map((p) => ({
-          id: p.id,
-          platform: p.platform,
-          topic: p.topic,
-          content: p.content?.slice(0, 200),
-          tone: p.tone,
-          likes: p.likes || 0,
-          shares: p.shares || 0,
-          comments: p.comments || 0,
-          impressions: p.impressions || 0,
-          contentScore: p.content_score || 0,
-        })),
-        platformRanking,
-        toneRanking,
-        dayRanking: dayRanking.slice(0, 3),
-        topHashtags,
-        lengthAnalysis,
-        totalAnalyzed: allPosts.length,
+    return NextResponse.json(
+      {
+        insights: {
+          topPosts: topPosts.map((p) => ({
+            id: p.id,
+            platform: p.platform,
+            topic: p.topic,
+            content: p.content?.slice(0, 200),
+            tone: p.tone,
+            likes: p.likes || 0,
+            shares: p.shares || 0,
+            comments: p.comments || 0,
+            impressions: p.impressions || 0,
+            contentScore: p.content_score || 0,
+          })),
+          platformRanking,
+          toneRanking,
+          dayRanking: dayRanking.slice(0, 3),
+          topHashtags,
+          lengthAnalysis,
+          totalAnalyzed: allPosts.length,
+        },
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+        },
+      }
+    );
   } catch (error) {
     captureError("Insights error", error);
     return NextResponse.json({ error: "Failed to generate insights" }, { status: 500 });

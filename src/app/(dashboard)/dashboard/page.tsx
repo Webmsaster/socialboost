@@ -18,9 +18,7 @@ interface Post {
   id: string;
   platform: string;
   topic: string;
-  content: string;
   status: string;
-  created_at: string;
 }
 
 interface Profile {
@@ -40,7 +38,11 @@ export default function DashboardPage() {
 
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     const [postsRes, allPostsRes, profileRes] = await Promise.all([
-      supabase.from("posts").select("*").order("created_at", { ascending: false }).limit(5),
+      supabase
+        .from("posts")
+        .select("id, platform, topic, status")
+        .order("created_at", { ascending: false })
+        .limit(5),
       supabase
         .from("posts")
         .select("platform, status, created_at, scheduled_for")
@@ -54,9 +56,12 @@ export default function DashboardPage() {
 
     return {
       posts: (postsRes.data || []) as Post[],
-      allPosts: (allPostsRes.data || []) as Array<
-        Pick<Post, "platform" | "status" | "created_at"> & { scheduled_for?: string }
-      >,
+      allPosts: (allPostsRes.data || []) as Array<{
+        platform: string;
+        status: string;
+        created_at: string;
+        scheduled_for?: string;
+      }>,
       profile: profileRes.data as Profile | null,
     };
   });

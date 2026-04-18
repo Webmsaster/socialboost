@@ -65,12 +65,19 @@ export async function GET() {
     const unlocked = getUnlockedAchievements(stats).map((a) => a.id);
     const locked = getLockedAchievements(stats).map((a) => a.id);
 
-    return NextResponse.json({
-      stats,
-      unlocked,
-      locked,
-      total: achievements.length,
-    });
+    return NextResponse.json(
+      {
+        stats,
+        unlocked,
+        locked,
+        total: achievements.length,
+      },
+      {
+        headers: {
+          "Cache-Control": "private, max-age=30, stale-while-revalidate=120",
+        },
+      }
+    );
   } catch (error) {
     captureError("Achievements error", error);
     return NextResponse.json({ error: "Failed to load achievements" }, { status: 500 });

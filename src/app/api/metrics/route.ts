@@ -30,11 +30,18 @@ export async function GET() {
     const byPlatform: Record<string, number> = {};
     posts?.forEach((p) => { byPlatform[p.platform] = (byPlatform[p.platform] || 0) + 1; });
 
-    return NextResponse.json({
-      summary: { totalPosts, totalLikes, totalShares, totalComments, totalImpressions, avgScore },
-      byPlatform,
-      recentPosts: posts?.slice(0, 10) || [],
-    });
+    return NextResponse.json(
+      {
+        summary: { totalPosts, totalLikes, totalShares, totalComments, totalImpressions, avgScore },
+        byPlatform,
+        recentPosts: posts?.slice(0, 10) || [],
+      },
+      {
+        headers: {
+          "Cache-Control": "private, max-age=30, stale-while-revalidate=120",
+        },
+      }
+    );
   } catch (error) {
     captureError("Metrics fetch error", error);
     return NextResponse.json({ error: "Failed to fetch metrics" }, { status: 500 });

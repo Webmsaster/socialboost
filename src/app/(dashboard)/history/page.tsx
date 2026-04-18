@@ -42,7 +42,7 @@ export default function HistoryPage() {
     async () => {
       let query = supabase
         .from("posts")
-        .select("*")
+        .select("id, platform, topic, content, hashtags, tone, status, is_favorite, created_at")
         .order("created_at", { ascending: false })
         .limit(200);
       if (filter !== "all") {

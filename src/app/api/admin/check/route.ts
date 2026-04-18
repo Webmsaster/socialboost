@@ -12,9 +12,16 @@ export async function GET() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const cacheHeaders = {
+    "Cache-Control": "private, max-age=300, stale-while-revalidate=3600",
+  };
+
   if (!user) {
-    return NextResponse.json({ isAdmin: false }, { status: 200 });
+    return NextResponse.json({ isAdmin: false }, { status: 200, headers: cacheHeaders });
   }
 
-  return NextResponse.json({ isAdmin: isAdminEmail(user.email) });
+  return NextResponse.json(
+    { isAdmin: isAdminEmail(user.email) },
+    { headers: cacheHeaders }
+  );
 }
