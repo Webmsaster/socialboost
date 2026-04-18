@@ -70,10 +70,36 @@ const nextConfig: NextConfig = {
       ],
     },
     {
-      // Don't cache API routes
+      // Don't cache API routes by default
       source: "/api/:path*",
       headers: [
         { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
+      ],
+    },
+    // Per-user cacheable GETs — private browser cache w/ stale-while-revalidate.
+    // Declared AFTER the /api/:path* blanket so later-match-wins overrides it.
+    {
+      source: "/api/achievements",
+      headers: [
+        { key: "Cache-Control", value: "private, max-age=30, stale-while-revalidate=120" },
+      ],
+    },
+    {
+      source: "/api/metrics",
+      headers: [
+        { key: "Cache-Control", value: "private, max-age=30, stale-while-revalidate=120" },
+      ],
+    },
+    {
+      source: "/api/insights",
+      headers: [
+        { key: "Cache-Control", value: "private, max-age=60, stale-while-revalidate=300" },
+      ],
+    },
+    {
+      source: "/api/admin/check",
+      headers: [
+        { key: "Cache-Control", value: "private, max-age=300, stale-while-revalidate=3600" },
       ],
     },
     {
