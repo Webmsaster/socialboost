@@ -308,6 +308,8 @@ create table if not exists public.content_series (
   preferred_time text default '09:00',
   is_active boolean not null default true,
   last_generated_at timestamptz,
+  post_type text not null default 'text'
+    check (post_type in ('text', 'video')),
   created_at timestamptz not null default now()
 );
 

@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { generatePost, type Platform, type Tone } from "./openai";
+import {
+  generatePost,
+  generateVideoScript,
+  type Platform,
+  type Tone,
+} from "./openai";
 import {
   scrapeWebsite,
   buildPromptBlockFromContext,
@@ -18,6 +23,7 @@ export type SeriesRow = {
   website_url: string | null;
   website_context: WebsiteContext | null;
   website_scraped_at: string | null;
+  post_type?: string | null;
 };
 
 export type ProfileRow = {
@@ -72,19 +78,45 @@ export async function runSeriesOnce(
     ? `${series.topic_template}\n\n${buildPromptBlockFromContext(websiteContext)}\n\nWrite a post that naturally ties the topic above to this website and ends with a soft call to action pointing readers there.`
     : series.topic_template;
 
-  let result;
+  const model =
+    profile.subscription_status === "active"
+      ? profile.preferred_model || "gpt-4o-mini"
+      : "gpt-4o-mini";
+  const postType = series.post_type === "video" ? "video" : "text";
+
+  // For text series we generate a single post; for video series we produce a
+  // full video script and serialize it into content so the user can review it
+  // in History and optionally generate assets on top of it from the Create
+  // page later. Asset generation in cron is deliberately out of scope — it
+  // would burn 5–7 credits per run.
+  let content: string;
+  let hashtags: string[] = [];
+  let content_score: number | undefined;
+
   try {
-    result = await generatePost({
-      platform: series.platform as Platform,
-      topic,
-      tone: (series.tone || "professional") as Tone,
-      language: "English",
-      brandVoice: profile.brand_voice || undefined,
-      model:
-        profile.subscription_status === "active"
-          ? profile.preferred_model || "gpt-4o-mini"
-          : "gpt-4o-mini",
-    });
+    if (postType === "video") {
+      const script = await generateVideoScript({
+        platform: series.platform as Platform,
+        topic,
+        tone: (series.tone || "professional") as Tone,
+        language: "English",
+        brandVoice: profile.brand_voice || undefined,
+        model,
+      });
+      content = formatVideoScript(script);
+    } else {
+      const result = await generatePost({
+        platform: series.platform as Platform,
+        topic,
+        tone: (series.tone || "professional") as Tone,
+        language: "English",
+        brandVoice: profile.brand_voice || undefined,
+        model,
+      });
+      content = result.content;
+      hashtags = result.hashtags;
+      content_score = result.content_score;
+    }
   } catch (err) {
     captureError("Series runner: generation failed", err, { seriesId: series.id });
     return {
@@ -108,12 +140,12 @@ export async function runSeriesOnce(
       user_id: series.user_id,
       platform: series.platform,
       topic: `[${series.name}] ${series.topic_template}`.slice(0, 200),
-      content: result.content,
-      hashtags: result.hashtags,
+      content,
+      hashtags,
       tone: series.tone || "professional",
       status: "scheduled",
       scheduled_for: scheduledFor.toISOString(),
-      content_score: result.content_score ? result.content_score * 10 : 0,
+      content_score: content_score ? content_score * 10 : 0,
     })
     .select("id")
     .single();
@@ -138,4 +170,37 @@ export async function runSeriesOnce(
   });
 
   return { ok: true, postId: inserted.id };
+}
+
+interface VideoScriptShape {
+  hook: string;
+  scenes: Array<{
+    sceneNumber: number;
+    duration: string;
+    visual: string;
+    narration: string;
+    textOverlay: string;
+  }>;
+  cta: string;
+  totalDuration: string;
+  musicSuggestion: string;
+}
+
+function formatVideoScript(script: VideoScriptShape): string {
+  const lines: string[] = [
+    `🎬 VIDEO SCRIPT (${script.totalDuration})`,
+    "",
+    `HOOK: ${script.hook}`,
+    "",
+  ];
+  for (const scene of script.scenes) {
+    lines.push(`— Scene ${scene.sceneNumber} (${scene.duration})`);
+    lines.push(`  Visual: ${scene.visual}`);
+    lines.push(`  Narration: ${scene.narration}`);
+    lines.push(`  Overlay: ${scene.textOverlay}`);
+    lines.push("");
+  }
+  lines.push(`CTA: ${script.cta}`);
+  lines.push(`Music: ${script.musicSuggestion}`);
+  return lines.join("\n");
 }

@@ -43,11 +43,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, platform, tone, topicTemplate, frequency, dayOfWeek, preferredTime, websiteUrl } = body;
+    const { name, platform, tone, topicTemplate, frequency, dayOfWeek, preferredTime, websiteUrl, postType } = body;
 
     if (!name?.trim() || !platform || !topicTemplate?.trim()) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    const normalizedPostType = postType === "video" ? "video" : "text";
 
     let normalizedWebsiteUrl: string | null = null;
     if (typeof websiteUrl === "string" && websiteUrl.trim()) {
@@ -74,6 +76,7 @@ export async function POST(request: NextRequest) {
         day_of_week: dayOfWeek ?? null,
         preferred_time: preferredTime || "09:00",
         website_url: normalizedWebsiteUrl,
+        post_type: normalizedPostType,
       })
       .select()
       .single();

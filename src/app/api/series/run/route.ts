@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     const { data: series, error: seriesError } = await supabase
       .from("content_series")
-      .select("id, user_id, name, platform, tone, topic_template, preferred_time, website_url, website_context, website_scraped_at")
+      .select("id, user_id, name, platform, tone, topic_template, preferred_time, website_url, website_context, website_scraped_at, post_type")
       .eq("id", id)
       .eq("user_id", user.id)
       .single();
