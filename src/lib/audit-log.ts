@@ -19,6 +19,7 @@ export type AuditAction =
   | "team.member_removed"
   | "series.created"
   | "series.deleted"
+  | "series.run_now"
   | "webhook.created"
   | "webhook.deleted"
   | "api_key.created"

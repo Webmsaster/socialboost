@@ -30,6 +30,7 @@ interface ContentSeries {
   is_active: boolean;
   last_generated_at: string | null;
   created_at: string;
+  website_url: string | null;
 }
 
 const platforms = ["linkedin", "facebook", "instagram", "pinterest", "twitter"] as const;
@@ -43,6 +44,7 @@ export default function SeriesPage() {
   const [showForm, setShowForm] = useState(false);
   const [creating, setCreating] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [runningId, setRunningId] = useState<string | null>(null);
   const { t } = useLanguage();
 
   // Form state
@@ -145,6 +147,36 @@ export default function SeriesPage() {
       toast.error("Failed to update series");
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function handleRunNow(id: string) {
+    setRunningId(id);
+    try {
+      const res = await fetch("/api/series/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        toast.success("Post generated — check History");
+        setSeriesList((prev) =>
+          prev.map((s) =>
+            s.id === id ? { ...s, last_generated_at: new Date().toISOString() } : s
+          )
+        );
+      } else {
+        const data = await res.json().catch(() => ({}));
+        if (data.error === "limit_reached") {
+          toast.error("Monthly generation limit reached");
+        } else {
+          toast.error(data.detail || data.error || "Failed to generate");
+        }
+      }
+    } catch {
+      toast.error("Failed to generate");
+    } finally {
+      setRunningId(null);
     }
   }
 
@@ -317,6 +349,19 @@ export default function SeriesPage() {
                       <Badge variant="outline">{series.preferred_time}</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{series.topic_template}</p>
+                    {series.website_url && (
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-medium">Site:</span>{" "}
+                        <a
+                          href={series.website_url}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="text-primary hover:underline break-all"
+                        >
+                          {series.website_url}
+                        </a>
+                      </p>
+                    )}
                     {series.last_generated_at && (
                       <p className="text-xs text-muted-foreground">
                         {t("series.lastGenerated")}: {new Date(series.last_generated_at).toLocaleDateString()}
@@ -324,6 +369,14 @@ export default function SeriesPage() {
                     )}
                   </div>
                   <div className="flex gap-2 shrink-0">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      disabled={runningId === series.id}
+                      onClick={() => handleRunNow(series.id)}
+                    >
+                      {runningId === series.id ? "..." : "Run now"}
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

@@ -1,0 +1,141 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { generatePost, type Platform, type Tone } from "./openai";
+import {
+  scrapeWebsite,
+  buildPromptBlockFromContext,
+  type WebsiteContext,
+} from "./website-scraper";
+import { captureError } from "./logger";
+
+export type SeriesRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  platform: string;
+  tone: string | null;
+  topic_template: string;
+  preferred_time: string | null;
+  website_url: string | null;
+  website_context: WebsiteContext | null;
+  website_scraped_at: string | null;
+};
+
+export type ProfileRow = {
+  brand_voice: string | null;
+  preferred_model: string | null;
+  subscription_status: string;
+  generation_count: number;
+};
+
+export type SeriesRunResult =
+  | { ok: true; postId: string }
+  | { ok: false; reason: "limit_reached" | "generation_failed" | "insert_failed"; detail?: string };
+
+/**
+ * Generate + persist one post for the given series. Shared between the cron
+ * scheduler and the on-demand "Run now" endpoint so the logic stays in sync.
+ *
+ * Caller is responsible for auth/ownership checks. Supabase client must have
+ * permission to write to `posts` and `content_series` for this user.
+ */
+export async function runSeriesOnce(
+  supabase: SupabaseClient,
+  series: SeriesRow,
+  profile: ProfileRow,
+  now: Date = new Date()
+): Promise<SeriesRunResult> {
+  const limit = profile.subscription_status === "active" ? 100 : 10;
+  if (profile.generation_count >= limit) {
+    return { ok: false, reason: "limit_reached" };
+  }
+
+  let websiteContext: WebsiteContext | null = series.website_context ?? null;
+  if (series.website_url) {
+    const lastScraped = series.website_scraped_at ? new Date(series.website_scraped_at) : null;
+    const stale = !lastScraped || now.getTime() - lastScraped.getTime() > 24 * 60 * 60 * 1000;
+    if (stale) {
+      const fresh = await scrapeWebsite(series.website_url);
+      if (fresh) {
+        websiteContext = fresh;
+        await supabase
+          .from("content_series")
+          .update({
+            website_context: fresh,
+            website_scraped_at: now.toISOString(),
+          })
+          .eq("id", series.id);
+      }
+    }
+  }
+
+  const topic = websiteContext
+    ? `${series.topic_template}\n\n${buildPromptBlockFromContext(websiteContext)}\n\nWrite a post that naturally ties the topic above to this website and ends with a soft call to action pointing readers there.`
+    : series.topic_template;
+
+  let result;
+  try {
+    result = await generatePost({
+      platform: series.platform as Platform,
+      topic,
+      tone: (series.tone || "professional") as Tone,
+      language: "English",
+      brandVoice: profile.brand_voice || undefined,
+      model:
+        profile.subscription_status === "active"
+          ? profile.preferred_model || "gpt-4o-mini"
+          : "gpt-4o-mini",
+    });
+  } catch (err) {
+    captureError("Series runner: generation failed", err, { seriesId: series.id });
+    return {
+      ok: false,
+      reason: "generation_failed",
+      detail: err instanceof Error ? err.message : "unknown",
+    };
+  }
+
+  const scheduledFor = new Date(now);
+  if (series.preferred_time) {
+    const [hours, minutes] = series.preferred_time.split(":").map(Number);
+    scheduledFor.setHours(hours, minutes, 0, 0);
+  } else {
+    scheduledFor.setHours(9, 0, 0, 0);
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("posts")
+    .insert({
+      user_id: series.user_id,
+      platform: series.platform,
+      topic: `[${series.name}] ${series.topic_template}`.slice(0, 200),
+      content: result.content,
+      hashtags: result.hashtags,
+      tone: series.tone || "professional",
+      status: "scheduled",
+      scheduled_for: scheduledFor.toISOString(),
+      content_score: result.content_score ? result.content_score * 10 : 0,
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !inserted) {
+    captureError("Series runner: insert failed", insertError, { seriesId: series.id });
+    return {
+      ok: false,
+      reason: "insert_failed",
+      detail: insertError?.message,
+    };
+  }
+
+  await supabase
+    .from("content_series")
+    .update({ last_generated_at: now.toISOString() })
+    .eq("id", series.id);
+
+  await supabase.rpc("increment_generation_count", {
+    p_user_id: series.user_id,
+    p_limit: limit,
+  });
+
+  return { ok: true, postId: inserted.id };
+}

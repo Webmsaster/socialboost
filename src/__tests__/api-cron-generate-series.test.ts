@@ -20,7 +20,14 @@ vi.mock("@supabase/supabase-js", () => ({
       }
       if (table === "posts") {
         return {
-          insert: () => { insertCalled = true; return { error: null }; },
+          insert: () => {
+            insertCalled = true;
+            return {
+              select: () => ({
+                single: () => ({ data: { id: "post-xyz" }, error: null }),
+              }),
+            };
+          },
         };
       }
       return {
