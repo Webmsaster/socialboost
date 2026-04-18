@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { useRecentWebsites } from "@/lib/use-recent-websites";
 import { PostPreview } from "@/components/post-preview";
 import {
   PLATFORM_LIMITS,
@@ -96,6 +97,10 @@ export default function CreatePage() {
 
   // Website URL for website-aware Social Post generation
   const [postWebsiteUrl, setPostWebsiteUrl] = useState("");
+
+  // Reuse URLs the user has already published against — shared for both the
+  // post tab and the video-script tab via a single datalist below.
+  const recentWebsites = useRecentWebsites();
 
   // Content score
   const [contentScore, setContentScore] = useState<{ score: number; tips: string[] } | null>(null);
@@ -1072,6 +1077,15 @@ export default function CreatePage() {
     <div className="space-y-8">
       <h1 className="text-3xl font-bold">Create Content</h1>
 
+      {/* Shared list of previously-used website URLs, attached via list="recent-websites" on every URL input on this page. */}
+      {recentWebsites.length > 0 && (
+        <datalist id="recent-websites">
+          {recentWebsites.map((u) => (
+            <option key={u} value={u} />
+          ))}
+        </datalist>
+      )}
+
       {/* Content Type Tabs */}
       <Tabs
         value={contentType}
@@ -1208,6 +1222,7 @@ export default function CreatePage() {
                     value={siteUrl}
                     onChange={(e) => setSiteUrl(e.target.value)}
                     className="flex-1"
+                    list="recent-websites"
                   />
                   <Button
                     type="button"
@@ -1263,6 +1278,7 @@ export default function CreatePage() {
                   placeholder="https://yoursite.com"
                   value={postWebsiteUrl}
                   onChange={(e) => setPostWebsiteUrl(e.target.value)}
+                  list="recent-websites"
                 />
                 <p className="text-xs text-muted-foreground">
                   If set, we scrape title, description, and headings and weave them into the post with a soft CTA back to your site.

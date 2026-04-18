@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useRecentWebsites } from "@/lib/use-recent-websites";
 
 const PLATFORMS = [
   { id: "linkedin", label: "LinkedIn" },
@@ -82,6 +83,7 @@ export default function BulkPage() {
   const [urlsInput, setUrlsInput] = useState("");
   const [sitemapInput, setSitemapInput] = useState("");
   const [loadingSitemap, setLoadingSitemap] = useState(false);
+  const recentWebsites = useRecentWebsites();
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<PlatformId>>(
     new Set()
   );
@@ -479,6 +481,13 @@ export default function BulkPage() {
 
   return (
     <div className="space-y-8">
+      {recentWebsites.length > 0 && (
+        <datalist id="recent-websites-bulk">
+          {recentWebsites.map((u) => (
+            <option key={u} value={u} />
+          ))}
+        </datalist>
+      )}
       <div>
         <h1 className="text-3xl font-bold">Bulk Generation</h1>
         <p className="text-muted-foreground mt-1">
@@ -541,6 +550,7 @@ export default function BulkPage() {
                   onChange={(e) => setSitemapInput(e.target.value)}
                   disabled={generating || loadingSitemap}
                   className="flex-1"
+                  list="recent-websites-bulk"
                 />
                 <Button
                   type="button"
