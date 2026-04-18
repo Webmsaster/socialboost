@@ -55,19 +55,30 @@ interface GeneratedPost {
   hashtags: string[];
   saved: boolean;
   error?: string;
+  // When the post was generated from a URL, we keep it so the card shows
+  // which site produced it and the saved row stores it as the topic.
+  sourceUrl?: string;
 }
 
 interface GenerationJob {
   platform: PlatformId;
   variationIndex: number;
+  websiteUrl?: string;
 }
+
+type BulkMode = "topic" | "urls";
+
+const URL_GENERIC_TOPIC =
+  "Share this website with my audience and drive traffic to it.";
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 export default function BulkPage() {
+  const [mode, setMode] = useState<BulkMode>("topic");
   const [topic, setTopic] = useState("");
+  const [urlsInput, setUrlsInput] = useState("");
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<PlatformId>>(
     new Set()
   );
@@ -101,7 +112,15 @@ export default function BulkPage() {
     } catch { /* ignore parse errors */ }
   }, []);
 
-  const totalPosts = selectedPlatforms.size * variations;
+  const parsedUrls = urlsInput
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const totalPosts =
+    mode === "urls"
+      ? parsedUrls.length * selectedPlatforms.size
+      : selectedPlatforms.size * variations;
 
   const togglePlatform = useCallback((platformId: PlatformId) => {
     setSelectedPlatforms((prev) => {
@@ -116,12 +135,19 @@ export default function BulkPage() {
   }, []);
 
   async function callGenerate(
-    platform: PlatformId
+    platform: PlatformId,
+    override?: { topic?: string; websiteUrl?: string }
   ): Promise<{ content: string; hashtags: string[] }> {
     const res = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ platform, topic, tone, language }),
+      body: JSON.stringify({
+        platform,
+        topic: override?.topic ?? topic,
+        tone,
+        language,
+        websiteUrl: override?.websiteUrl,
+      }),
     });
 
     if (!res.ok) {
@@ -132,24 +158,59 @@ export default function BulkPage() {
     return res.json();
   }
 
+  function validateUrls(lines: string[]): { valid: string[]; invalid: string[] } {
+    const valid: string[] = [];
+    const invalid: string[] = [];
+    for (const line of lines) {
+      try {
+        const parsed = new URL(line);
+        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+          valid.push(parsed.toString());
+        } else {
+          invalid.push(line);
+        }
+      } catch {
+        invalid.push(line);
+      }
+    }
+    return { valid, invalid };
+  }
+
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
-
-    if (!topic.trim()) {
-      toast.error("Please enter a topic");
-      return;
-    }
 
     if (selectedPlatforms.size === 0) {
       toast.error("Please select at least one platform");
       return;
     }
 
-    // Build job queue
+    // Build job queue depending on the mode.
     const jobs: GenerationJob[] = [];
-    for (const platform of selectedPlatforms) {
-      for (let v = 0; v < variations; v++) {
-        jobs.push({ platform, variationIndex: v });
+
+    if (mode === "topic") {
+      if (!topic.trim()) {
+        toast.error("Please enter a topic");
+        return;
+      }
+      for (const platform of selectedPlatforms) {
+        for (let v = 0; v < variations; v++) {
+          jobs.push({ platform, variationIndex: v });
+        }
+      }
+    } else {
+      const { valid, invalid } = validateUrls(parsedUrls);
+      if (invalid.length > 0) {
+        toast.error(`Invalid URL: ${invalid[0]}`);
+        return;
+      }
+      if (valid.length === 0) {
+        toast.error("Add at least one website URL");
+        return;
+      }
+      for (const websiteUrl of valid) {
+        for (const platform of selectedPlatforms) {
+          jobs.push({ platform, variationIndex: 0, websiteUrl });
+        }
       }
     }
 
@@ -166,13 +227,17 @@ export default function BulkPage() {
       setProgress({ current: i + 1, total: jobs.length });
 
       try {
-        const result = await callGenerate(job.platform);
+        const result = await callGenerate(job.platform, {
+          topic: job.websiteUrl ? URL_GENERIC_TOPIC : undefined,
+          websiteUrl: job.websiteUrl,
+        });
         generated.push({
           id: generateId(),
           platform: job.platform,
           content: result.content,
           hashtags: result.hashtags,
           saved: false,
+          sourceUrl: job.websiteUrl,
         });
       } catch (err) {
         errorCount++;
@@ -182,6 +247,7 @@ export default function BulkPage() {
           content: "",
           hashtags: [],
           saved: false,
+          sourceUrl: job.websiteUrl,
           error: err instanceof Error ? err.message : "Generation failed",
         });
       }
@@ -221,7 +287,7 @@ export default function BulkPage() {
       const { error } = await supabase.from("posts").insert({
         user_id: user.id,
         platform: post.platform,
-        topic,
+        topic: post.sourceUrl || topic,
         tone,
         content: post.content,
         hashtags: post.hashtags,
@@ -267,7 +333,7 @@ export default function BulkPage() {
       const rows = unsaved.map((post) => ({
         user_id: user.id,
         platform: post.platform,
-        topic,
+        topic: post.sourceUrl || topic,
         tone,
         content: post.content,
         hashtags: post.hashtags,
@@ -296,7 +362,10 @@ export default function BulkPage() {
     setRegeneratingIds((prev) => new Set(prev).add(post.id));
 
     try {
-      const result = await callGenerate(post.platform);
+      const result = await callGenerate(post.platform, {
+        topic: post.sourceUrl ? URL_GENERIC_TOPIC : undefined,
+        websiteUrl: post.sourceUrl,
+      });
       setResults((prev) =>
         prev.map((p) =>
           p.id === post.id
@@ -362,18 +431,70 @@ export default function BulkPage() {
       </div>
 
       <form onSubmit={handleGenerate} className="space-y-6">
-        {/* Topic */}
-        <div className="space-y-2">
-          <Label>Topic / Theme</Label>
-          <Textarea
-            placeholder="Describe the main topic or theme for your posts..."
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            rows={4}
-            required
+        {/* Mode switch */}
+        <div className="inline-flex rounded-lg border p-1">
+          <button
+            type="button"
             disabled={generating}
-          />
+            onClick={() => setMode("topic")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              mode === "topic"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            } disabled:opacity-50`}
+          >
+            Single topic
+          </button>
+          <button
+            type="button"
+            disabled={generating}
+            onClick={() => setMode("urls")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              mode === "urls"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            } disabled:opacity-50`}
+          >
+            Multiple websites
+          </button>
         </div>
+
+        {/* Topic OR URL list */}
+        {mode === "topic" ? (
+          <div className="space-y-2">
+            <Label>Topic / Theme</Label>
+            <Textarea
+              placeholder="Describe the main topic or theme for your posts..."
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              rows={4}
+              required
+              disabled={generating}
+            />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label>Website URLs (one per line)</Label>
+            <Textarea
+              placeholder={"https://example.com\nhttps://another-site.com/landing\nhttps://blog.example.com/post"}
+              value={urlsInput}
+              onChange={(e) => setUrlsInput(e.target.value)}
+              rows={6}
+              disabled={generating}
+            />
+            <p className="text-xs text-muted-foreground">
+              We scrape title + description + headings for each URL and weave them into a post tailored to each site.
+              {parsedUrls.length > 0 && (
+                <>
+                  {" "}
+                  <span className="font-medium text-foreground">
+                    {parsedUrls.length} URL{parsedUrls.length === 1 ? "" : "s"} detected.
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+        )}
 
         {/* Platform toggles */}
         <div className="space-y-2">
@@ -405,7 +526,7 @@ export default function BulkPage() {
           )}
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className={`grid gap-6 ${mode === "urls" ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
           {/* Tone */}
           <div className="space-y-2">
             <Label>Tone</Label>
@@ -448,47 +569,63 @@ export default function BulkPage() {
             </Select>
           </div>
 
-          {/* Variations */}
-          <div className="space-y-2">
-            <Label>Variations per platform</Label>
-            <Select
-              value={String(variations)}
-              onValueChange={(v) => setVariations(Number(v))}
-              disabled={generating}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {VARIATION_OPTIONS.map((v) => (
-                  <SelectItem key={v} value={String(v)}>
-                    {v} {v === 1 ? "variation" : "variations"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Variations — only meaningful in topic mode; URL mode = one post per URL */}
+          {mode === "topic" && (
+            <div className="space-y-2">
+              <Label>Variations per platform</Label>
+              <Select
+                value={String(variations)}
+                onValueChange={(v) => setVariations(Number(v))}
+                disabled={generating}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {VARIATION_OPTIONS.map((v) => (
+                    <SelectItem key={v} value={String(v)}>
+                      {v} {v === 1 ? "variation" : "variations"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {/* Estimated count and generate button */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            {selectedPlatforms.size > 0 && (
+            {selectedPlatforms.size > 0 && totalPosts > 0 && (
               <p className="text-sm text-muted-foreground">
                 Will generate{" "}
                 <span className="font-semibold text-foreground">
                   {totalPosts}
                 </span>{" "}
-                {totalPosts === 1 ? "post" : "posts"} ({selectedPlatforms.size}{" "}
-                {selectedPlatforms.size === 1 ? "platform" : "platforms"} ×{" "}
-                {variations} {variations === 1 ? "variation" : "variations"})
+                {totalPosts === 1 ? "post" : "posts"}{" "}
+                {mode === "topic" ? (
+                  <>
+                    ({selectedPlatforms.size}{" "}
+                    {selectedPlatforms.size === 1 ? "platform" : "platforms"} ×{" "}
+                    {variations} {variations === 1 ? "variation" : "variations"})
+                  </>
+                ) : (
+                  <>
+                    ({parsedUrls.length}{" "}
+                    {parsedUrls.length === 1 ? "URL" : "URLs"} ×{" "}
+                    {selectedPlatforms.size}{" "}
+                    {selectedPlatforms.size === 1 ? "platform" : "platforms"})
+                  </>
+                )}
               </p>
             )}
           </div>
           <Button
             type="submit"
             disabled={
-              generating || selectedPlatforms.size === 0 || !topic.trim()
+              generating ||
+              selectedPlatforms.size === 0 ||
+              (mode === "topic" ? !topic.trim() : parsedUrls.length === 0)
             }
             className="w-full sm:w-auto"
           >
@@ -583,6 +720,19 @@ export default function BulkPage() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
+                      {post.sourceUrl && (
+                        <p className="truncate text-xs text-muted-foreground">
+                          <span className="font-medium">Source:</span>{" "}
+                          <a
+                            href={post.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="text-primary hover:underline"
+                          >
+                            {post.sourceUrl}
+                          </a>
+                        </p>
+                      )}
                       {post.error ? (
                         <p className="text-sm text-destructive">
                           {post.error}
