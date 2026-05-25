@@ -29,6 +29,7 @@ interface Post {
   status: string;
   is_favorite: boolean;
   created_at: string;
+  published_at?: string | null;
 }
 
 type FilterStatus = "all" | "draft" | "pending_review" | "approved" | "scheduled" | "published";
@@ -257,6 +258,28 @@ export default function HistoryPage() {
     } catch {
       toast.error("Failed to submit for review");
     }
+  }
+
+  // Used for the manual-publish workflow. The cron sends a copy-paste-ready
+  // reminder when a scheduled post hits its time without a connected account;
+  // once the user actually posts on the platform, they come back here and
+  // confirm it so the post moves out of "scheduled" into "published".
+  async function handleMarkAsPublished(id: string) {
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase
+      .from("posts")
+      .update({ status: "published", published_at: nowIso })
+      .eq("id", id);
+    if (error) {
+      toast.error("Failed to update post");
+      return;
+    }
+    updatePosts((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, status: "published", published_at: nowIso } : p,
+      ),
+    );
+    toast.success("Marked as published");
   }
 
   async function handleDuplicate(post: Post) {
@@ -548,6 +571,15 @@ export default function HistoryPage() {
                       onClick={() => handleSubmitForReview(post.id)}
                     >
                       Submit for Review
+                    </Button>
+                  )}
+                  {post.status === "scheduled" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleMarkAsPublished(post.id)}
+                    >
+                      Mark as published
                     </Button>
                   )}
                   {post.status === "published" && (

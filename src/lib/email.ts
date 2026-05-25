@@ -393,6 +393,52 @@ export async function sendWeeklyDigestEmail(
   });
 }
 
+/**
+ * Sent by cron/publish when a scheduled post hits its publish time but the
+ * user has no OAuth-connected account on that platform. Includes the full
+ * post text + hashtags so the user can copy-paste straight from the email
+ * into the platform's compose box on their phone.
+ *
+ * This is the "manual workflow" — most users never wire up OAuth (Meta
+ * requires app review, Twitter API tier costs $100+/mo) and just want a
+ * timely nudge.
+ */
+export async function sendScheduledReminderEmail(
+  to: string,
+  post: {
+    id: string;
+    platform: string;
+    content: string;
+    hashtags: string[];
+    topic?: string | null;
+  },
+): Promise<boolean> {
+  const platformName = post.platform.charAt(0).toUpperCase() + post.platform.slice(1);
+  const fullText = post.hashtags.length
+    ? `${post.content}\n\n${post.hashtags.map((h) => `#${h}`).join(" ")}`
+    : post.content;
+  const escaped = fullText
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  const url = appUrl();
+  return sendEmail({
+    to,
+    subject: `Time to post on ${platformName}`,
+    html: shell(`
+      <h2 style="margin-top: 0;">Your scheduled ${platformName} post is ready.</h2>
+      <p style="color: #374151;">No connected ${platformName} account — copy the text below and post it manually.</p>
+      <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 12px 0; border-left: 3px solid #7c3aed;">
+        <pre style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; color: #1f2937; white-space: pre-wrap; word-wrap: break-word;">${escaped}</pre>
+      </div>
+      ${cta(`${url}/history`, "Open in SocialBoost (one-click copy)")}
+      <p style="color: #9ca3af; font-size: 12px; margin-top: 16px;">
+        After posting, mark it as published in your <a href="${url}/history" style="color: #7c3aed;">History</a> so it's off your to-do list. Connect a ${platformName} account in <a href="${url}/accounts" style="color: #7c3aed;">Accounts</a> to skip this step next time.
+      </p>
+    `),
+  });
+}
+
 export async function sendPublishFailedEmail(
   to: string,
   platform: string,

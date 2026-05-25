@@ -50,6 +50,7 @@ vi.mock("@/lib/logger", () => ({
 vi.mock("@/lib/email", () => ({
   sendPostPublishedEmail: vi.fn().mockResolvedValue(true),
   sendPublishFailedEmail: vi.fn().mockResolvedValue(true),
+  sendScheduledReminderEmail: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("@/lib/platforms/registry", () => ({
@@ -115,20 +116,22 @@ describe("GET /api/cron/publish", () => {
     expect(json.processed).toBe(0);
   });
 
-  it("processes and publishes scheduled posts", async () => {
-
+  it("sends a manual-publish reminder when the post has no connected account", async () => {
+    // The pipeline switched in late 2026 from "silently mark as published"
+    // to "email the user a copy-paste-ready reminder" for posts on platforms
+    // the user hasn't OAuth-connected. They post manually, then confirm.
     const posts = [
       {
         id: "post-1",
         user_id: "user-1",
         platform: "linkedin",
         content: "Hello World",
+        hashtags: [],
         connected_account_id: null,
+        reminder_sent_at: null,
       },
     ];
     mockAdminLteResult.mockReturnValueOnce({ data: posts, error: null });
-
-    // Profile email lookup for notification
     mockAdminSelectResult.mockReturnValueOnce({
       data: { email: "user@example.com" },
     });
@@ -138,14 +141,21 @@ describe("GET /api/cron/publish", () => {
 
     expect(response.status).toBe(200);
     expect(json.processed).toBe(1);
-    expect(json.published).toBe(1);
+    expect(json.published).toBe(0);
+    expect(json.remindersSent).toBe(1);
     expect(json.failed).toBe(0);
-    // Verify update was called for marking published
+    // The reminder cron updates only reminder_sent_at — it does NOT flip
+    // status to "published" anymore (that's the user's job via the UI).
     expect(mockAdminUpdate).toHaveBeenCalledWith(
       "posts",
-      expect.objectContaining({ status: "published" }),
+      expect.objectContaining({ reminder_sent_at: expect.any(String) }),
       "id",
       "post-1"
+    );
+    const { sendScheduledReminderEmail } = await import("@/lib/email");
+    expect(sendScheduledReminderEmail).toHaveBeenCalledWith(
+      "user@example.com",
+      expect.objectContaining({ id: "post-1", platform: "linkedin" }),
     );
   });
 
@@ -528,61 +538,79 @@ describe("GET /api/cron/publish", () => {
     );
   });
 
-  it("skips email when profile has no email (manual publish success path)", async () => {
-
+  it("does not send a reminder when the user has no email on file", async () => {
     const posts = [
       {
         id: "post-11",
         user_id: "user-1",
         platform: "linkedin",
         content: "Manual no email",
+        hashtags: [],
         connected_account_id: null,
+        reminder_sent_at: null,
       },
     ];
     mockAdminLteResult.mockReturnValueOnce({ data: posts, error: null });
-
-    // Profile has no email
+    // Profile lookup returns data: null — no email on file.
     mockAdminSelectResult.mockReturnValueOnce({ data: null });
 
     const response = await GET(createRequest());
     const json = await response.json();
 
-    expect(json.published).toBe(1);
-    const { sendPostPublishedEmail } = await import("@/lib/email");
-    expect(sendPostPublishedEmail).not.toHaveBeenCalled();
+    expect(json.processed).toBe(1);
+    expect(json.remindersSent).toBe(0);
+    const { sendScheduledReminderEmail } = await import("@/lib/email");
+    expect(sendScheduledReminderEmail).not.toHaveBeenCalled();
   });
 
-  it("counts failure when update to mark post as published fails", async () => {
+  it("does not re-send the reminder if it was already sent for this post", async () => {
+    const posts = [
+      {
+        id: "post-already-reminded",
+        user_id: "user-1",
+        platform: "linkedin",
+        content: "Already nudged",
+        hashtags: [],
+        connected_account_id: null,
+        reminder_sent_at: "2026-05-25T10:00:00Z",
+      },
+    ];
+    mockAdminLteResult.mockReturnValueOnce({ data: posts, error: null });
 
+    const response = await GET(createRequest());
+    const json = await response.json();
+
+    expect(json.remindersSent).toBe(0);
+    const { sendScheduledReminderEmail } = await import("@/lib/email");
+    expect(sendScheduledReminderEmail).not.toHaveBeenCalled();
+  });
+
+  it("counts a failure when the reminder email send fails", async () => {
     const posts = [
       {
         id: "post-6",
         user_id: "user-1",
         platform: "linkedin",
-        content: "Update will fail",
+        content: "Reminder will fail",
+        hashtags: [],
         connected_account_id: null,
+        reminder_sent_at: null,
       },
     ];
     mockAdminLteResult.mockReturnValueOnce({ data: posts, error: null });
+    mockAdminSelectResult.mockReturnValueOnce({
+      data: { email: "user@example.com" },
+    });
 
-    // Make the update call return an error
-    (mockAdminUpdate as ReturnType<typeof vi.fn> & { _nextResult?: unknown })._nextResult = {
-      error: { message: "update failed" },
-    };
+    const { sendScheduledReminderEmail } = await import("@/lib/email");
+    (sendScheduledReminderEmail as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
 
     const response = await GET(createRequest());
     const json = await response.json();
 
     expect(response.status).toBe(200);
     expect(json.processed).toBe(1);
-    expect(json.published).toBe(0);
+    expect(json.remindersSent).toBe(0);
     expect(json.failed).toBe(1);
-
-    const { captureError } = await import("@/lib/logger");
-    expect(captureError).toHaveBeenCalledWith(
-      "Cron: failed to mark post as published",
-      expect.objectContaining({ message: "update failed" }),
-      expect.objectContaining({ postId: "post-6" })
-    );
   });
 });
