@@ -10,7 +10,7 @@ import { generateVoiceover } from "@/lib/openai-tts";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
 import { trackEvent } from "@/lib/analytics";
-import { isProSubscription } from "@/lib/subscription";
+import { isProSubscription, videoQuotaFor } from "@/lib/subscription";
 import { persistImage } from "@/lib/storage";
 import {
   scrapeWebsite,
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("generation_count, subscription_status, brand_voice, preferred_model")
+      .select("generation_count, video_generation_count, subscription_status, brand_voice, preferred_model")
       .eq("id", user.id)
       .single();
 
@@ -87,6 +87,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: `Not enough monthly quota (${remaining} left).` },
         { status: 403 }
+      );
+    }
+
+    // Separate video-quota cap. This route does the same expensive work
+    // as /api/generate-video-assets (images per scene + TTS) so it shares
+    // the cap.
+    const videoLimit = videoQuotaFor(profile.subscription_status);
+    if ((profile.video_generation_count ?? 0) >= videoLimit) {
+      return NextResponse.json(
+        {
+          error: `Monthly video limit reached (${videoLimit}/month on Pro). Resets next billing cycle.`,
+        },
+        { status: 403 },
       );
     }
 
@@ -180,8 +193,8 @@ export async function POST(request: NextRequest) {
       images = imgs;
       voiceover = vo;
 
-      const successful =
-        images.filter((i) => i.url).length + (voiceover.dataUrl ? 1 : 0);
+      const successfulImages = images.filter((i) => i.url).length;
+      const successful = successfulImages + (voiceover.dataUrl ? 1 : 0);
       if (successful > 0) {
         const results = await Promise.all(
           Array.from({ length: successful }, () =>
@@ -198,6 +211,19 @@ export async function POST(request: NextRequest) {
             });
             break;
           }
+        }
+      }
+
+      // Also count this as 1 video for the dedicated video quota.
+      if (successfulImages > 0) {
+        const { error: videoIncErr } = await supabase.rpc(
+          "increment_video_generation_count",
+          { p_user_id: user.id, p_limit: videoLimit },
+        );
+        if (videoIncErr) {
+          captureError("Failed to increment video generation count", videoIncErr, {
+            userId: user.id,
+          });
         }
       }
     }

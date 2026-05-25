@@ -4,7 +4,7 @@ import { generateImage } from "@/lib/openai";
 import { generateVoiceover } from "@/lib/openai-tts";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
-import { isProSubscription } from "@/lib/subscription";
+import { isProSubscription, videoQuotaFor } from "@/lib/subscription";
 import { persistImage } from "@/lib/storage";
 
 interface SceneInput {
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("subscription_status, generation_count")
+      .select("subscription_status, generation_count, video_generation_count")
       .eq("id", user.id)
       .single();
 
@@ -37,6 +37,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Video assets are a Pro feature." },
         { status: 403 }
+      );
+    }
+
+    // Video-specific quota guard. This is the expensive route (gpt-image-1
+    // ×N + TTS = ~$0.30) so it has its own cap separate from the regular
+    // generation_count. See src/lib/subscription.ts for the limits.
+    const videoLimit = videoQuotaFor(profile.subscription_status);
+    if ((profile.video_generation_count ?? 0) >= videoLimit) {
+      return NextResponse.json(
+        {
+          error: `Monthly video limit reached (${videoLimit}/month on Pro). Resets next billing cycle.`,
+        },
+        { status: 403 },
       );
     }
 
@@ -128,6 +141,20 @@ export async function POST(request: NextRequest) {
           });
           break;
         }
+      }
+    }
+
+    // One asset-bundle = 1 video for quota purposes. Counted separately from
+    // text generations because video costs ~$0.30 vs text's ~$0.001.
+    if (successfulImages > 0) {
+      const { error: videoIncErr } = await supabase.rpc(
+        "increment_video_generation_count",
+        { p_user_id: user.id, p_limit: videoLimit },
+      );
+      if (videoIncErr) {
+        captureError("Failed to increment video generation count", videoIncErr, {
+          userId: user.id,
+        });
       }
     }
 
