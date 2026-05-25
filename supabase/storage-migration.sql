@@ -32,3 +32,11 @@ CREATE POLICY "Users can delete own images"
     bucket_id = 'generated-images'
     AND (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- ============================================================
+-- Generated videos bucket (added 2026-05-25)
+-- Mirrors the public-read pattern used by `generated-images`.
+-- ============================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('generated-videos', 'generated-videos', true)
+ON CONFLICT (id) DO NOTHING;

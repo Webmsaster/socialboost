@@ -11,6 +11,7 @@ import {
   type WebsiteContext,
 } from "./website-scraper";
 import { captureError } from "./logger";
+import { scoreContent } from "./content-score";
 
 export type SeriesRow = {
   id: string;
@@ -91,7 +92,6 @@ export async function runSeriesOnce(
   // would burn 5–7 credits per run.
   let content: string;
   let hashtags: string[] = [];
-  let content_score: number | undefined;
 
   try {
     if (postType === "video") {
@@ -115,7 +115,6 @@ export async function runSeriesOnce(
       });
       content = result.content;
       hashtags = result.hashtags;
-      content_score = result.content_score;
     }
   } catch (err) {
     captureError("Series runner: generation failed", err, { seriesId: series.id });
@@ -145,7 +144,13 @@ export async function runSeriesOnce(
       tone: series.tone || "professional",
       status: "scheduled",
       scheduled_for: scheduledFor.toISOString(),
-      content_score: content_score ? content_score * 10 : 0,
+      // Match what the Create UI stores: deterministic 0-100 score from the
+      // shared scoreContent() helper, not OpenAI's self-rated 1-10 scaled up.
+      content_score: scoreContent({
+        content,
+        platform: series.platform,
+        hashtags,
+      }).score,
     })
     .select("id")
     .single();

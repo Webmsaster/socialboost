@@ -4,6 +4,7 @@ import { captureError } from "@/lib/logger";
 import { sendPostPublishedEmail, sendPublishFailedEmail } from "@/lib/email";
 import { logAudit } from "@/lib/audit-log";
 import { dispatchWebhooks } from "@/lib/webhook-dispatcher";
+import { trackEvent } from "@/lib/analytics";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -138,6 +139,11 @@ export async function GET(request: NextRequest) {
         published++;
 
         await logAudit(post.user_id, "post.published", { postId: post.id, platform: post.platform });
+        trackEvent({
+          event: "post_published",
+          userId: post.user_id,
+          properties: { platform: post.platform, via: "platform_api" },
+        });
         dispatchWebhooks(post.user_id, "post.published", {
           postId: post.id,
           platform: post.platform,
@@ -174,6 +180,14 @@ export async function GET(request: NextRequest) {
           published_at: new Date().toISOString(),
         })
         .eq("id", post.id);
+
+      if (!error) {
+        trackEvent({
+          event: "post_published",
+          userId: post.user_id,
+          properties: { platform: post.platform, via: "manual" },
+        });
+      }
 
       if (error) {
         captureError("Cron: failed to mark post as published", error, { postId: post.id });

@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { optimalPostingTimes } from "@/lib/optimal-times";
+import { trackClient } from "@/lib/track-client";
 import {
   startOfMonth,
   endOfMonth,
@@ -199,6 +200,7 @@ export default function CalendarPage() {
       );
     } else {
       toast.success(`Post moved to ${format(targetDate, "MMM d, yyyy")}`);
+      trackClient("post_scheduled", { via: "drag_drop", platform: post.platform });
     }
   };
 

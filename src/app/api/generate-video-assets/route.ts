@@ -64,8 +64,13 @@ export async function POST(request: NextRequest) {
     // 1. Generate one image per scene (in parallel, best-effort).
     const imagePromises = scenes.map(async (scene) => {
       try {
-        const prompt = `Cinematic social media ad frame. ${scene.visual}. High contrast, vibrant, professional.`;
-        const temporary = await generateImage(prompt);
+        // Describe the visual content only. Words like "frame" or "ad" near the
+        // start tend to make gpt-image-1 render those words AS text in the image
+        // itself, so the style guidance moves to the end as comma-separated tags.
+        // Explicit "single subject" / "no split-screen" kills the model's habit
+        // of returning 4-panel grids when it sees "scenes" or "diverse" in input.
+        const prompt = `${scene.visual}. Single subject, one continuous shot, no split-screen, no collage, no grid, no text, no watermark. Photorealistic, vertical composition, vibrant lighting, cinematic depth of field.`;
+        const temporary = await generateImage(prompt, "1024x1536");
         const persisted = await persistImage(temporary, user.id).catch(() => temporary);
         return { sceneNumber: scene.sceneNumber, url: persisted, error: null as string | null };
       } catch (err) {
