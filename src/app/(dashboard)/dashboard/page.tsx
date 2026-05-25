@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DashboardSkeleton } from "@/components/loading-skeleton";
 import { useLanguage } from "@/lib/i18n";
+import { videoQuotaFor } from "@/lib/subscription";
 import { Onboarding } from "@/components/onboarding";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { achievements } from "@/lib/achievements";
@@ -94,6 +95,7 @@ export default function DashboardPage() {
   const errorMessage = error ? (error instanceof Error ? error.message : "Failed to load dashboard") : null;
 
   const limit = profile?.subscription_status === "active" ? 100 : 10;
+  const videoLimit = videoQuotaFor(profile?.subscription_status);
 
   if (errorMessage) {
     return (
@@ -298,18 +300,20 @@ export default function DashboardPage() {
                 />
               </div>
             </div>
-            {profile.subscription_status === "active" && (
+            {videoLimit > 0 && (
               <div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Video renders</span>
                   <span className="text-sm font-medium">
-                    {Math.max(0, 5 - (profile.video_generation_count ?? 0))} of 5 left this month
+                    {Math.max(0, videoLimit - (profile.video_generation_count ?? 0))} of {videoLimit} left this month
                   </span>
                 </div>
                 <div className="mt-2 h-2 rounded-full bg-muted">
                   <div
                     className="h-2 rounded-full bg-amber-500 transition-all"
-                    style={{ width: `${Math.min(((profile.video_generation_count ?? 0) / 5) * 100, 100)}%` }}
+                    style={{
+                      width: `${Math.min(((profile.video_generation_count ?? 0) / videoLimit) * 100, 100)}%`,
+                    }}
                   />
                 </div>
               </div>
