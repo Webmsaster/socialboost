@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateImage } from "@/lib/openai";
+import { generateImage, type ImageSize } from "@/lib/openai";
+
+// Map social platform to the gpt-image-1 size that actually fits its feed.
+// gpt-image-1 only supports these three sizes — we pick the closest match.
+// Defaults to square if nothing is specified (works passably everywhere).
+const PLATFORM_IMAGE_SIZE: Record<string, ImageSize> = {
+  linkedin: "1024x1024", // LinkedIn feed renders square cleanest
+  facebook: "1536x1024", // FB feed prefers landscape
+  twitter: "1536x1024", // X cards are landscape (16:9)
+  instagram: "1024x1536", // IG Reels / portrait posts dominate
+  pinterest: "1024x1536", // Pinterest is portrait-first
+};
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
 import { trackEvent } from "@/lib/analytics";
@@ -26,7 +37,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { prompt } = body as { prompt: string };
+    const { prompt, platform } = body as { prompt: string; platform?: string };
+    const size: ImageSize =
+      (platform && PLATFORM_IMAGE_SIZE[platform]) || "1024x1024";
 
     if (!prompt || !prompt.trim()) {
       return NextResponse.json(
@@ -68,7 +81,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const temporaryUrl = await generateImage(prompt);
+    const temporaryUrl = await generateImage(prompt, size);
 
     // Persist to Supabase Storage so URL doesn't expire
     const { persistImage } = await import("@/lib/storage");
@@ -79,7 +92,11 @@ export async function POST(request: NextRequest) {
       p_limit: limit,
     });
 
-    trackEvent({ event: "generate_image", userId: user.id, properties: { persisted: url !== temporaryUrl } });
+    trackEvent({
+      event: "generate_image",
+      userId: user.id,
+      properties: { persisted: url !== temporaryUrl, size, platform: platform ?? null },
+    });
 
     return NextResponse.json({ url });
   } catch (error) {

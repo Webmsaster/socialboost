@@ -337,7 +337,7 @@ export default function CreatePage() {
           const imgRes = await fetch("/api/generate-image", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: topic }),
+            body: JSON.stringify({ prompt: topic, platform }),
           });
           if (imgRes.ok) {
             const imgData = await imgRes.json();

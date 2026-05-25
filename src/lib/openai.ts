@@ -430,7 +430,7 @@ export async function generateVariants(input: VariantsInput): Promise<PostVarian
     messages: [
       {
         role: "system",
-        content: `Generate ${input.count} distinct variants of the same social media post, each with a different angle/approach.
+        content: `Generate ${input.count} STRUCTURALLY DIFFERENT variants of the same social media post. The point is to give the user real choice, not three rewordings of the same draft.
 
 ${STYLE_GUARDS}
 
@@ -440,6 +440,18 @@ ${platformRules[input.platform]}
 Output language: ${input.language}
 Tone: ${input.tone}${brandVoiceSection}
 
+VARIANT DIVERSITY RULES (this is the most important constraint):
+- Pick a different "angle" from the list below for EACH variant. No two variants may share an angle.
+- The first sentence of every variant must use a different opening device — never start two variants with the same word, never two with a question, never two with a statistic.
+- The angles available (use any ${input.count} of these, one per variant):
+  1. **Personal story** — open with a first-person anecdote or lived moment, then draw the lesson.
+  2. **Data point** — open with a specific, concrete statistic or number (real or clearly framed as illustrative), then explain its implication.
+  3. **Contrarian hot take** — open by stating something most people in the niche believe is wrong. Defend it.
+  4. **How-to** — open with the problem, then 3 short numbered steps. No filler.
+  5. **Surprising fact / counter-intuitive** — open with something that sounds wrong but isn't, then explain why.
+  6. **Direct question hook** — open with a one-line question the reader can't help but answer in their head. (Use at most once.)
+  7. **Case study** — open by naming a specific company/person/tool and what they did concretely.
+
 Output JSON with this exact structure:
 {
   "variants": [
@@ -447,12 +459,12 @@ Output JSON with this exact structure:
       "variantLabel": "A",
       "content": "Full post text without hashtags",
       "hashtags": ["hashtag1", "hashtag2"],
-      "approach": "Brief description of the angle taken"
+      "approach": "Name the angle you used (must match one from the list above)"
     }
   ]
 }
 
-Each variant should be meaningfully different in approach (e.g., storytelling vs. data-driven, question-based vs. statement, emotional vs. logical). All variants should be high quality and platform-appropriate.`,
+If two variants come out too similar, rewrite one of them from a different angle before finalizing.`,
       },
       {
         role: "user",
