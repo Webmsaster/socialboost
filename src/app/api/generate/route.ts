@@ -34,12 +34,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { platform, topic, tone, language, websiteUrl } = body as {
+    const { platform, topic, tone, language, websiteUrl, brandVoiceOverride } = body as {
       platform: Platform;
       topic: string;
       tone: Tone;
       language: string;
       websiteUrl?: string;
+      // Used by the Settings → Auto-Train trainer to preview a sample post
+      // in a brand voice the user hasn't saved yet. When present, takes
+      // priority over the profile's saved brand_voice.
+      brandVoiceOverride?: string;
     };
 
     if (!platform || !topic || !tone) {
@@ -112,7 +116,10 @@ export async function POST(request: NextRequest) {
       topic: effectiveTopic,
       tone,
       language: language || "English",
-      brandVoice: profile.brand_voice || undefined,
+      brandVoice:
+        (typeof brandVoiceOverride === "string" && brandVoiceOverride.trim()
+          ? brandVoiceOverride.trim().slice(0, 2000)
+          : profile.brand_voice) || undefined,
       model,
     });
 

@@ -165,10 +165,9 @@ export default function SettingsPage() {
     setTrainerSampleLoading(true);
     setTrainerSample(null);
     try {
-      // Inject the analyzed text directly via brandVoice override on the
-      // generate route. We don't write to the DB yet; the route reads brand_voice
-      // from profile only when the body doesn't supply one, so we go via topic
-      // prefix here to keep it server-stateless.
+      // The /api/generate route accepts brandVoiceOverride which takes priority
+      // over the saved profile.brand_voice. Without it the preview would mix the
+      // user's CURRENT (about-to-be-replaced) voice with the new one.
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -176,9 +175,8 @@ export default function SettingsPage() {
           platform: "linkedin",
           tone: "professional",
           language: "English",
-          // The analyze endpoint already returned a serialized brand voice; we
-          // append it as a hidden brief so the prompt's `brandVoice` slot fills.
-          topic: `${"Write a short post about productivity for solopreneurs."}\n\n[Sample preview — write in this voice exactly:]\n${trainerResult.text}`,
+          topic: "Write a short post about productivity for solopreneurs.",
+          brandVoiceOverride: trainerResult.text,
         }),
       });
       const data = await res.json();
