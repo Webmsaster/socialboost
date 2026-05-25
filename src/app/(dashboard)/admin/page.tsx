@@ -28,6 +28,14 @@ interface AdminUser {
   postCount: number;
 }
 
+interface AnalyticsData {
+  windowDays: number;
+  totalEvents: number;
+  topEvents: { event: string; count: number }[];
+  tabBreakdown: { tab: string; count: number }[];
+  daily: { day: string; count: number }[];
+}
+
 function formatNumber(n: number): string {
   return new Intl.NumberFormat("en-US").format(n);
 }
@@ -52,6 +60,24 @@ export default function AdminDashboard() {
   const [userPage, setUserPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
+
+  // Analytics tab state
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  async function loadAnalytics() {
+    if (analytics || analyticsLoading) return;
+    setAnalyticsLoading(true);
+    try {
+      const res = await fetch("/api/admin/analytics-events");
+      if (!res.ok) throw new Error("Failed to load analytics");
+      setAnalytics(await res.json());
+    } catch {
+      toast.error("Failed to load analytics");
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -128,10 +154,17 @@ export default function AdminDashboard() {
         </p>
       </div>
 
-      <Tabs defaultValue="overview" onValueChange={(v) => v === "users" && handleUsersTab()}>
+      <Tabs
+        defaultValue="overview"
+        onValueChange={(v) => {
+          if (v === "users") handleUsersTab();
+          if (v === "analytics") loadAnalytics();
+        }}
+      >
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-4">
@@ -272,7 +305,129 @@ export default function AdminDashboard() {
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-6 mt-4">
+          {analyticsLoading && (
+            <div className="space-y-4">
+              <Skeleton className="h-32" />
+              <Skeleton className="h-48" />
+            </div>
+          )}
+          {!analyticsLoading && analytics && (
+            <>
+              <div className="grid gap-4 md:grid-cols-3">
+                <MetricCard
+                  title="Total events"
+                  value={formatNumber(analytics.totalEvents)}
+                  description={`Last ${analytics.windowDays} days`}
+                />
+                <MetricCard
+                  title="Distinct event types"
+                  value={formatNumber(analytics.topEvents.length)}
+                  description="What users are doing"
+                />
+                <MetricCard
+                  title="Most popular tab"
+                  value={analytics.tabBreakdown[0]?.tab ?? "—"}
+                  description={
+                    analytics.tabBreakdown[0]
+                      ? `${analytics.tabBreakdown[0].count} switches`
+                      : "No tab data yet"
+                  }
+                />
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Daily event volume</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BarChart
+                    rows={analytics.daily.map((d) => ({
+                      label: d.day.slice(5),
+                      value: d.count,
+                    }))}
+                    valueFmt={formatNumber}
+                  />
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top events (30d)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <BarChart
+                      rows={analytics.topEvents.slice(0, 12).map((e) => ({
+                        label: e.event,
+                        value: e.count,
+                      }))}
+                      valueFmt={formatNumber}
+                    />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Tab adoption</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {analytics.tabBreakdown.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No tab-switch events recorded yet.
+                      </p>
+                    ) : (
+                      <BarChart
+                        rows={analytics.tabBreakdown.map((t) => ({
+                          label: t.tab,
+                          value: t.count,
+                        }))}
+                        valueFmt={formatNumber}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Pulled from public.analytics_events. Each row is one tracked
+                action — generation, save, tab-switch, schedule, publish, etc.
+                See src/app/api/track and src/lib/analytics.ts for what&apos;s tracked.
+              </p>
+            </>
+          )}
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function BarChart({
+  rows,
+  valueFmt,
+}: {
+  rows: { label: string; value: number }[];
+  valueFmt: (n: number) => string;
+}) {
+  const max = Math.max(1, ...rows.map((r) => r.value));
+  return (
+    <div className="space-y-1.5">
+      {rows.map((r) => (
+        <div key={r.label} className="space-y-0.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="truncate font-mono">{r.label}</span>
+            <span className="tabular-nums text-muted-foreground">
+              {valueFmt(r.value)}
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded bg-muted">
+            <div
+              className="h-full rounded bg-primary"
+              style={{ width: `${(r.value / max) * 100}%` }}
+            />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

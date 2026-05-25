@@ -936,7 +936,6 @@ export default function CreatePage() {
               {fullVideoUrl && (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">Rendered MP4</p>
-                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                   <video
                     src={fullVideoUrl}
                     controls

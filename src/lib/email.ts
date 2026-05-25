@@ -279,6 +279,93 @@ export async function sendDay7UpgradeEmail(to: string, generationsUsed: number):
   });
 }
 
+/**
+ * Day 5: Push the Pro Auto-Train-Brand-Voice feature.
+ * The feature is invisible unless we explicitly point users at it — and it's
+ * the single biggest quality lever they have, so this email is the most
+ * cost-effective nudge in the drip.
+ */
+export async function sendBrandVoiceNudgeEmail(
+  to: string,
+  postsSoFar: number,
+): Promise<boolean> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://socialboost.app";
+  const recap = postsSoFar > 0
+    ? `You've generated <strong>${postsSoFar}</strong> posts so far. Want them to sound less like ChatGPT and more like you?`
+    : `Most users tell us their first AI posts sound generic. There's a fix.`;
+  return sendEmail({
+    to,
+    subject: "Make SocialBoost write in your voice — 30 seconds",
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #7c3aed, #6d28d9); padding: 24px; border-radius: 12px 12px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 20px;">SocialBoost</h1>
+        </div>
+        <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+          <h2 style="margin-top: 0;">Your posts can sound like you — not like ChatGPT</h2>
+          <p style="color: #374151;">${recap}</p>
+          <p style="color: #374151;">Auto-Train Brand Voice (Pro feature) reads your existing posts, learns your tone, vocabulary, hook style, and CTA patterns, then injects that into every future post. No more "Unlocking the power of…" openings.</p>
+          <div style="background: #f5f3ff; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0; color: #5b21b6; font-weight: 600;">How it works</p>
+            <ol style="color: #374151; margin: 8px 0 0; padding-left: 18px; font-size: 14px;">
+              <li>Open Settings → Auto-train brand voice</li>
+              <li>Pick "Use my last posts" or paste 5-10 examples</li>
+              <li>Click Analyze — you get a voice profile in ~5 seconds</li>
+              <li>Apply it. Every future post sounds like you wrote it.</li>
+            </ol>
+          </div>
+          <a href="${appUrl}/settings#brand-voice"
+             style="display: inline-block; background: #7c3aed; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 14px;">
+            Train my voice now
+          </a>
+          <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
+            This feature is part of Pro. Not yet on Pro? <a href="${appUrl}/settings" style="color: #7c3aed;">Upgrade for $9/mo</a>.
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}
+
+/**
+ * Day 10: Highlight the video pipeline. Pro-only, drives upgrades.
+ * Sent only to users still on the Free plan after the brand-voice nudge —
+ * the email-drip route handles the targeting.
+ */
+export async function sendVideoFeatureEmail(to: string): Promise<boolean> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://socialboost.app";
+  return sendEmail({
+    to,
+    subject: "Did you know SocialBoost makes videos too?",
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #7c3aed, #6d28d9); padding: 24px; border-radius: 12px 12px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 20px;">SocialBoost</h1>
+        </div>
+        <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+          <h2 style="margin-top: 0;">Reels / TikTok / Shorts — done in one click</h2>
+          <p style="color: #374151;">Most people use SocialBoost for text posts and never discover the video pipeline. It produces ready-to-post 1080×1920 MP4s in under a minute.</p>
+          <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <ol style="color: #374151; margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.6;">
+              <li>Open Create → Video Script tab, type your topic.</li>
+              <li>Click <strong>Generate Full Video Assets</strong> — AI writes the script, generates one portrait image per scene, and creates a voiceover.</li>
+              <li>Click <strong>Render Full Video</strong> — get a finished MP4 with Ken-Burns motion, text overlays, and embedded voiceover.</li>
+              <li>Download. Post to Reels / TikTok / Shorts / LinkedIn.</li>
+            </ol>
+          </div>
+          <a href="${appUrl}/create?tab=video-script"
+             style="display: inline-block; background: #7c3aed; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 14px;">
+            Try video generation
+          </a>
+          <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
+            Full video render is a Pro feature. Scripts and image previews are available on every plan.
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}
+
 export async function sendWeeklyDigestEmail(
   to: string,
   stats: { postsCreated: number; postsPublished: number; topPlatform: string; streak: number }

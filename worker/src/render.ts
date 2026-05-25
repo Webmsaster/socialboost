@@ -48,12 +48,6 @@ async function downloadToFile(url: string, dest: string): Promise<void> {
   await writeFile(dest, buf);
 }
 
-function escapeTextForDrawtext(text: string): string {
-  // Use textfile= so we don't need to escape shell metachars.
-  // Keep this function for any inline usage.
-  return text.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/:/g, "\\:");
-}
-
 export async function renderVideo(req: RenderRequest): Promise<string> {
   const aspect = req.aspect ?? "9:16";
   const { w, h } = ASPECT_DIMENSIONS[aspect];
