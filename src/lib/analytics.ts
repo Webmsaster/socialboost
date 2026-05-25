@@ -55,12 +55,19 @@ export function trackEvent({ event, userId, properties }: AnalyticsEvent) {
       event,
       properties: properties ?? {},
     });
-    if (result && typeof (result as { then?: unknown }).then === "function") {
-      (result as Promise<{ error: { message: string } | null }>)
-        .then(({ error }) => {
+    const maybeThenable = result as unknown as {
+      then?: (
+        onFulfilled: (v: { error: { message: string } | null }) => unknown,
+        onRejected?: (e: unknown) => unknown,
+      ) => unknown;
+    };
+    if (maybeThenable && typeof maybeThenable.then === "function") {
+      maybeThenable.then(
+        ({ error }) => {
           if (error) console.error("analytics insert failed:", error.message);
-        })
-        .catch(() => {});
+        },
+        () => {},
+      );
     }
   } catch {
     // Swallow — analytics must never block the parent request.

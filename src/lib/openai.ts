@@ -436,3 +436,109 @@ Each variant should be meaningfully different in approach (e.g., storytelling vs
   const parsed = JSON.parse(raw) as { variants: PostVariant[] };
   return parsed.variants;
 }
+
+// --- Feature 7: Brand Voice Analyzer ---
+// Extract a structured style profile from a user's existing posts, so we can
+// inject "write like THIS person" guidance into every subsequent generation
+// instead of relying on the user to describe their own voice manually.
+
+export interface BrandVoiceProfile {
+  summary: string; // one-paragraph description, the thing we feed back into prompts
+  toneTags: string[]; // e.g. ["witty", "story-driven", "no-nonsense"]
+  vocabulary: string[]; // signature words / phrases the user uses
+  hookStyle: string; // "opens with a question", "bold statement", "personal story"
+  ctaStyle: string; // how they end posts
+  emojiUsage: "none" | "sparse" | "heavy";
+  sentenceLength: "short" | "medium" | "long" | "mixed";
+}
+
+export interface AnalyzeBrandVoiceInput {
+  examples: string[]; // 1-20 example post texts
+  model?: string;
+}
+
+export async function analyzeBrandVoice(
+  input: AnalyzeBrandVoiceInput,
+): Promise<BrandVoiceProfile> {
+  if (!Array.isArray(input.examples) || input.examples.length === 0) {
+    throw new Error("At least one example post is required");
+  }
+
+  const openai = getOpenAI();
+  const numbered = input.examples
+    .slice(0, 20)
+    .map((p, i) => `--- POST ${i + 1} ---\n${sanitizeInput(p, 2000)}`)
+    .join("\n\n");
+
+  const response = await openai.chat.completions.create({
+    model: input.model || "gpt-4o-mini",
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: `You are a brand-voice analyst. The user will paste in social media posts they have written. Your job is to extract a compact, faithful description of their writing style — so a future AI can imitate it.
+
+Output JSON with this exact structure:
+{
+  "summary": "One paragraph (2-4 sentences) describing the writing voice. This is what will be fed back into future post generations as 'write in this voice'. Be specific and actionable. Avoid generic words like 'engaging' or 'authentic'.",
+  "toneTags": ["3-6 short tags like 'witty', 'story-driven', 'data-led', 'contrarian'"],
+  "vocabulary": ["5-10 signature words or short phrases the user actually uses repeatedly"],
+  "hookStyle": "How they typically open posts (1 short sentence)",
+  "ctaStyle": "How they typically end posts / call to action (1 short sentence)",
+  "emojiUsage": "none | sparse | heavy",
+  "sentenceLength": "short | medium | long | mixed"
+}
+
+Base every field on the actual posts. Do not invent. If the examples are inconsistent, summarize the dominant pattern.`,
+      },
+      {
+        role: "user",
+        content: `Here are my posts. Extract my brand voice:\n\n${numbered}`,
+      },
+    ],
+    temperature: 0.3,
+    max_tokens: 700,
+  });
+
+  const raw = response.choices[0].message.content;
+  if (!raw) throw new Error("Empty response from OpenAI");
+
+  const parsed = JSON.parse(raw) as Partial<BrandVoiceProfile>;
+  return {
+    summary: typeof parsed.summary === "string" ? parsed.summary : "",
+    toneTags: Array.isArray(parsed.toneTags) ? parsed.toneTags.slice(0, 8) : [],
+    vocabulary: Array.isArray(parsed.vocabulary) ? parsed.vocabulary.slice(0, 12) : [],
+    hookStyle: typeof parsed.hookStyle === "string" ? parsed.hookStyle : "",
+    ctaStyle: typeof parsed.ctaStyle === "string" ? parsed.ctaStyle : "",
+    emojiUsage:
+      parsed.emojiUsage === "none" || parsed.emojiUsage === "heavy"
+        ? parsed.emojiUsage
+        : "sparse",
+    sentenceLength:
+      parsed.sentenceLength === "short" ||
+      parsed.sentenceLength === "long" ||
+      parsed.sentenceLength === "mixed"
+        ? parsed.sentenceLength
+        : "medium",
+  };
+}
+
+/**
+ * Serializes a BrandVoiceProfile to a single text block suitable for the
+ * `brand_voice` column. Keeps it short enough to fit through sanitizeInput's
+ * 1000-char limit when it gets injected into prompts.
+ */
+export function brandVoiceProfileToText(profile: BrandVoiceProfile): string {
+  const parts = [
+    profile.summary,
+    profile.toneTags.length ? `Tone: ${profile.toneTags.join(", ")}.` : "",
+    profile.vocabulary.length
+      ? `Signature phrases: ${profile.vocabulary.join(", ")}.`
+      : "",
+    profile.hookStyle ? `Hooks: ${profile.hookStyle}` : "",
+    profile.ctaStyle ? `CTAs: ${profile.ctaStyle}` : "",
+    `Emojis: ${profile.emojiUsage}. Sentence length: ${profile.sentenceLength}.`,
+  ];
+  return parts.filter(Boolean).join("\n").slice(0, 1000);
+}
+

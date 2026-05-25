@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -54,8 +55,105 @@ export default function SettingsPage() {
   const [notifyMarketing, setNotifyMarketing] = useState(true);
   const [notifyDigest, setNotifyDigest] = useState(true);
   const [notifyPublish, setNotifyPublish] = useState(true);
+
+  // Brand voice auto-train state
+  const [trainerOpen, setTrainerOpen] = useState(false);
+  const [trainerSource, setTrainerSource] = useState<"history" | "manual">("history");
+  const [trainerPaste, setTrainerPaste] = useState("");
+  const [trainerHistoryCount, setTrainerHistoryCount] = useState<number | null>(null);
+  const [trainerLoading, setTrainerLoading] = useState(false);
+  const [trainerResult, setTrainerResult] = useState<{
+    profile: {
+      summary: string;
+      toneTags: string[];
+      vocabulary: string[];
+      hookStyle: string;
+      ctaStyle: string;
+      emojiUsage: string;
+      sentenceLength: string;
+    };
+    text: string;
+  } | null>(null);
+
   const { t } = useLanguage();
   const supabase = createClient();
+
+  async function loadHistoryExamples(): Promise<string[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+    // Prefer published posts (best representation of user's real voice).
+    // Fall back to any non-draft posts if there aren't enough published ones.
+    const { data: published } = await supabase
+      .from("posts")
+      .select("content")
+      .eq("user_id", user.id)
+      .eq("status", "published")
+      .order("created_at", { ascending: false })
+      .limit(15);
+    if (published && published.length >= 5) {
+      return published.map((p) => p.content as string).filter(Boolean);
+    }
+    const { data: any_post } = await supabase
+      .from("posts")
+      .select("content")
+      .eq("user_id", user.id)
+      .neq("status", "draft")
+      .order("created_at", { ascending: false })
+      .limit(15);
+    return (any_post || []).map((p) => p.content as string).filter(Boolean);
+  }
+
+  async function runBrandVoiceAnalyze() {
+    setTrainerLoading(true);
+    setTrainerResult(null);
+    try {
+      let examples: string[] = [];
+      if (trainerSource === "history") {
+        examples = await loadHistoryExamples();
+        setTrainerHistoryCount(examples.length);
+        if (examples.length === 0) {
+          toast.error(
+            "No published posts found yet. Publish a few or paste examples instead.",
+          );
+          return;
+        }
+      } else {
+        examples = trainerPaste
+          .split(/\n\s*---+\s*\n|\n\n\n+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (examples.length === 0) {
+          toast.error("Paste at least one post (separate multiple with '---').");
+          return;
+        }
+      }
+
+      const res = await fetch("/api/brand-voice/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ examples, source: trainerSource }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to analyze");
+        return;
+      }
+      setTrainerResult(data);
+      toast.success("Your voice has been analyzed");
+    } catch {
+      toast.error("Failed to analyze brand voice");
+    } finally {
+      setTrainerLoading(false);
+    }
+  }
+
+  function applyTrainedVoice() {
+    if (!trainerResult) return;
+    setBrandVoice(trainerResult.text);
+    setTrainerOpen(false);
+    setTrainerResult(null);
+    toast.success("Applied — remember to click 'Save Profile' below");
+  }
 
   async function saveNotificationPrefs() {
     try {
@@ -288,6 +386,125 @@ export default function SettingsPage() {
               {t("settings.brandVoiceDesc")}
             </p>
           </div>
+
+          {isPro && (
+            <div className="space-y-3 rounded-lg border border-dashed p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">
+                    {t("settings.brandVoiceTrain")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("settings.brandVoiceTrainDesc")}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant={trainerOpen ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setTrainerOpen((o) => !o)}
+                >
+                  {trainerOpen ? t("settings.brandVoiceClose") : t("settings.brandVoiceOpen")}
+                </Button>
+              </div>
+
+              {trainerOpen && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={trainerSource === "history" ? "default" : "outline"}
+                      onClick={() => setTrainerSource("history")}
+                    >
+                      {t("settings.brandVoiceUsePosts")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={trainerSource === "manual" ? "default" : "outline"}
+                      onClick={() => setTrainerSource("manual")}
+                    >
+                      {t("settings.brandVoicePaste")}
+                    </Button>
+                  </div>
+
+                  {trainerSource === "manual" && (
+                    <Textarea
+                      placeholder={t("settings.brandVoicePastePlaceholder")}
+                      rows={6}
+                      value={trainerPaste}
+                      onChange={(e) => setTrainerPaste(e.target.value)}
+                      maxLength={30000}
+                    />
+                  )}
+
+                  {trainerSource === "history" && trainerHistoryCount !== null && (
+                    <p className="text-xs text-muted-foreground">
+                      {trainerHistoryCount} {t("settings.brandVoicePostsFound")}
+                    </p>
+                  )}
+
+                  <Button
+                    type="button"
+                    onClick={runBrandVoiceAnalyze}
+                    disabled={trainerLoading}
+                  >
+                    {trainerLoading
+                      ? t("settings.brandVoiceAnalyzing")
+                      : t("settings.brandVoiceAnalyze")}
+                  </Button>
+
+                  {trainerResult && (
+                    <div className="space-y-3 rounded-md border bg-muted/40 p-3">
+                      <p className="text-sm font-medium">
+                        {t("settings.brandVoiceResult")}
+                      </p>
+                      <p className="text-sm">{trainerResult.profile.summary}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {trainerResult.profile.toneTags.map((tag) => (
+                          <Badge key={tag} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        {trainerResult.profile.hookStyle && (
+                          <p>
+                            <span className="font-medium">Hooks:</span>{" "}
+                            {trainerResult.profile.hookStyle}
+                          </p>
+                        )}
+                        {trainerResult.profile.ctaStyle && (
+                          <p>
+                            <span className="font-medium">CTAs:</span>{" "}
+                            {trainerResult.profile.ctaStyle}
+                          </p>
+                        )}
+                        <p>
+                          <span className="font-medium">Emojis:</span>{" "}
+                          {trainerResult.profile.emojiUsage}
+                          {" · "}
+                          <span className="font-medium">Sentences:</span>{" "}
+                          {trainerResult.profile.sentenceLength}
+                        </p>
+                        {trainerResult.profile.vocabulary.length > 0 && (
+                          <p>
+                            <span className="font-medium">Signature:</span>{" "}
+                            {trainerResult.profile.vocabulary.join(", ")}
+                          </p>
+                        )}
+                      </div>
+                      <Button size="sm" onClick={applyTrainedVoice}>
+                        {t("settings.brandVoiceApply")}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {isPro && (
             <div className="space-y-2">
               <Label htmlFor="preferred-model">{t("settings.aiModel")}</Label>
