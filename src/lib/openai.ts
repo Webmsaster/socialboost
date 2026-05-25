@@ -47,13 +47,36 @@ export function sanitizeInput(input: string, maxLength = 1000): string {
   return sanitized;
 }
 
+// Concrete length targets per platform — these match content-score.ts' ideal
+// values, so the deterministic scorer and the generation prompt agree on what
+// "right length" means.
 const platformRules: Record<Platform, string> = {
-  linkedin: `LinkedIn post. Professional formatting with line breaks for readability. Max 3000 characters. 3-5 relevant hashtags at the end. Use a hook in the first line.`,
-  facebook: `Facebook post. Conversational, storytelling style. Emojis allowed but not excessive. Up to 5 hashtags.`,
-  instagram: `Instagram caption. Engaging, visual language. Use emojis naturally. 5-10 hashtags at the end, separated by a line break.`,
-  pinterest: `Pinterest pin description. SEO-optimized with keywords. Short, descriptive. 3-5 hashtags.`,
-  twitter: `Tweet for X/Twitter. Max 280 characters including hashtags. Punchy, concise. 1-2 hashtags inline.`,
+  linkedin: `LinkedIn post. Target 800-1300 characters (the engagement sweet spot — never over 3000). Open with a one-line hook on its own line, then a short paragraph, then 2-4 short paragraphs with single-line breaks between them. End with exactly 3-5 specific hashtags on their own line.`,
+  facebook: `Facebook post. Target 300-500 characters. Conversational, story-driven. Open with a hook line. Up to 5 hashtags at the end. Light emoji use only.`,
+  instagram: `Instagram caption. Target 800-1200 characters. Visual, sensory language. Use emojis naturally inline. Put 5-12 specific hashtags on a separate line break at the end.`,
+  pinterest: `Pinterest pin description. Target 150-300 characters. SEO-keyword-rich, descriptive, action-oriented. 3-5 hashtags at the end.`,
+  twitter: `Tweet for X/Twitter. Target 120-220 characters total (must include hashtags). Punchy single thought. 1-2 hashtags inline, not at the end. Never use multi-paragraph structure.`,
 };
+
+// Phrases that scream "I was written by ChatGPT". Injected into every
+// generation system-prompt as an anti-pattern list so the model stops
+// reaching for the most overused AI-tells.
+//
+// Keep this list short and concrete — fluffy guidance ("don't sound generic")
+// is ignored, specific phrase bans actually work.
+const STYLE_GUARDS = `STRICT STYLE RULES — these matter more than anything else:
+
+1. NEVER use these AI-tell phrases or any close variants: "unlock", "leverage", "harness", "dive into", "embrace", "embark on", "pave the way", "elevate", "unprecedented", "empower", "navigate the landscape", "in today's fast-paced world", "game-changer", "revolutionize", "in conclusion", "delve into", "tapestry", "realm", "robust", "ever-evolving", "transformative", "synergy", "seamless", "cutting-edge".
+
+2. NEVER end with generic CTAs like "What do you think?", "Let me know your thoughts", "Share your experience", "Stay tuned", or "What's your take?". If you write a CTA, it must be specific to the topic.
+
+3. NEVER open with "As we" / "In a world where" / "Have you ever wondered" / "Did you know that".
+
+4. NEVER use em-dashes for dramatic pauses (typical AI rhythm). Use plain periods.
+
+5. Use concrete numbers, named tools, specific examples — not abstractions. "Stripe handles refunds in 3 clicks" beats "modern payment platforms streamline the experience".
+
+6. Write like a human who has lived the thing. Opinions, contrarian takes, and small admissions of uncertainty land better than balanced corporate prose.`;
 
 export async function generatePost(input: GeneratePostInput): Promise<GeneratePostOutput> {
   const openai = getOpenAI();
@@ -69,6 +92,8 @@ export async function generatePost(input: GeneratePostInput): Promise<GeneratePo
       {
         role: "system",
         content: `You are a social media content expert. Generate engaging posts for different platforms.
+
+${STYLE_GUARDS}
 
 Rules for this post:
 ${platformRules[input.platform]}
@@ -173,6 +198,8 @@ export async function generateVideoScript(input: VideoScriptInput): Promise<Vide
         role: "system",
         content: `You are a video content expert. Create short-form video scripts for social media (Reels, TikTok, Shorts).
 
+${STYLE_GUARDS}
+
 Output language: ${input.language}
 Tone: ${input.tone}
 Platform: ${input.platform}${brandVoiceSection}
@@ -252,6 +279,8 @@ export async function generateVideoAd(input: VideoAdInput): Promise<VideoAdOutpu
         role: "system",
         content: `You are a creative advertising expert specializing in video ads for social media.
 
+${STYLE_GUARDS}
+
 Output language: ${input.language}
 Tone: ${input.tone}
 Product/Brand: ${input.product}${brandVoiceSection}
@@ -330,6 +359,8 @@ export async function generateCarousel(input: CarouselInput): Promise<CarouselOu
         role: "system",
         content: `You are an expert at creating carousel/swipeable content for social media, especially LinkedIn and Instagram.
 
+${STYLE_GUARDS}
+
 Output language: ${input.language}
 Tone: ${input.tone}
 Platform: ${input.platform}
@@ -400,6 +431,8 @@ export async function generateVariants(input: VariantsInput): Promise<PostVarian
       {
         role: "system",
         content: `Generate ${input.count} distinct variants of the same social media post, each with a different angle/approach.
+
+${STYLE_GUARDS}
 
 Platform rules:
 ${platformRules[input.platform]}
