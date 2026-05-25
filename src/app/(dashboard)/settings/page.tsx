@@ -62,6 +62,8 @@ export default function SettingsPage() {
   const [trainerPaste, setTrainerPaste] = useState("");
   const [trainerHistoryCount, setTrainerHistoryCount] = useState<number | null>(null);
   const [trainerLoading, setTrainerLoading] = useState(false);
+  const [trainerSample, setTrainerSample] = useState<string | null>(null);
+  const [trainerSampleLoading, setTrainerSampleLoading] = useState(false);
   const [trainerResult, setTrainerResult] = useState<{
     profile: {
       summary: string;
@@ -152,7 +154,44 @@ export default function SettingsPage() {
     setBrandVoice(trainerResult.text);
     setTrainerOpen(false);
     setTrainerResult(null);
+    setTrainerSample(null);
     toast.success("Applied — remember to click 'Save Profile' below");
+  }
+
+  // Generate a sample LinkedIn post in the freshly-analyzed voice — gives the
+  // user something concrete to judge before committing the brand_voice change.
+  async function previewTrainedVoiceSample() {
+    if (!trainerResult || trainerSampleLoading) return;
+    setTrainerSampleLoading(true);
+    setTrainerSample(null);
+    try {
+      // Inject the analyzed text directly via brandVoice override on the
+      // generate route. We don't write to the DB yet; the route reads brand_voice
+      // from profile only when the body doesn't supply one, so we go via topic
+      // prefix here to keep it server-stateless.
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platform: "linkedin",
+          tone: "professional",
+          language: "English",
+          // The analyze endpoint already returned a serialized brand voice; we
+          // append it as a hidden brief so the prompt's `brandVoice` slot fills.
+          topic: `${"Write a short post about productivity for solopreneurs."}\n\n[Sample preview — write in this voice exactly:]\n${trainerResult.text}`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to generate sample");
+        return;
+      }
+      setTrainerSample(data.content as string);
+    } catch {
+      toast.error("Failed to generate sample");
+    } finally {
+      setTrainerSampleLoading(false);
+    }
   }
 
   async function saveNotificationPrefs() {
@@ -495,9 +534,29 @@ export default function SettingsPage() {
                           </p>
                         )}
                       </div>
-                      <Button size="sm" onClick={applyTrainedVoice}>
-                        {t("settings.brandVoiceApply")}
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" onClick={applyTrainedVoice}>
+                          {t("settings.brandVoiceApply")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={previewTrainedVoiceSample}
+                          disabled={trainerSampleLoading}
+                        >
+                          {trainerSampleLoading
+                            ? t("settings.brandVoiceSampling")
+                            : t("settings.brandVoiceSample")}
+                        </Button>
+                      </div>
+                      {trainerSample && (
+                        <div className="mt-3 space-y-1 rounded-md border bg-background p-3">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            {t("settings.brandVoiceSampleLabel")}
+                          </p>
+                          <p className="whitespace-pre-wrap text-sm">{trainerSample}</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

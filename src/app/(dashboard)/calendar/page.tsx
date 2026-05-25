@@ -68,6 +68,9 @@ export default function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  // Track the dragged post's platform so we can highlight the optimal weekdays
+  // for it while the user is dragging. Cleared on drop.
+  const [draggedPlatform, setDraggedPlatform] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [bestTimesPlatform, setBestTimesPlatform] = useState("linkedin");
   const [autoScheduling, setAutoScheduling] = useState(false);
@@ -145,6 +148,7 @@ export default function CalendarPage() {
   const handleDragStart = (e: DragEvent<HTMLDivElement>, post: Post) => {
     e.dataTransfer.setData("text/plain", post.id);
     e.dataTransfer.effectAllowed = "move";
+    setDraggedPlatform(post.platform);
   };
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>, dateKey: string) => {
@@ -157,9 +161,35 @@ export default function CalendarPage() {
     setDragOverDate(null);
   };
 
+  // Browsers fire `dragend` even on a cancelled drag (Esc, off-window drop).
+  // Wire it on every draggable so the platform highlight always clears.
+  const handleDragEnd = () => {
+    setDraggedPlatform(null);
+    setDragOverDate(null);
+  };
+
+  // Pre-compute optimal-weekday lookup per platform so the grid render stays cheap.
+  const optimalDaysByPlatform = useMemo(() => {
+    const out: Record<string, Record<number, "high" | "medium">> = {};
+    for (const [platform, slots] of Object.entries(optimalPostingTimes)) {
+      const dayMap: Record<number, "high" | "medium"> = {};
+      const nameToIdx: Record<string, number> = {
+        Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3,
+        Thursday: 4, Friday: 5, Saturday: 6,
+      };
+      for (const s of slots) {
+        const idx = nameToIdx[s.day];
+        if (idx !== undefined) dayMap[idx] = s.engagement;
+      }
+      out[platform] = dayMap;
+    }
+    return out;
+  }, []);
+
   const handleDrop = async (e: DragEvent<HTMLDivElement>, targetDate: Date) => {
     e.preventDefault();
     setDragOverDate(null);
+    setDraggedPlatform(null);
 
     const postId = e.dataTransfer.getData("text/plain");
     if (!postId) return;
@@ -357,6 +387,11 @@ export default function CalendarPage() {
                   const isDragOver = dragOverDate === dateKey;
                   const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
                   const isTodayDate = isToday(day);
+                  // While the user is dragging a post, color the cell by how
+                  // well this weekday fits the post's platform.
+                  const optimalRating = draggedPlatform
+                    ? optimalDaysByPlatform[draggedPlatform]?.[getDay(day)]
+                    : undefined;
 
                   return (
                     <div
@@ -364,6 +399,8 @@ export default function CalendarPage() {
                       className={`
                         relative min-h-[100px] border-b border-r p-1.5 transition-colors
                         ${isCurrentMonth ? "bg-card" : "bg-muted/30"}
+                        ${optimalRating === "high" ? "bg-amber-50 dark:bg-amber-950/30" : ""}
+                        ${optimalRating === "medium" ? "bg-amber-50/40 dark:bg-amber-950/15" : ""}
                         ${isDragOver ? "bg-primary/10 ring-2 ring-inset ring-primary/40" : ""}
                         ${isSelected ? "bg-accent" : ""}
                         cursor-pointer hover:bg-accent/50
@@ -398,6 +435,7 @@ export default function CalendarPage() {
                             key={post.id}
                             draggable
                             onDragStart={(e) => handleDragStart(e, post)}
+                            onDragEnd={handleDragEnd}
                             onClick={(e) => {
                               e.stopPropagation();
                               handlePostClick(post);
@@ -448,6 +486,7 @@ export default function CalendarPage() {
                           key={post.id}
                           draggable
                           onDragStart={(e) => handleDragStart(e, post)}
+                            onDragEnd={handleDragEnd}
                           onClick={() => handlePostClick(post)}
                           className={`
                             cursor-pointer rounded-lg border p-3 transition-colors
@@ -570,6 +609,7 @@ export default function CalendarPage() {
                         key={post.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, post)}
+                            onDragEnd={handleDragEnd}
                         onClick={() => handlePostClick(post)}
                         className={`
                           cursor-grab rounded-lg border border-dashed p-2.5 transition-colors

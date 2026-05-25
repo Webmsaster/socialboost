@@ -39,9 +39,11 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 
 // OpenAI generatePost mock
-const mockGeneratePost = vi.fn();
+// Route switched from generatePost (regenerate-from-topic) to repurposePost
+// (rewrite-the-original) when the change to preserve the user's voice landed.
+const mockRepurposePost = vi.fn();
 vi.mock("@/lib/openai", () => ({
-  generatePost: (...args: unknown[]) => mockGeneratePost(...args),
+  repurposePost: (...args: unknown[]) => mockRepurposePost(...args),
 }));
 
 // Subscription mock
@@ -194,7 +196,7 @@ describe("POST /api/repurpose", () => {
       },
     });
     mockIsProSubscription.mockReturnValue(true);
-    mockGeneratePost.mockResolvedValueOnce({ content: "Twitter version", hashtags: ["#ai"] });
+    mockRepurposePost.mockResolvedValueOnce({ content: "Twitter version", hashtags: ["#ai"] });
     mockRpc.mockResolvedValueOnce({ data: null, error: null });
 
     const request = createRequest({
@@ -211,8 +213,8 @@ describe("POST /api/repurpose", () => {
     // linkedin was skipped (same as sourcePlatform), only twitter was generated
     expect(json.results.twitter.content).toBe("Twitter version");
     expect(json.results.linkedin).toBeUndefined();
-    expect(mockGeneratePost).toHaveBeenCalledTimes(1);
-    expect(mockGeneratePost).toHaveBeenCalledWith(
+    expect(mockRepurposePost).toHaveBeenCalledTimes(1);
+    expect(mockRepurposePost).toHaveBeenCalledWith(
       expect.objectContaining({ model: "gpt-4o", brandVoice: "Bold" })
     );
   });
@@ -231,7 +233,7 @@ describe("POST /api/repurpose", () => {
       },
     });
     mockIsProSubscription.mockReturnValue(true);
-    mockGeneratePost.mockResolvedValueOnce({ content: "Twitter ver", hashtags: [] });
+    mockRepurposePost.mockResolvedValueOnce({ content: "Twitter ver", hashtags: [] });
     mockRpc.mockResolvedValueOnce({ data: null, error: null });
 
     const request = createRequest({
@@ -242,12 +244,12 @@ describe("POST /api/repurpose", () => {
     });
     const response = await POST(request);
     expect(response.status).toBe(200);
-    expect(mockGeneratePost).toHaveBeenCalledWith(
+    expect(mockRepurposePost).toHaveBeenCalledWith(
       expect.objectContaining({ model: "gpt-4o-mini" })
     );
   });
 
-  it("defaults tone to professional and language to English when not provided", async () => {
+  it("defaults language to English and preserves the original voice — no longer needs a tone since repurpose mode preserves the user's actual writing", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
@@ -261,7 +263,7 @@ describe("POST /api/repurpose", () => {
       },
     });
     mockIsProSubscription.mockReturnValue(false);
-    mockGeneratePost.mockResolvedValueOnce({ content: "Twitter ver", hashtags: [] });
+    mockRepurposePost.mockResolvedValueOnce({ content: "Twitter ver", hashtags: [] });
     mockRpc.mockResolvedValueOnce({ data: null, error: null });
 
     const request = createRequest({
@@ -272,9 +274,8 @@ describe("POST /api/repurpose", () => {
     });
     const response = await POST(request);
     expect(response.status).toBe(200);
-    expect(mockGeneratePost).toHaveBeenCalledWith(
+    expect(mockRepurposePost).toHaveBeenCalledWith(
       expect.objectContaining({
-        tone: "professional",
         language: "English",
         brandVoice: "Bold voice",
       })
@@ -295,7 +296,7 @@ describe("POST /api/repurpose", () => {
       },
     });
     mockIsProSubscription.mockReturnValue(false);
-    mockGeneratePost
+    mockRepurposePost
       .mockResolvedValueOnce({ content: "Twitter version", hashtags: ["#ai"] })
       .mockResolvedValueOnce({ content: "Facebook version", hashtags: ["#tech"] });
     mockRpc.mockResolvedValueOnce({ data: null, error: null });
@@ -313,7 +314,7 @@ describe("POST /api/repurpose", () => {
     expect(response.status).toBe(200);
     expect(json.results.twitter.content).toBe("Twitter version");
     expect(json.results.facebook.content).toBe("Facebook version");
-    expect(mockGeneratePost).toHaveBeenCalledTimes(2);
+    expect(mockRepurposePost).toHaveBeenCalledTimes(2);
   });
 
   it("returns 500 when an unexpected error is thrown (catch block)", async () => {

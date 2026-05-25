@@ -134,6 +134,84 @@ Make the content authentic, engaging, and platform-appropriate. Never use generi
   };
 }
 
+// --- Cross-platform repurpose ---
+// Different from generatePost: this REWRITES an existing post for a new
+// platform while preserving the user's actual writing. We were previously
+// just calling generatePost with a "Adapt the following…" topic, which
+// produced shiny new corporate prose that threw away whatever voice the
+// user had in the original. The trick is the system prompt has to be
+// adapt-mode, not generate-mode.
+
+export interface RepurposeInput {
+  original: string; // the user's existing post
+  sourcePlatform: Platform;
+  targetPlatform: Platform;
+  language: string;
+  brandVoice?: string;
+  model?: string;
+}
+
+export async function repurposePost(
+  input: RepurposeInput,
+): Promise<GeneratePostOutput> {
+  const openai = getOpenAI();
+  const brandVoiceSection = input.brandVoice
+    ? `\n\nBrand voice guidelines from the user:\n${sanitizeInput(input.brandVoice, 1000)}`
+    : "";
+
+  const response = await openai.chat.completions.create({
+    model: input.model || "gpt-4o-mini",
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: `You are adapting an existing social media post for a different platform. This is REWRITE mode, not GENERATE mode — the user wrote something they liked, your job is to keep their voice and only change what the new platform demands.
+
+${STYLE_GUARDS}
+
+PRESERVATION RULES — these matter most:
+- Keep the user's sentence patterns, vocabulary, and tone. If they write short punchy sentences, you write short punchy sentences. If they have a signature phrase, keep it.
+- Keep the same core argument and any concrete numbers, named tools, or examples from the original.
+- Do NOT introduce new claims, statistics, or anecdotes that weren't in the original.
+- Do NOT make it more "professional" or "polished" — leave the rough edges alone, that's the voice.
+
+ADAPT only what the platform demands:
+- Adjust length to fit the new platform's range (see rules below).
+- Reformat for the platform (line breaks, paragraph structure, emoji density).
+- Generate platform-appropriate hashtags (the original's hashtags may or may not fit).
+- If the original has hashtags inline, separate them out into the hashtags array.
+
+Source platform: ${input.sourcePlatform}
+Target platform rules:
+${platformRules[input.targetPlatform]}
+
+Output language: ${input.language}${brandVoiceSection}
+
+Respond in JSON format:
+{
+  "content": "the rewritten post for the new platform (without hashtags)",
+  "hashtags": ["hashtag1", "hashtag2"]
+}`,
+      },
+      {
+        role: "user",
+        content: `Here is my original ${input.sourcePlatform} post. Rewrite it for ${input.targetPlatform}, keeping my voice:\n\n${sanitizeInput(input.original, 5000)}`,
+      },
+    ],
+    temperature: 0.6,
+    max_tokens: 1500,
+  });
+
+  const raw = response.choices[0].message.content;
+  if (!raw) throw new Error("Empty response from OpenAI");
+
+  const parsed = JSON.parse(raw) as Partial<GeneratePostOutput>;
+  return {
+    content: parsed.content ?? "",
+    hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : [],
+  };
+}
+
 // --- Feature 1: AI Image Generation ---
 
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";

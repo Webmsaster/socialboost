@@ -108,7 +108,86 @@ export function scoreContent({
     score += 5;
   } else {
     tips.push(
-      "Add a call-to-action to drive engagement (e.g., 'What do you think?' or 'Share your experience').",
+      "Add a specific call-to-action (e.g., 'Reply with your favorite tool' or 'DM me if you want the template').",
+    );
+  }
+
+  // --- Concrete AI-cliché detection ---
+  // The general STYLE_GUARDS prompt asks the model to avoid these, but it
+  // doesn't always comply. When a slip-through lands in the user's draft, it's
+  // far more useful to tell them WHICH word to fix and what to replace it
+  // with than a vague "make it less generic".
+  const CLICHE_REPLACEMENTS: Record<string, string> = {
+    leverage: "use",
+    harness: "use",
+    unlock: "open up",
+    "dive into": "look at",
+    "embark on": "start",
+    embrace: "adopt",
+    elevate: "improve",
+    empower: "help",
+    unprecedented: "unique",
+    "pave the way": "set up",
+    "game-changer": "shift",
+    "game changer": "shift",
+    revolutionize: "change",
+    "delve into": "explore",
+    tapestry: "mix",
+    realm: "area",
+    robust: "solid",
+    "ever-evolving": "changing",
+    transformative: "useful",
+    synergy: "fit",
+    seamless: "smooth",
+    "cutting-edge": "new",
+    "in today's fast-paced world": "today",
+  };
+  const lc = content.toLowerCase();
+  const clicheHits: string[] = [];
+  for (const word of Object.keys(CLICHE_REPLACEMENTS)) {
+    if (lc.includes(word)) clicheHits.push(word);
+  }
+  if (clicheHits.length > 0) {
+    score -= Math.min(15, clicheHits.length * 3);
+    // Cap at three suggestions to avoid overwhelming the user.
+    for (const word of clicheHits.slice(0, 3)) {
+      tips.push(
+        `Replace "${word}" — try "${CLICHE_REPLACEMENTS[word]}". Sounds less AI-generated.`,
+      );
+    }
+  }
+
+  // Generic CTAs that smell like ChatGPT defaults.
+  const genericCtas = [
+    /\bwhat do you think\?/i,
+    /\blet me know your thoughts\b/i,
+    /\bshare your experience\b/i,
+    /\bstay tuned\b/i,
+    /\bwhat'?s your take\?/i,
+  ];
+  const genericCtaHit = genericCtas.find((re) => re.test(content));
+  if (genericCtaHit) {
+    score -= 5;
+    tips.push(
+      `Generic CTA detected ("${content.match(genericCtaHit)?.[0]}"). Swap it for one specific to the post — e.g. "Which of these would you try first?" or "Reply with your stack".`,
+    );
+  }
+
+  // Cliché openings.
+  const trimmedFirst = firstLine.trim();
+  if (/^(as we |in a world where |have you ever wondered |did you know that )/i.test(trimmedFirst)) {
+    score -= 3;
+    tips.push(
+      `Cliché opening — drop the "As we…" / "Have you ever wondered…" hook and start with a concrete claim or number.`,
+    );
+  }
+
+  // Reward presence of concrete signals (numbers, named tools) — these are
+  // the easiest fix for "feels generic" critiques.
+  const hasNumber = /\b\d{1,4}(\.\d+)?\s?(%|x|×|k|m|min|sec|hours?|days?)?\b/i.test(content);
+  if (!hasNumber && contentLength > 200) {
+    tips.push(
+      "No numbers in this post. Add one concrete stat or count (years, %, hours saved, # of customers) — it's the single biggest credibility boost.",
     );
   }
 
