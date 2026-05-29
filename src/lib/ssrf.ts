@@ -20,6 +20,11 @@ export function isBlockedHostname(hostname: string): boolean {
   if (h === "::1" || h === "[::1]" || h === "::" || h === "[::]") return true;
   // IPv6 unique-local (fc00::/7) and link-local (fe80::/10) — prefix check
   if (/^\[?fc|^\[?fd/.test(h) || /^\[?fe8|^\[?fe9|^\[?fea|^\[?feb/.test(h)) return true;
+  // IPv4-mapped IPv6 (e.g. [::ffff:169.254.169.254] parses to "[::ffff:a9fe:a9fe]"):
+  // Node doesn't normalize these to dotted-quad, so they bypass the v4 checks
+  // below while the kernel still routes them to the embedded IPv4
+  // (loopback/metadata). Block all of them outright.
+  if (/^\[?::ffff:/i.test(h)) return true;
   // IPv4 literal checks
   const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (v4) {
@@ -45,5 +50,36 @@ export function parseSafeUrl(url: string): URL | null {
     return parsed;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Fetch a user-supplied URL with SSRF protection that ALSO covers redirects:
+ * validates the initial URL, then follows up to `maxHops` redirects MANUALLY,
+ * re-validating each Location through parseSafeUrl. undici's default
+ * redirect:"follow" would transparently follow a 302 to a private/metadata host
+ * that the one-time initial check never sees. Throws on any validation failure.
+ * (DNS rebinding — re-resolving the same hostname to a private IP at connect
+ * time — is still not covered; that needs a resolve-and-pin dispatcher.)
+ */
+export async function safeFetch(
+  url: string,
+  init?: RequestInit,
+  maxHops = 4,
+): Promise<Response> {
+  let current = parseSafeUrl(url);
+  if (!current) throw new Error("URL failed SSRF validation");
+  for (let hop = 0; ; hop++) {
+    const res = await fetch(current.toString(), { ...init, redirect: "manual" });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location) return res;
+      if (hop >= maxHops) throw new Error("Too many redirects");
+      const next = parseSafeUrl(new URL(location, current).toString());
+      if (!next) throw new Error("Redirect target failed SSRF validation");
+      current = next;
+      continue;
+    }
+    return res;
   }
 }

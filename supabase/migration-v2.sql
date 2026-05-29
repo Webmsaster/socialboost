@@ -90,13 +90,12 @@ CREATE TABLE IF NOT EXISTS public.org_members (
 
 ALTER TABLE public.org_members ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Org members can read own org"
-  ON public.organizations FOR SELECT
-  USING (id IN (SELECT org_id FROM public.org_members WHERE user_id = auth.uid()));
-
-CREATE POLICY "Org members can read membership"
-  ON public.org_members FOR SELECT
-  USING (org_id IN (SELECT org_id FROM public.org_members WHERE user_id = auth.uid()));
+-- NOTE: these org_members/organizations SELECT policies were self-referential
+-- (org_members subqueried from inside an org_members policy) → 42P17 infinite
+-- recursion that broke the entire Teams feature. They are no longer defined
+-- here. The canonical, non-recursive policy set lives in schema.sql +
+-- migration-teams-rls-fix.sql (via the SECURITY DEFINER helper public.is_org_member).
+-- Do NOT re-add a recursive org_members policy.
 
 CREATE POLICY "Service role full access on organizations"
   ON public.organizations FOR ALL

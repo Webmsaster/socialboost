@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { captureError } from "@/lib/logger";
 import { getPublisher, ensureFreshToken } from "@/lib/platforms/registry";
+import { decryptToken, encryptToken } from "@/lib/token-crypto";
 import type { ConnectedAccount } from "@/lib/platforms";
 
 function getSupabaseAdmin() {
@@ -58,7 +59,14 @@ export async function GET(request: NextRequest) {
       .from("connected_accounts")
       .select("*")
       .in("id", accountIds);
-    for (const a of (accounts || []) as ConnectedAccount[]) accountMap.set(a.id, a);
+    for (const a of (accounts || []) as ConnectedAccount[]) {
+      // Tokens are encrypted at rest — decrypt before handing them to the
+      // refresher / fetchMetrics, or the platform API gets a `gcm1:` ciphertext
+      // Bearer, 401s, and every metric sync silently fails.
+      a.access_token = decryptToken(a.access_token) ?? a.access_token;
+      a.refresh_token = decryptToken(a.refresh_token);
+      accountMap.set(a.id, a);
+    }
   }
 
   for (const post of posts) {
@@ -78,7 +86,19 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      const { account: fresh } = await ensureFreshToken(account);
+      const { account: fresh, refreshed } = await ensureFreshToken(account);
+      if (refreshed) {
+        // Persist the refreshed token re-encrypted (this route never persisted
+        // refreshes before, so it could not self-heal an expiring token).
+        await supabase
+          .from("connected_accounts")
+          .update({
+            access_token: encryptToken(fresh.access_token),
+            refresh_token: encryptToken(fresh.refresh_token),
+            token_expires_at: fresh.token_expires_at,
+          })
+          .eq("id", fresh.id);
+      }
       const metrics = await publisher.fetchMetrics(fresh, post.platform_post_id!);
       if (!metrics) {
         skipped++;

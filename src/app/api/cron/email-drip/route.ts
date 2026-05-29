@@ -22,7 +22,10 @@ function getAdmin() {
 // cron day self-heal: the stage fires on the next successful run inside the
 // grace window instead of being skipped forever. The claim guarantees it still
 // sends at most once.
-const GRACE_DAYS = 3;
+// 1 day: stages are spaced >= 2 days apart, so a 1-day grace catches a single
+// missed cron run without letting two adjacent stage windows overlap (which
+// could fire two different onboarding emails to one user in a single run).
+const GRACE_DAYS = 1;
 
 // Profiles old enough for the given stage: created_at in
 // (now - (days + GRACE_DAYS), now - days]  →  account age in [days, days+GRACE).

@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { captureError } from "./logger";
-import { parseSafeUrl } from "./ssrf";
+import { parseSafeUrl, safeFetch } from "./ssrf";
 
 function getAdmin() {
   return createClient(
@@ -47,7 +47,7 @@ export async function dispatchWebhooks(
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
       try {
-        const res = await fetch(safe.toString(), {
+        const res = await safeFetch(safe.toString(), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

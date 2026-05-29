@@ -426,18 +426,49 @@ create table if not exists public.org_members (
 
 alter table public.org_members enable row level security;
 
-create policy "Org members can read members"
+-- Non-recursive membership check. The original org_members policies each
+-- subqueried org_members from INSIDE an org_members policy → PostgreSQL rejects
+-- that as 42P17 "infinite recursion detected in policy", so every authenticated
+-- read/write of org_members errored and the whole Teams feature was dead. A
+-- SECURITY DEFINER helper reads the table WITHOUT re-triggering RLS.
+create or replace function public.is_org_member(p_org uuid)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.org_members
+    where org_id = p_org and user_id = auth.uid() and accepted = true
+  );
+$$;
+revoke all on function public.is_org_member(uuid) from public;
+revoke all on function public.is_org_member(uuid) from anon;
+grant execute on function public.is_org_member(uuid) to authenticated, service_role;
+
+-- End users may READ their own membership rows + the roster of orgs they belong
+-- to. They may NOT write org_members directly: every membership mutation
+-- (create-owner, invite, accept, remove) goes through the server via the
+-- service-role client after app-layer authorization, so a user cannot
+-- self-escalate to owner/admin by hitting the REST API directly.
+create policy "Members can read own org roster"
   on public.org_members for select
-  using (org_id in (select org_id from public.org_members om where om.user_id = auth.uid() and om.accepted = true));
-create policy "Admins can manage members"
-  on public.org_members for all
-  using (org_id in (select org_id from public.org_members om where om.user_id = auth.uid() and om.role in ('owner', 'admin')));
+  using (user_id = auth.uid() or public.is_org_member(org_id));
 create policy "Service role full access on org_members"
   on public.org_members for all
   using (auth.role() = 'service_role');
 
 create index if not exists idx_org_members_org on public.org_members(org_id);
 create index if not exists idx_org_members_user on public.org_members(user_id);
+
+-- One membership row per (org, user). schema.sql's CREATE TABLE IF NOT EXISTS
+-- means migration-v2's UNIQUE never lands on an existing DB, so add it here
+-- idempotently (NULL user_id = pending invite, allowed to repeat).
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'org_members_org_user_unique') then
+    delete from public.org_members a using public.org_members b
+      where a.ctid < b.ctid and a.org_id = b.org_id and a.user_id = b.user_id and a.user_id is not null;
+    alter table public.org_members
+      add constraint org_members_org_user_unique unique (org_id, user_id);
+  end if;
+end $$;
 
 -- ============================================
 -- 14. Notification Preferences

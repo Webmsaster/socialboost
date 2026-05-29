@@ -73,7 +73,9 @@ export const linkedinPublisher: PlatformPublisher = {
     const profileRes = await fetch("https://api.linkedin.com/v2/userinfo", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
+    if (!profileRes.ok) throw new Error(`LinkedIn profile fetch failed: ${profileRes.status}`);
     const profile = await profileRes.json();
+    if (!profile?.sub) throw new Error("LinkedIn profile response missing sub");
 
     return {
       accessToken: tokens.access_token,

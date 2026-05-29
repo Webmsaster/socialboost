@@ -65,7 +65,9 @@ export const twitterPublisher: PlatformPublisher = {
     const userRes = await fetch("https://api.twitter.com/2/users/me", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
+    if (!userRes.ok) throw new Error(`Twitter profile fetch failed: ${userRes.status}`);
     const user = await userRes.json();
+    if (!user?.data?.id) throw new Error("Twitter profile response missing data.id");
 
     return {
       accessToken: tokens.access_token,

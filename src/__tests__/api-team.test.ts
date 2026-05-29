@@ -29,7 +29,11 @@ vi.mock("@/lib/supabase/server", () => ({
               eq: (...eq2Args: unknown[]) => {
                 const eq2Result = mockSelectResult(table, "second-eq", ...eqArgs, ...eq2Args);
                 return {
-                  eq: () => mockSelectResult(table, "triple-eq", ...eqArgs, ...eq2Args),
+                  // Third .eq() (e.g. the invite auth check's .eq("accepted", true))
+                  // returns a chainable so .eq().eq().eq().single() resolves.
+                  eq: () => ({
+                    single: () => mockSelectResult(table, "triple-eq-single", ...eqArgs, ...eq2Args),
+                  }),
                   single: () => mockSelectResult(table, "double-eq-single", ...eqArgs, ...eq2Args),
                   // Spread the result so { data } can be destructured directly
                   ...(eq2Result ?? {}),
@@ -54,6 +58,26 @@ vi.mock("@/lib/supabase/server", () => ({
         eq: (...eqArgs: unknown[]) => ({
           eq: (...eq2Args: unknown[]) => ({
             eq: () => mockUpdateResult(table, data, ...eqArgs, ...eq2Args),
+          }),
+        }),
+      }),
+    }),
+  }),
+}));
+
+// org_members writes go through the service-role admin client.
+const mockAdminInsert = vi.fn();
+const mockAdminUpdate = vi.fn();
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: () => ({
+    from: () => ({
+      insert: (data: unknown) => Promise.resolve(mockAdminInsert(data) ?? { error: null }),
+      update: (data: unknown) => ({
+        eq: () => ({
+          eq: () => ({
+            eq: () => ({
+              select: () => Promise.resolve(mockAdminUpdate(data) ?? { data: [{ id: "m1" }], error: null }),
+            }),
           }),
         }),
       }),
@@ -330,7 +354,7 @@ describe("POST /api/team/invite", () => {
       .mockReturnValueOnce({ data: null }) // double-eq-single (not already invited)
       .mockReturnValueOnce(undefined)   // first-eq (profile lookup)
       .mockReturnValueOnce({ data: { id: "invited-user-id" } }); // single (profile found)
-    mockInsertResult.mockReturnValueOnce({ error: null });
+    mockAdminInsert.mockReturnValueOnce({ error: null });
 
     const response = await InvitePost(
       createRequest(
@@ -342,7 +366,7 @@ describe("POST /api/team/invite", () => {
 
     expect(response.status).toBe(200);
     expect(json.success).toBe(true);
-    expect(mockInsertResult).toHaveBeenCalledWith("org_members", expect.objectContaining({
+    expect(mockAdminInsert).toHaveBeenCalledWith(expect.objectContaining({
       org_id: "org-1",
       invited_email: "newmember@example.com",
       accepted: false,
@@ -365,7 +389,7 @@ describe("POST /api/team/invite", () => {
       .mockReturnValueOnce({ data: null }) // double-eq-single (not already invited)
       .mockReturnValueOnce(undefined)   // first-eq (profile lookup)
       .mockReturnValueOnce({ data: null }); // single (profile not found)
-    mockInsertResult.mockReturnValueOnce({ error: { message: "DB insert error" } });
+    mockAdminInsert.mockReturnValueOnce({ error: { message: "DB insert error" } });
 
     const response = await InvitePost(
       createRequest(
@@ -434,8 +458,8 @@ describe("POST /api/team/accept", () => {
     mockSelectResult
       .mockReturnValueOnce(undefined)   // first-eq (profile lookup)
       .mockReturnValueOnce({ data: { email: "user@example.com" } }); // single (profile)
-    // Update: update({accepted: true, user_id: ...}).eq("org_id", orgId).eq("invited_email", email).eq("accepted", false)
-    mockUpdateResult.mockReturnValueOnce({ error: null });
+    // Accept update goes through the admin client + .select(); 1 row matched.
+    mockAdminUpdate.mockReturnValueOnce({ data: [{ id: "m1" }], error: null });
 
     const response = await AcceptPost(
       createRequest({ orgId: "org-1" }, "http://localhost:3000/api/team/accept")
@@ -454,8 +478,8 @@ describe("POST /api/team/accept", () => {
     mockSelectResult
       .mockReturnValueOnce(undefined)   // first-eq (profile lookup)
       .mockReturnValueOnce({ data: { email: "user@example.com" } }); // single (profile)
-    // Update fails (no matching row)
-    mockUpdateResult.mockReturnValueOnce({ error: { message: "No rows updated" } });
+    // No matching pending invite → .select() returns 0 rows.
+    mockAdminUpdate.mockReturnValueOnce({ data: [], error: null });
 
     const response = await AcceptPost(
       createRequest({ orgId: "org-1" }, "http://localhost:3000/api/team/accept")

@@ -1,5 +1,5 @@
 import { captureError } from "./logger";
-import { isBlockedHostname } from "./ssrf";
+import { isBlockedHostname, safeFetch } from "./ssrf";
 
 export interface WebsiteContext {
   url: string;
@@ -71,8 +71,7 @@ export async function scrapeWebsite(url: string): Promise<WebsiteContext | null>
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-    const res = await fetch(parsed.toString(), {
-      redirect: "follow",
+    const res = await safeFetch(parsed.toString(), {
       signal: controller.signal,
       headers: {
         "user-agent": "SocialBoost/1.0 (+https://socialboost.app)",

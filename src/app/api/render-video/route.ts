@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
 import { isProSubscription } from "@/lib/subscription";
+import { parseSafeUrl } from "@/lib/ssrf";
 
 const PRO_LIMIT = 100;
 
@@ -58,8 +59,12 @@ export async function POST(request: NextRequest) {
     if (scenes.length === 0) {
       return NextResponse.json({ error: "Missing scenes" }, { status: 400 });
     }
+    // SSRF guard: the render worker fetches these URLs server-side and holds the
+    // service-role key, so reject any private/loopback/metadata/IPv4-mapped host
+    // here (the worker is a separate package and can't import our SSRF helper).
+    // Legitimate scene images come from our own Supabase storage / image CDN.
     const validScenes = scenes
-      .filter((s) => typeof s?.imageUrl === "string" && s.imageUrl.startsWith("http"))
+      .filter((s) => typeof s?.imageUrl === "string" && parseSafeUrl(s.imageUrl) !== null)
       .slice(0, 8);
     if (validScenes.length === 0) {
       return NextResponse.json({ error: "No valid scene images" }, { status: 400 });
@@ -77,8 +82,13 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         userId: user.id,
         scenes: validScenes,
+        // data: URLs are inline (safe); an http(s) voiceover URL must pass the
+        // same SSRF check before the worker fetches it.
         voiceoverDataUrl:
-          typeof body.voiceoverDataUrl === "string" ? body.voiceoverDataUrl : undefined,
+          typeof body.voiceoverDataUrl === "string" &&
+          (body.voiceoverDataUrl.startsWith("data:") || parseSafeUrl(body.voiceoverDataUrl) !== null)
+            ? body.voiceoverDataUrl
+            : undefined,
         aspect,
         brandName: typeof body.brandName === "string" ? body.brandName : undefined,
       }),

@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { captureError } from "@/lib/logger";
 import { rateLimit } from "@/lib/rate-limit";
+
+// org_members writes go through service-role (RLS denies direct end-user writes).
+function getAdmin() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 // POST: Invite a member to an organization
 export async function POST(request: NextRequest) {
@@ -31,15 +40,17 @@ export async function POST(request: NextRequest) {
     if (!["owner", "admin", "member"].includes(normalizedRole)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
-    // Only an owner can grant owner role — prevent an admin from escalating.
-    // We check the caller's role after the membership lookup below.
+    // Normalize email so dedup + lookups are case-insensitive (Alice@x vs alice@x).
+    const normalizedEmail = email.trim().toLowerCase();
 
-    // Check if user is owner or admin of the org
+    // Check if user is an ACCEPTED owner or admin of the org. The accepted=true
+    // filter matters: a not-yet-accepted invitee must not be able to act as admin.
     const { data: membership } = await supabase
       .from("org_members")
       .select("role")
       .eq("org_id", orgId)
       .eq("user_id", user.id)
+      .eq("accepted", true)
       .single();
 
     if (!membership || !["owner", "admin"].includes(membership.role)) {
@@ -75,7 +86,7 @@ export async function POST(request: NextRequest) {
       .from("org_members")
       .select("id")
       .eq("org_id", orgId)
-      .eq("invited_email", email)
+      .eq("invited_email", normalizedEmail)
       .single();
 
     if (existing) {
@@ -86,16 +97,17 @@ export async function POST(request: NextRequest) {
     const { data: invitedProfile } = await supabase
       .from("profiles")
       .select("id")
-      .eq("email", email)
+      .eq("email", normalizedEmail)
       .single();
 
     // user_id is only set when the invited user already has an account;
     // for pending invites (no profile yet) we leave it null until they accept.
-    const { error: inviteError } = await supabase.from("org_members").insert({
+    // Written via service-role: RLS denies direct end-user org_members writes.
+    const { error: inviteError } = await getAdmin().from("org_members").insert({
       org_id: orgId,
       user_id: invitedProfile?.id ?? null,
       role: normalizedRole,
-      invited_email: email,
+      invited_email: normalizedEmail,
       accepted: false,
     });
 
