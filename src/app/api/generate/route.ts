@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     // Check generation limit
     const { data: profile } = await supabase
       .from("profiles")
-      .select("generation_count, subscription_status, email, brand_voice, preferred_model")
+      .select("generation_count, subscription_status, email, brand_voice, preferred_model, bonus_generations")
       .eq("id", user.id)
       .single();
 
@@ -86,7 +86,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    const limit = profile.subscription_status === "active" ? PRO_LIMIT : FREE_LIMIT;
+    // Referral rewards (bonus_generations) extend the monthly allowance on top
+    // of the base plan limit. The UI promises these, so they must be honored.
+    const isPro = isProSubscription(profile.subscription_status);
+    const baseLimit = isPro ? PRO_LIMIT : FREE_LIMIT;
+    const limit = baseLimit + (profile.bonus_generations ?? 0);
 
     if (profile.generation_count >= limit) {
       // Notify user (fire-and-forget, don't block response)
@@ -99,7 +103,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const model = isProSubscription(profile.subscription_status)
+    const model = isPro
       ? (profile.preferred_model || "gpt-4o-mini")
       : "gpt-4o-mini";
 

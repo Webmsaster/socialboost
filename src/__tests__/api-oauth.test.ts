@@ -273,7 +273,11 @@ describe("GET /api/auth/oauth/callback", () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null } });
 
     const request = new NextRequest(
-      callbackUrl({ code: "auth-code", state: encodeState({ platform: "linkedin" }) })
+      callbackUrl({
+        code: "auth-code",
+        state: encodeState({ platform: "linkedin", userId: "user-1", nonce: "test-nonce" }),
+      }),
+      { headers: { cookie: "oauth_state=test-nonce" } }
     );
     const response = await CallbackGet(request);
 
@@ -286,7 +290,11 @@ describe("GET /api/auth/oauth/callback", () => {
     mockGetPublisher.mockReturnValueOnce(null);
 
     const request = new NextRequest(
-      callbackUrl({ code: "auth-code", state: encodeState({ platform: "tiktok" }) })
+      callbackUrl({
+        code: "auth-code",
+        state: encodeState({ platform: "tiktok", userId: "user-1", nonce: "test-nonce" }),
+      }),
+      { headers: { cookie: "oauth_state=test-nonce" } }
     );
     const response = await CallbackGet(request);
 
@@ -308,7 +316,11 @@ describe("GET /api/auth/oauth/callback", () => {
     mockUpsert.mockReturnValueOnce({ error: null });
 
     const request = new NextRequest(
-      callbackUrl({ code: "auth-code", state: encodeState({ platform: "linkedin" }) })
+      callbackUrl({
+        code: "auth-code",
+        state: encodeState({ platform: "linkedin", userId: "user-1", nonce: "test-nonce" }),
+      }),
+      { headers: { cookie: "oauth_state=test-nonce" } }
     );
     const response = await CallbackGet(request);
 
@@ -339,7 +351,11 @@ describe("GET /api/auth/oauth/callback", () => {
     mockUpsert.mockReturnValueOnce({ error: { message: "DB constraint" } });
 
     const request = new NextRequest(
-      callbackUrl({ code: "auth-code", state: encodeState({ platform: "linkedin" }) })
+      callbackUrl({
+        code: "auth-code",
+        state: encodeState({ platform: "linkedin", userId: "user-1", nonce: "test-nonce" }),
+      }),
+      { headers: { cookie: "oauth_state=test-nonce" } }
     );
     const response = await CallbackGet(request);
 
@@ -354,7 +370,11 @@ describe("GET /api/auth/oauth/callback", () => {
     });
 
     const request = new NextRequest(
-      callbackUrl({ code: "auth-code", state: encodeState({ platform: "linkedin" }) })
+      callbackUrl({
+        code: "auth-code",
+        state: encodeState({ platform: "linkedin", userId: "user-1", nonce: "test-nonce" }),
+      }),
+      { headers: { cookie: "oauth_state=test-nonce" } }
     );
     const response = await CallbackGet(request);
 

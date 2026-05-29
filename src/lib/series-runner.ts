@@ -12,6 +12,7 @@ import {
 } from "./website-scraper";
 import { captureError } from "./logger";
 import { scoreContent } from "./content-score";
+import { isProSubscription } from "./subscription";
 
 export type SeriesRow = {
   id: string;
@@ -32,6 +33,7 @@ export type ProfileRow = {
   preferred_model: string | null;
   subscription_status: string;
   generation_count: number;
+  bonus_generations?: number | null;
 };
 
 export type SeriesRunResult =
@@ -51,7 +53,7 @@ export async function runSeriesOnce(
   profile: ProfileRow,
   now: Date = new Date()
 ): Promise<SeriesRunResult> {
-  const limit = profile.subscription_status === "active" ? 100 : 10;
+  const limit = (isProSubscription(profile.subscription_status) ? 100 : 10) + (profile.bonus_generations ?? 0);
   if (profile.generation_count >= limit) {
     return { ok: false, reason: "limit_reached" };
   }
@@ -79,10 +81,9 @@ export async function runSeriesOnce(
     ? `${series.topic_template}\n\n${buildPromptBlockFromContext(websiteContext)}\n\nWrite a post that naturally ties the topic above to this website and ends with a soft call to action pointing readers there.`
     : series.topic_template;
 
-  const model =
-    profile.subscription_status === "active"
-      ? profile.preferred_model || "gpt-4o-mini"
-      : "gpt-4o-mini";
+  const model = isProSubscription(profile.subscription_status)
+    ? profile.preferred_model || "gpt-4o-mini"
+    : "gpt-4o-mini";
   const postType = series.post_type === "video" ? "video" : "text";
 
   // For text series we generate a single post; for video series we produce a
@@ -126,9 +127,12 @@ export async function runSeriesOnce(
   }
 
   const scheduledFor = new Date(now);
-  if (series.preferred_time) {
-    const [hours, minutes] = series.preferred_time.split(":").map(Number);
-    scheduledFor.setHours(hours, minutes, 0, 0);
+  // Guard against a malformed preferred_time (e.g. "", "9", "9am"): an unparsed
+  // value yields NaN → Invalid Date → toISOString() throws AFTER the (paid)
+  // generation already ran. Fall back to 09:00 on any non-HH:MM value.
+  const [ph, pm] = (series.preferred_time ?? "").split(":").map(Number);
+  if (Number.isFinite(ph) && Number.isFinite(pm)) {
+    scheduledFor.setHours(ph, pm, 0, 0);
   } else {
     scheduledFor.setHours(9, 0, 0, 0);
   }

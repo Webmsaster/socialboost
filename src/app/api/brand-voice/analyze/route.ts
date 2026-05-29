@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("subscription_status")
+      .select("subscription_status, preferred_model")
       .eq("id", user.id)
       .single();
 
@@ -73,7 +73,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const analyzed = await analyzeBrandVoice({ examples });
+    // Use the Pro user's chosen model — voice extraction is exactly where the
+    // higher-quality model matters most, and the result feeds every later
+    // generation that uses this profile.
+    const model = profile.preferred_model || "gpt-4o-mini";
+    const analyzed = await analyzeBrandVoice({ examples, model });
     const text = brandVoiceProfileToText(analyzed);
 
     trackEvent({

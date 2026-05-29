@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { captureError } from "@/lib/logger";
+import { isProSubscription } from "@/lib/subscription";
 import {
   sendWelcomeEmail,
   sendDay3ReminderEmail,
@@ -16,15 +17,21 @@ function getAdmin() {
   );
 }
 
-// Window: profiles whose created_at falls on the date exactly N days ago (UTC).
-// Since this cron runs once per day, a calendar-day window tiles perfectly
-// without overlap or gaps.
-function dayWindow(daysAgo: number): { start: string; end: string } {
-  const now = new Date();
-  const target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysAgo));
-  const next = new Date(target);
-  next.setUTCDate(next.getUTCDate() + 1);
-  return { start: target.toISOString(), end: next.toISOString() };
+// Extra days after a stage's anniversary during which we still try to send it.
+// Combined with the per-(user,stage) claim in `drip_emails`, this lets a missed
+// cron day self-heal: the stage fires on the next successful run inside the
+// grace window instead of being skipped forever. The claim guarantees it still
+// sends at most once.
+const GRACE_DAYS = 3;
+
+// Profiles old enough for the given stage: created_at in
+// (now - (days + GRACE_DAYS), now - days]  →  account age in [days, days+GRACE).
+function ageWindow(days: number): { start: string; end: string } {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const olderThan = new Date(now - days * dayMs); // created_at <= this → age >= days
+  const youngerThan = new Date(now - (days + GRACE_DAYS) * dayMs); // created_at > this → age < days+GRACE
+  return { start: youngerThan.toISOString(), end: olderThan.toISOString() };
 }
 
 /**
@@ -58,12 +65,12 @@ export async function GET(request: NextRequest) {
   };
 
   for (const stage of stages) {
-    const { start, end } = dayWindow(stage.days);
+    const { start, end } = ageWindow(stage.days);
     const { data: users, error } = await supabase
       .from("profiles")
       .select("id, email, full_name, generation_count, subscription_status, brand_voice")
-      .gte("created_at", start)
-      .lt("created_at", end);
+      .gt("created_at", start)
+      .lte("created_at", end);
 
     if (error) {
       captureError("Cron email-drip fetch failed", error, { stage: stage.key });
@@ -78,23 +85,63 @@ export async function GET(request: NextRequest) {
         // Already trained — skip the nudge.
         continue;
       }
-      if (stage.key === "video" && u.subscription_status === "active") {
-        // Pro users have already seen the upsell — show them something else later.
+      if (stage.key === "video" && isProSubscription(u.subscription_status)) {
+        // Paying users have already seen the upsell — show them something else later.
         continue;
       }
 
+      // Claim this (user, stage) atomically BEFORE sending. A duplicate-key
+      // conflict (23505) means this stage was already sent (or is being sent by
+      // a concurrent run) — skip. This is the idempotency guard that stops the
+      // drip from re-sending the same email on a same-day re-run/retry.
+      const { error: claimError } = await supabase
+        .from("drip_emails")
+        .insert({ user_id: u.id, stage: stage.key });
+      if (claimError) {
+        const code = (claimError as { code?: string }).code;
+        if (code === "42P01") {
+          // drip_emails table not created yet (migration-drip-log.sql not applied).
+          // Fail loudly instead of silently skipping every user (which would look
+          // "healthy" with sent:0) until the migration lands.
+          captureError(
+            "Cron email-drip: drip_emails table missing — apply migration-drip-log.sql",
+            claimError,
+          );
+          return NextResponse.json({ error: "drip_emails table missing" }, { status: 500 });
+        }
+        if (code !== "23505") {
+          captureError("Cron email-drip claim failed", claimError, { userId: u.id, stage: stage.key });
+        }
+        continue;
+      }
+
+      let ok = false;
       try {
-        let ok = false;
         if (stage.key === "welcome") ok = await sendWelcomeEmail(u.email, u.full_name || undefined);
         else if (stage.key === "day3") ok = await sendDay3ReminderEmail(u.email);
         else if (stage.key === "brandVoice") ok = await sendBrandVoiceNudgeEmail(u.email, u.generation_count || 0);
         else if (stage.key === "day7") ok = await sendDay7UpgradeEmail(u.email, u.generation_count || 0);
         else if (stage.key === "video") ok = await sendVideoFeatureEmail(u.email);
-
-        if (ok) sent[stage.key]++;
-        else failed[stage.key]++;
       } catch (err) {
         captureError("Cron email-drip send failed", err, { userId: u.id, stage: stage.key });
+        ok = false;
+      }
+
+      if (ok) {
+        sent[stage.key]++;
+      } else {
+        // Send failed — release the claim so a future run retries (within grace).
+        const { error: releaseError } = await supabase
+          .from("drip_emails")
+          .delete()
+          .eq("user_id", u.id)
+          .eq("stage", stage.key);
+        if (releaseError) {
+          captureError("Cron email-drip claim release failed", releaseError, {
+            userId: u.id,
+            stage: stage.key,
+          });
+        }
         failed[stage.key]++;
       }
     }

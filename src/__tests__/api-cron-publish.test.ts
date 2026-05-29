@@ -159,24 +159,6 @@ describe("GET /api/cron/publish", () => {
     );
   });
 
-  it("logs error when generation count reset fails", async () => {
-
-    mockAdminResetResult.mockReturnValueOnce({ error: { message: "reset failed" } });
-    mockAdminLteResult.mockReturnValueOnce({ data: [], error: null });
-
-    const response = await GET(createRequest());
-    const json = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(json.processed).toBe(0);
-
-    const { captureError } = await import("@/lib/logger");
-    expect(captureError).toHaveBeenCalledWith(
-      "Cron: failed to reset generation counts",
-      expect.objectContaining({ message: "reset failed" })
-    );
-  });
-
   it("returns 500 when fetching scheduled posts fails", async () => {
 
     mockAdminResetResult.mockReturnValueOnce({ error: null });

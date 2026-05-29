@@ -197,6 +197,15 @@ export default function CalendarPage() {
     const post = posts.find((p) => p.id === postId);
     if (!post) return;
 
+    // Don't let an already-published post be dragged back to "scheduled": the
+    // cron would then try to publish it again (a duplicate on the platform).
+    // Published is terminal. "failed" is intentionally allowed — re-scheduling
+    // is the retry path for a post that previously failed to publish.
+    if (post.status === "published") {
+      toast.error("Published posts can't be rescheduled");
+      return;
+    }
+
     // Use noon in the user's local timezone, then convert to UTC
     const year = targetDate.getFullYear();
     const month = targetDate.getMonth();
@@ -213,10 +222,18 @@ export default function CalendarPage() {
       )
     );
 
-    const { error } = await supabase
+    // Reset reminder_sent_at: this is a NEW scheduled time, so the manual-publish
+    // reminder must be allowed to fire again (the publish cron skips posts that
+    // already have reminder_sent_at set). The `.neq("status","published")` is a
+    // server-side guard: the `posts` state is loaded once at mount and never
+    // revalidated, so if the cron published this post meanwhile, the stale
+    // client-side check could otherwise resurrect it (→ duplicate publish).
+    const { data: updated, error } = await supabase
       .from("posts")
-      .update({ scheduled_for: isoString, status: "scheduled" })
-      .eq("id", postId);
+      .update({ scheduled_for: isoString, status: "scheduled", reminder_sent_at: null })
+      .eq("id", postId)
+      .neq("status", "published")
+      .select("id");
 
     if (error) {
       toast.error("Failed to reschedule post");
@@ -228,6 +245,16 @@ export default function CalendarPage() {
             : p
         )
       );
+    } else if (!updated || updated.length === 0) {
+      toast.error("This post was already published — refreshing");
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, scheduled_for: post.scheduled_for, status: post.status }
+            : p
+        )
+      );
+      loadPosts();
     } else {
       toast.success(`Post moved to ${format(targetDate, "MMM d, yyyy")}`);
       trackClient("post_scheduled", { via: "drag_drop", platform: post.platform });

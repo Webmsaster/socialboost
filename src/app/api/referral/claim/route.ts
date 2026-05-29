@@ -59,14 +59,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Already referred" }, { status: 409 });
     }
 
-    // Create referral record
-    await supabase.from("referrals").insert({
+    // Create referral record. The unique(referrer_id, referred_id) constraint is
+    // the concurrency guard: if two claims race, only one insert succeeds, so the
+    // bonus is granted exactly once (no double-grant on double-submit/retry).
+    const { error: insertError } = await supabase.from("referrals").insert({
       referrer_id: referrer.id,
       referred_id: newUserId,
       bonus_granted: true,
     });
+    if (insertError) {
+      // 23505 = already referred (lost the race) — expected, not worth surfacing.
+      if ((insertError as { code?: string }).code !== "23505") {
+        captureError("Referral insert failed", insertError, { referrerId: referrer.id });
+      }
+      return NextResponse.json({ error: "Already referred" }, { status: 409 });
+    }
 
-    // Grant bonus to both users
+    // Grant bonus to both users — only reached when the insert above succeeded.
     await supabase.rpc("grant_referral_bonus", {
       p_referrer_id: referrer.id,
       p_referred_id: newUserId,

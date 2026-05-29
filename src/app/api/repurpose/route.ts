@@ -35,12 +35,12 @@ export async function POST(request: NextRequest) {
     // Check limits
     const { data: profile } = await supabase
       .from("profiles")
-      .select("generation_count, subscription_status, brand_voice, preferred_model")
+      .select("generation_count, subscription_status, brand_voice, preferred_model, bonus_generations")
       .eq("id", user.id).single();
 
     if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
-    const limit = profile.subscription_status === "active" ? 100 : 10;
+    const limit = (isProSubscription(profile.subscription_status) ? 100 : 10) + (profile.bonus_generations ?? 0);
     if (profile.generation_count >= limit) {
       return NextResponse.json({ error: `Monthly limit reached (${limit})` }, { status: 403 });
     }

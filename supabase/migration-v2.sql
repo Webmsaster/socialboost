@@ -16,11 +16,16 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS preferred_model text NOT NU
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referral_code text UNIQUE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bonus_generations integer NOT NULL DEFAULT 0;
 
--- Protect new fields from client-side manipulation
+-- Protect new fields from client-side manipulation. Privileged writes pass when
+-- app.bypass_field_guard='on' (set by the SECURITY DEFINER RPCs — PG16+ forbids
+-- setting `role` inside SECDEF) or role='service_role' (admin client).
+-- migration-video-quota.sql extends this list with the video-quota columns
+-- (canonical final version).
 CREATE OR REPLACE FUNCTION public.protect_profile_fields()
 RETURNS trigger AS $$
 BEGIN
-  IF current_setting('role') != 'service_role' THEN
+  IF current_setting('app.bypass_field_guard', true) IS DISTINCT FROM 'on'
+     AND current_setting('role', true) IS DISTINCT FROM 'service_role' THEN
     new.subscription_status := old.subscription_status;
     new.generation_count := old.generation_count;
     new.generation_reset_at := old.generation_reset_at;

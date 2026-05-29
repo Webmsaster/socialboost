@@ -4,12 +4,20 @@ import { NextRequest } from "next/server";
 // --- Mocks ---
 
 const mockGetUser = vi.fn();
+const mockProfileSingle = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue({
     auth: {
       getUser: () => mockGetUser(),
     },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: () => mockProfileSingle(),
+        }),
+      }),
+    }),
   }),
 }));
 
@@ -42,6 +50,7 @@ function createRequest(body?: Record<string, unknown>): NextRequest {
 describe("POST /api/stripe/checkout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockProfileSingle.mockResolvedValue({ data: { stripe_customer_id: null } });
   });
 
   it("returns 401 if no user", async () => {
@@ -97,7 +106,8 @@ describe("POST /api/stripe/checkout", () => {
     expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
       "user-1",
       "test@example.com",
-      "monthly"
+      "monthly",
+      null
     );
   });
 
@@ -118,7 +128,8 @@ describe("POST /api/stripe/checkout", () => {
     expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
       "user-1",
       "test@example.com",
-      "annual"
+      "annual",
+      null
     );
   });
 

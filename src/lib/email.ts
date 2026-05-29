@@ -81,7 +81,7 @@ export async function sendLimitReachedEmail(
   currentPlan: string,
   limit: number
 ): Promise<boolean> {
-  const isPro = currentPlan === "active";
+  const isPro = currentPlan === "active" || currentPlan === "past_due";
   return sendEmail({
     to,
     subject: "You've reached your monthly generation limit",

@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLanguage } from "@/lib/i18n";
+import { isProSubscription } from "@/lib/subscription";
 import { toast } from "sonner";
 
 interface ProfileData {
@@ -380,7 +381,11 @@ export default function SettingsPage() {
     );
   }
 
-  const isPro = profile?.subscription_status === "active";
+  // Use the shared entitlement helper so a `past_due` user (renewal blip, still
+  // in Stripe's retry window) keeps the Pro UI — and, critically, still sees the
+  // "Manage subscription" billing-portal button to fix their card, instead of
+  // being shown a "Free" downgrade with only "Upgrade" buttons.
+  const isPro = isProSubscription(profile?.subscription_status);
   const limit = isPro ? 100 : 10;
 
   return (

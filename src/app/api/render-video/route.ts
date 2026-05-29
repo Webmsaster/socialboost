@@ -91,12 +91,26 @@ export async function POST(request: NextRequest) {
         userId: user.id,
       });
       return NextResponse.json(
-        { error: "Render failed", details: text.slice(0, 500) },
+        { error: "Render failed. Please try again later." },
         { status: 502 },
       );
     }
 
-    const { videoUrl } = (await workerRes.json()) as { videoUrl: string };
+    const { videoUrl } = (await workerRes
+      .json()
+      .catch(() => ({ videoUrl: null }))) as { videoUrl: string | null };
+
+    // Only charge a generation if the worker actually returned a usable URL —
+    // a 200 with an empty/garbage body must not burn quota or show a fake success.
+    if (!videoUrl || typeof videoUrl !== "string") {
+      captureError("Render worker returned no videoUrl", new Error("missing videoUrl"), {
+        userId: user.id,
+      });
+      return NextResponse.json(
+        { error: "Render failed. Please try again later." },
+        { status: 502 },
+      );
+    }
 
     await supabase.rpc("increment_generation_count", {
       p_user_id: user.id,

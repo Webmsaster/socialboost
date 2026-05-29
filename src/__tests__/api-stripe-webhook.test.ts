@@ -36,6 +36,9 @@ vi.mock("@supabase/supabase-js", () => ({
           single: () => mockAdminSelectSingle(table),
         }),
       }),
+      delete: () => ({
+        eq: () => ({ data: null, error: null }),
+      }),
     }),
   }),
 }));

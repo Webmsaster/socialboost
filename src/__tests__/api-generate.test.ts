@@ -198,6 +198,7 @@ describe("POST /api/generate", () => {
     mockSingle.mockResolvedValueOnce({
       data: { generation_count: 100, subscription_status: "active" },
     });
+    mockIsProSubscription.mockReturnValueOnce(true);
 
     const request = createRequest({
       platform: "linkedin",

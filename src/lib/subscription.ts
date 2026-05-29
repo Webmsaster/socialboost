@@ -15,8 +15,15 @@ export function isProFeature(endpoint: string): boolean {
   return PRO_ONLY_FEATURES.has(endpoint);
 }
 
+// "past_due" is intentionally treated as entitled. When a renewal payment
+// fails, Stripe keeps the subscription in `past_due` and runs Smart Retries
+// (often over several days). Cutting off Pro access the instant a payment
+// blips — when the card will likely succeed on retry — causes avoidable churn
+// and support load. Access is only revoked once Stripe gives up and the
+// subscription becomes `canceled`/`unpaid` (the webhook maps both to
+// "canceled"). Keep this the single source of truth for entitlement.
 export function isProSubscription(status: string | null | undefined): boolean {
-  return status === "active";
+  return status === "active" || status === "past_due";
 }
 
 // Video quotas live separately from text-generation quota because a video

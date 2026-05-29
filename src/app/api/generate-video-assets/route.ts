@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("subscription_status, generation_count, video_generation_count")
+      .select("subscription_status, generation_count, video_generation_count, bonus_generations")
       .eq("id", user.id)
       .single();
 
@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
     // Budget check: each scene = 1 image + a share of the narration TTS.
     // Count 1 generation per scene image; voiceover counts as 1 additional generation.
     const estimatedCost = scenes.length + 1;
-    const limit = 100;
-    if (profile.generation_count + estimatedCost >= limit) {
+    const limit = 100 + (profile.bonus_generations ?? 0);
+    if (profile.generation_count + estimatedCost > limit) {
       return NextResponse.json(
         { error: `Not enough monthly quota. Need ${estimatedCost}, have ${limit - profile.generation_count} left.` },
         { status: 403 }

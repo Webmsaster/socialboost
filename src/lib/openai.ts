@@ -310,10 +310,13 @@ Create 3-6 scenes. Keep total duration between 15-60 seconds. Make it engaging a
     max_tokens: 1500,
   });
 
-  const raw = response.choices[0].message.content;
+  const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty response from OpenAI");
 
-  return JSON.parse(raw) as VideoScriptOutput;
+  // Guard the array the Create page maps over: a malformed/partial model
+  // response must degrade gracefully, not crash the page with `undefined.map`.
+  const parsed = JSON.parse(raw) as VideoScriptOutput;
+  return { ...parsed, scenes: Array.isArray(parsed.scenes) ? parsed.scenes : [] };
 }
 
 // --- Feature 6: Video Ad Storyboard ---
@@ -392,10 +395,11 @@ Create 4-8 frames. Make the ad compelling, visually descriptive, and conversion-
     max_tokens: 1500,
   });
 
-  const raw = response.choices[0].message.content;
+  const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty response from OpenAI");
 
-  return JSON.parse(raw) as VideoAdOutput;
+  const parsed = JSON.parse(raw) as VideoAdOutput;
+  return { ...parsed, frames: Array.isArray(parsed.frames) ? parsed.frames : [] };
 }
 
 // --- Feature 7: Carousel Generator ---
@@ -470,10 +474,15 @@ The first slide should be an attention-grabbing cover. The last slide should be 
     max_tokens: 2000,
   });
 
-  const raw = response.choices[0].message.content;
+  const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty response from OpenAI");
 
-  return JSON.parse(raw) as CarouselOutput;
+  const parsed = JSON.parse(raw) as CarouselOutput;
+  return {
+    ...parsed,
+    slides: Array.isArray(parsed.slides) ? parsed.slides : [],
+    hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : [],
+  };
 }
 
 // --- Feature 8: A/B Variants ---
@@ -553,11 +562,11 @@ If two variants come out too similar, rewrite one of them from a different angle
     max_tokens: 2000,
   });
 
-  const raw = response.choices[0].message.content;
+  const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty response from OpenAI");
 
   const parsed = JSON.parse(raw) as { variants: PostVariant[] };
-  return parsed.variants;
+  return Array.isArray(parsed.variants) ? parsed.variants : [];
 }
 
 // --- Feature 7: Brand Voice Analyzer ---

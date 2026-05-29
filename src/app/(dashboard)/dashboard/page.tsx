@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DashboardSkeleton } from "@/components/loading-skeleton";
 import { useLanguage } from "@/lib/i18n";
-import { videoQuotaFor } from "@/lib/subscription";
+import { isProSubscription, videoQuotaFor } from "@/lib/subscription";
 import { Onboarding } from "@/components/onboarding";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { achievements } from "@/lib/achievements";
@@ -94,7 +94,7 @@ export default function DashboardPage() {
   const loading = isLoading;
   const errorMessage = error ? (error instanceof Error ? error.message : "Failed to load dashboard") : null;
 
-  const limit = profile?.subscription_status === "active" ? 100 : 10;
+  const limit = isProSubscription(profile?.subscription_status) ? 100 : 10;
   const videoLimit = videoQuotaFor(profile?.subscription_status);
 
   if (errorMessage) {

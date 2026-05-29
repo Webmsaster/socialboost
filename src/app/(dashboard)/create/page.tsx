@@ -209,6 +209,8 @@ export default function CreatePage() {
     setCurrentSlide(0);
     setVideoAssets(null);
     setFullVideoUrl(null);
+    setContentScore(null);
+    setSuggestedHashtags([]);
   }, [contentType]);
 
   // --- Hashtag suggestions ---
@@ -252,6 +254,7 @@ export default function CreatePage() {
     setCurrentSlide(0);
     setVideoAssets(null);
     setFullVideoUrl(null);
+    setContentScore(null);
   }, []);
 
   async function handleGenerate(e: React.FormEvent) {

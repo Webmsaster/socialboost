@@ -4,6 +4,7 @@ import { validateApiKey } from "@/lib/api-keys";
 import { generatePost, type Platform, type Tone } from "@/lib/openai";
 import { captureError } from "@/lib/logger";
 import { rateLimit } from "@/lib/rate-limit";
+import { isProSubscription } from "@/lib/subscription";
 
 function getAdmin() {
   return createClient(
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     const supabase = getAdmin();
     const { data: profile } = await supabase
       .from("profiles")
-      .select("subscription_status, generation_count, brand_voice, preferred_model")
+      .select("subscription_status, generation_count, brand_voice, preferred_model, bonus_generations")
       .eq("id", userId)
       .single();
 
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    const limit = profile.subscription_status === "active" ? 100 : 10;
+    const limit = (isProSubscription(profile.subscription_status) ? 100 : 10) + (profile.bonus_generations ?? 0);
     if (profile.generation_count >= limit) {
       return NextResponse.json({ error: `Monthly limit reached (${limit})` }, { status: 403 });
     }
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
       tone: (tone || "professional") as Tone,
       language: language || "English",
       brandVoice: profile.brand_voice || undefined,
-      model: profile.subscription_status === "active"
+      model: isProSubscription(profile.subscription_status)
         ? (profile.preferred_model || "gpt-4o-mini")
         : "gpt-4o-mini",
     });

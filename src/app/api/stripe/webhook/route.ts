@@ -83,6 +83,15 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // If a handler fails after we've optimistically inserted the idempotency
+  // marker, roll the marker back so Stripe's retry re-processes the event —
+  // otherwise the retry hits the duplicate fast-path and the plan change is
+  // silently dropped.
+  const failAndRetry = async (message: string) => {
+    await supabaseAdmin.from("stripe_events").delete().eq("id", event.id);
+    return NextResponse.json({ error: message }, { status: 500 });
+  };
+
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -100,18 +109,26 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "User not found" }, { status: 400 });
         }
 
+        // Only grant Pro once payment is actually confirmed. For subscriptions,
+        // checkout.session.completed can fire while the first invoice is still
+        // unpaid (async payment methods, SCA pending, incomplete) — writing
+        // "active" then would hand out Pro for free. Always bind the customer
+        // id; let customer.subscription.updated be the authority on status.
+        const paid =
+          session.payment_status === "paid" ||
+          session.payment_status === "no_payment_required";
         const { error } = await withRetry(() =>
           supabaseAdmin
             .from("profiles")
             .update({
               stripe_customer_id: session.customer as string,
-              subscription_status: "active",
+              ...(paid ? { subscription_status: "active" } : {}),
             })
             .eq("id", userId)
         );
         if (error) {
           captureError("Failed to update profile after checkout", error);
-          return NextResponse.json({ error: "Database update failed" }, { status: 500 });
+          return failAndRetry("Database update failed");
         }
       }
       break;
@@ -129,7 +146,7 @@ export async function POST(request: NextRequest) {
       );
       if (error) {
         captureError("Failed to update subscription status", error);
-        return NextResponse.json({ error: "Database update failed" }, { status: 500 });
+        return failAndRetry("Database update failed");
       }
       break;
     }
@@ -145,7 +162,7 @@ export async function POST(request: NextRequest) {
       );
       if (error) {
         captureError("Failed to update canceled subscription", error);
-        return NextResponse.json({ error: "Database update failed" }, { status: 500 });
+        return failAndRetry("Database update failed");
       }
       break;
     }

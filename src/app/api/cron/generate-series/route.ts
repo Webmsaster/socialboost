@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   const { data: seriesList, error: fetchError } = await supabase
     .from("content_series")
-    .select("*, profiles(brand_voice, preferred_model, subscription_status, generation_count)")
+    .select("*, profiles(brand_voice, preferred_model, subscription_status, generation_count, bonus_generations)")
     .eq("is_active", true);
 
   if (fetchError) {

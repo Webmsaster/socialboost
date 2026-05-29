@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("brand_voice, preferred_model, subscription_status, generation_count")
+      .select("brand_voice, preferred_model, subscription_status, generation_count, bonus_generations")
       .eq("id", user.id)
       .single();
 
