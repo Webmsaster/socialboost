@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("subscription_status, preferred_model")
+      .select("subscription_status, preferred_model, generation_count, bonus_generations")
       .eq("id", user.id)
       .single();
 
@@ -34,6 +34,12 @@ export async function POST(request: NextRequest) {
         { error: "Brand voice training is a Pro feature." },
         { status: 403 },
       );
+    }
+
+    // Voice extraction is a paid OpenAI call → count it against the monthly quota.
+    const limit = 100 + (profile.bonus_generations ?? 0);
+    if (profile.generation_count >= limit) {
+      return NextResponse.json({ error: `Monthly limit reached (${limit}).` }, { status: 403 });
     }
 
     const body = await request.json();
@@ -79,6 +85,8 @@ export async function POST(request: NextRequest) {
     const model = profile.preferred_model || "gpt-4o-mini";
     const analyzed = await analyzeBrandVoice({ examples, model });
     const text = brandVoiceProfileToText(analyzed);
+
+    await supabase.rpc("increment_generation_count", { p_user_id: user.id, p_limit: limit });
 
     trackEvent({
       event: "brand_voice_trained",

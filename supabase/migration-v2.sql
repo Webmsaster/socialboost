@@ -51,14 +51,8 @@ CREATE TABLE IF NOT EXISTS public.referrals (
 );
 
 ALTER TABLE public.referrals ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can read own referrals"
-  ON public.referrals FOR SELECT
-  USING (auth.uid() = referrer_id);
-
-CREATE POLICY "Service role full access on referrals"
-  ON public.referrals FOR ALL
-  USING (auth.role() = 'service_role');
+-- RLS policies for referrals are defined canonically in schema.sql; removed here
+-- to avoid duplicate "already exists" errors on a clean restore (schema.sql runs first).
 
 -- ============================================
 -- 3. Organizations (Team/Agency Plan)
@@ -79,7 +73,7 @@ ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS public.org_members (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
-  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE,  -- nullable: pending invites have no user_id yet (matches schema.sql)
   role text NOT NULL DEFAULT 'member'
     CHECK (role IN ('owner', 'admin', 'member')),
   invited_email text,
@@ -97,13 +91,8 @@ ALTER TABLE public.org_members ENABLE ROW LEVEL SECURITY;
 -- migration-teams-rls-fix.sql (via the SECURITY DEFINER helper public.is_org_member).
 -- Do NOT re-add a recursive org_members policy.
 
-CREATE POLICY "Service role full access on organizations"
-  ON public.organizations FOR ALL
-  USING (auth.role() = 'service_role');
-
-CREATE POLICY "Service role full access on org_members"
-  ON public.org_members FOR ALL
-  USING (auth.role() = 'service_role');
+-- Service-role policies for organizations/org_members are defined canonically in
+-- schema.sql; removed here to avoid duplicate-policy errors on a clean restore.
 
 -- ============================================
 -- 4. Post metrics for performance tracking

@@ -115,7 +115,10 @@ Make the content authentic, engaging, and platform-appropriate. Never use generi
       },
       {
         role: "user",
-        content: `Create a ${input.tone} ${input.platform} post about: ${sanitizeInput(input.topic)}`,
+        // 4000 (not the 1000 default): when a website context block + the
+        // soft-CTA instruction are appended to the topic, the default cap would
+        // silently truncate them, dropping exactly the CTA the feature promises.
+        content: `Create a ${input.tone} ${input.platform} post about: ${sanitizeInput(input.topic, 4000)}`,
       },
     ],
     temperature: 0.8,
@@ -303,7 +306,7 @@ Create 3-6 scenes. Keep total duration between 15-60 seconds. Make it engaging a
       },
       {
         role: "user",
-        content: `Create a ${input.tone} video script about: ${sanitizeInput(input.topic)}`,
+        content: `Create a ${input.tone} video script about: ${sanitizeInput(input.topic, 4000)}`,
       },
     ],
     temperature: 0.8,

@@ -5,12 +5,16 @@ import { NextRequest } from "next/server";
 
 // Supabase mock
 const mockGetUser = vi.fn();
+const mockProfileSingle = vi.fn();
+const mockRpc = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue({
     auth: {
       getUser: () => mockGetUser(),
     },
+    from: () => ({ select: () => ({ eq: () => ({ single: () => mockProfileSingle() }) }) }),
+    rpc: (...args: unknown[]) => mockRpc(...args),
   }),
 }));
 
@@ -59,6 +63,10 @@ function createRequest(body: Record<string, unknown>): NextRequest {
 describe("POST /api/hashtags", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockProfileSingle.mockResolvedValue({
+      data: { generation_count: 0, subscription_status: "active", bonus_generations: 0 },
+    });
+    mockRpc.mockResolvedValue({ data: null, error: null });
   });
 
   it("returns 401 if no user is authenticated", async () => {

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     // Pro-only feature.
     const { data: profile } = await supabase
       .from("profiles")
-      .select("subscription_status")
+      .select("subscription_status, generation_count, bonus_generations")
       .eq("id", user.id)
       .single();
 
@@ -30,6 +30,12 @@ export async function POST(request: NextRequest) {
         { error: "Voiceover generation is a Pro feature." },
         { status: 403 }
       );
+    }
+
+    // Count the TTS call against the monthly quota (it's a paid OpenAI call).
+    const limit = 100 + (profile.bonus_generations ?? 0);
+    if (profile.generation_count >= limit) {
+      return NextResponse.json({ error: `Monthly limit reached (${limit}).` }, { status: 403 });
     }
 
     const body = await request.json();
@@ -44,6 +50,8 @@ export async function POST(request: NextRequest) {
     }
 
     const audio = await generateVoiceover({ text, voice });
+
+    await supabase.rpc("increment_generation_count", { p_user_id: user.id, p_limit: limit });
 
     return new NextResponse(audio as unknown as BodyInit, {
       status: 200,

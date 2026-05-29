@@ -11,6 +11,20 @@ function getResend(): Resend | null {
   return _resend;
 }
 
+/**
+ * Escape user-controlled text before interpolating it into email HTML.
+ * Prevents stored HTML / phishing-link injection in transactional emails
+ * (e.g. an org admin's reviewer name / note reaching a subordinate's inbox).
+ */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const FROM_EMAIL = process.env.EMAIL_FROM || "SocialBoost <noreply@socialboost.app>";
 
 interface SendEmailOptions {
@@ -61,7 +75,7 @@ export async function sendPostPublishedEmail(
         <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
           <h2 style="margin-top: 0;">Your post is live on ${platformName}!</h2>
           <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 3px solid #7c3aed;">
-            <p style="margin: 0; color: #374151; font-size: 14px; white-space: pre-wrap;">${postContent.slice(0, 300)}${postContent.length > 300 ? "..." : ""}</p>
+            <p style="margin: 0; color: #374151; font-size: 14px; white-space: pre-wrap;">${escapeHtml(postContent.slice(0, 300))}${postContent.length > 300 ? "..." : ""}</p>
           </div>
           <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://socialboost.app"}/history"
              style="display: inline-block; background: #7c3aed; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px;">
@@ -133,10 +147,10 @@ export async function sendReviewApprovedEmail(
         <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
           <h2 style="margin-top: 0; color: #16a34a;">Post Approved</h2>
           <p style="color: #374151;">
-            <strong>${reviewerName}</strong> approved your post: <em>${postTopic}</em>
+            <strong>${escapeHtml(reviewerName)}</strong> approved your post: <em>${escapeHtml(postTopic)}</em>
           </p>
           ${note ? `<div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 3px solid #16a34a;">
-            <p style="margin: 0; color: #166534; font-size: 14px;">${note}</p>
+            <p style="margin: 0; color: #166534; font-size: 14px;">${escapeHtml(note)}</p>
           </div>` : ""}
           <p style="color: #374151; font-size: 14px;">
             Your post is now ready to be scheduled and published.
@@ -168,10 +182,10 @@ export async function sendReviewRejectedEmail(
         <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
           <h2 style="margin-top: 0; color: #d97706;">Changes Requested</h2>
           <p style="color: #374151;">
-            <strong>${reviewerName}</strong> sent back your post: <em>${postTopic}</em>
+            <strong>${escapeHtml(reviewerName)}</strong> sent back your post: <em>${escapeHtml(postTopic)}</em>
           </p>
           ${note ? `<div style="background: #fffbeb; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 3px solid #d97706;">
-            <p style="margin: 0; color: #92400e; font-size: 14px;">${note}</p>
+            <p style="margin: 0; color: #92400e; font-size: 14px;">${escapeHtml(note)}</p>
           </div>` : ""}
           <p style="color: #374151; font-size: 14px;">
             Your post has been moved back to drafts. Edit it and resubmit when ready.
@@ -459,7 +473,7 @@ export async function sendPublishFailedEmail(
             We couldn't publish your scheduled post to <strong>${platformName}</strong>.
           </p>
           <div style="background: #fef2f2; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 3px solid #dc2626;">
-            <p style="margin: 0; color: #991b1b; font-size: 14px;">${errorMessage}</p>
+            <p style="margin: 0; color: #991b1b; font-size: 14px;">${escapeHtml(errorMessage)}</p>
           </div>
           <p style="color: #374151; font-size: 14px;">
             Your post has been saved as a draft. You can try reconnecting your account or publishing manually.

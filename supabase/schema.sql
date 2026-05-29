@@ -402,17 +402,9 @@ create table if not exists public.organizations (
 
 alter table public.organizations enable row level security;
 
-create policy "Org members can read org"
-  on public.organizations for select
-  using (id in (select org_id from public.org_members where user_id = auth.uid()));
-create policy "Owner can update org"
-  on public.organizations for update using (owner_id = auth.uid());
-create policy "Users can create orgs"
-  on public.organizations for insert with check (auth.uid() = owner_id);
-create policy "Service role full access on organizations"
-  on public.organizations for all
-  using (auth.role() = 'service_role');
-
+-- org_members is created BEFORE the organizations SELECT policy below (which
+-- references org_members) so a clean standalone schema.sql apply doesn't error
+-- on a forward reference. organizations still precedes org_members (FK target).
 create table if not exists public.org_members (
   id uuid default gen_random_uuid() primary key,
   org_id uuid references public.organizations(id) on delete cascade not null,
@@ -425,6 +417,17 @@ create table if not exists public.org_members (
 );
 
 alter table public.org_members enable row level security;
+
+create policy "Org members can read org"
+  on public.organizations for select
+  using (id in (select org_id from public.org_members where user_id = auth.uid()));
+create policy "Owner can update org"
+  on public.organizations for update using (owner_id = auth.uid());
+create policy "Users can create orgs"
+  on public.organizations for insert with check (auth.uid() = owner_id);
+create policy "Service role full access on organizations"
+  on public.organizations for all
+  using (auth.role() = 'service_role');
 
 -- Non-recursive membership check. The original org_members policies each
 -- subqueried org_members from INSIDE an org_members policy → PostgreSQL rejects
