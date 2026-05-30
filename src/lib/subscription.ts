@@ -26,6 +26,16 @@ export function isProSubscription(status: string | null | undefined): boolean {
   return status === "active" || status === "past_due";
 }
 
+// Monthly text-generation quota (base plan allowance, before referral
+// bonus_generations are added). Single source of truth so routes never
+// hardcode 10/100 — see src/app/api/*/route.ts.
+export const TEXT_QUOTA_FREE = 10;
+export const TEXT_QUOTA_PRO = 100;
+
+export function textQuotaFor(status: string | null | undefined): number {
+  return isProSubscription(status) ? TEXT_QUOTA_PRO : TEXT_QUOTA_FREE;
+}
+
 // Video quotas live separately from text-generation quota because a video
 // costs ~$0.30 of OpenAI (gpt-image-1 × scenes + TTS) vs ~$0.001 for a text
 // post. Without a separate cap a single Pro user can burn through more than

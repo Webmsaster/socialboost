@@ -40,6 +40,7 @@ supabase/migration-website-series.sql
 supabase/migration-add-full-name.sql
 supabase/migration-publish-reminder.sql
 supabase/migration-video-quota.sql
+supabase/migration-quota-reserve.sql
 supabase/migration-teams-rls-fix.sql
 supabase/migration-perf-indexes.sql
 supabase/storage-migration.sql
@@ -47,15 +48,20 @@ supabase/PENDING-APPLY-ON-LIVE.sql
 ```
 
 Reihenfolge ist wichtig: Tabellen vor den Migrationen, die sie indizieren/altern
-(perf-indexes & PENDING zuletzt). Das sind alle 17 Files — die früher fehlenden
-(api-webhooks, drip-log, publish-reminder, video-quota, teams-rls-fix) sind für ein
-funktionierendes Prod zwingend (ohne sie: keine Public-API/Webhooks/Drip, keine
-Video-Quota-Deckelung, kaputtes Teams-RLS).
+(perf-indexes & PENDING zuletzt). `migration-quota-reserve.sql` muss **nach**
+`migration-video-quota.sql` laufen — es nutzt deren Field-Guard-Trigger + die
+`app.bypass_field_guard`-GUC (reserve/refund-RPCs für die TOCTOU-sichere Quota).
+Das sind alle 18 Files — die früher fehlenden (api-webhooks, drip-log,
+publish-reminder, video-quota, teams-rls-fix) sind für ein funktionierendes Prod
+zwingend (ohne sie: keine Public-API/Webhooks/Drip, keine Video-Quota-Deckelung,
+kaputtes Teams-RLS).
 
-Hinweis: Der **erste** saubere Apply auf eine leere DB läuft fehlerfrei. Bei einem
-**erneuten** Apply können einzelne `create policy`-Statements "already exists"
-werfen (nicht alle Files sind voll idempotent) — auf einer frischen Restore-DB
-irrelevant.
+Hinweis: `schema.sql`, `schema-templates.sql`, `storage-migration.sql` und
+`migration-quota-reserve.sql` sind jetzt voll idempotent (jede `create policy` hat
+ein vorgelagertes `drop policy if exists`, FK-Constraints sind `pg_constraint`-
+geguarded) — ein erneuter Apply läuft fehlerfrei durch (lokal auf PG 17.6
+verifiziert). `migration-api-webhooks.sql` fügt die `secret`-Spalte für die
+HMAC-signierten Outbound-Webhooks idempotent hinzu (`add column if not exists`).
 
 ## Schritt 3 — Storage-Buckets erstellen (1 Min)
 

@@ -4,6 +4,7 @@ import { type PlatformId, platformConfigs } from "@/lib/platforms";
 import { getPublisher } from "@/lib/platforms/registry";
 import { captureError } from "@/lib/logger";
 import { rateLimit } from "@/lib/rate-limit";
+import { deriveCodeChallenge, generateCodeVerifier } from "@/lib/platforms/twitter";
 import { randomBytes } from "crypto";
 
 export async function POST(request: NextRequest) {
@@ -56,7 +57,16 @@ export async function POST(request: NextRequest) {
       JSON.stringify({ platform, userId: user.id, nonce })
     ).toString("base64url");
 
-    const authUrl = publisher.getAuthUrl(redirectUri, state);
+    // Twitter/X requires S256 PKCE: generate a verifier, keep it server-side in
+    // an httpOnly cookie (like the nonce), and send only the derived challenge.
+    let codeChallenge: string | undefined;
+    let codeVerifier: string | undefined;
+    if (platform === "twitter") {
+      codeVerifier = generateCodeVerifier();
+      codeChallenge = deriveCodeChallenge(codeVerifier);
+    }
+
+    const authUrl = publisher.getAuthUrl(redirectUri, state, codeChallenge);
     const response = NextResponse.json({ url: authUrl });
     response.cookies.set("oauth_state", nonce, {
       httpOnly: true,
@@ -65,6 +75,15 @@ export async function POST(request: NextRequest) {
       maxAge: 600,
       path: "/",
     });
+    if (codeVerifier) {
+      response.cookies.set("oauth_pkce_verifier", codeVerifier, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 600,
+        path: "/",
+      });
+    }
     return response;
   } catch (err) {
     captureError("OAuth connect error", err);

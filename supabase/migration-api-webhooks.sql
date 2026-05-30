@@ -43,6 +43,13 @@ CREATE TABLE IF NOT EXISTS public.user_webhooks (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Per-endpoint signing secret. Outbound deliveries are HMAC-SHA256-signed with
+-- this value (X-SocialBoost-Signature: sha256=...). The create route generates
+-- and returns it once; this default backfills any pre-existing rows so signing
+-- never breaks for webhooks created before this column existed.
+ALTER TABLE public.user_webhooks
+  ADD COLUMN IF NOT EXISTS secret text NOT NULL DEFAULT encode(gen_random_bytes(24), 'hex');
+
 ALTER TABLE public.user_webhooks ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users manage own webhooks" ON public.user_webhooks;

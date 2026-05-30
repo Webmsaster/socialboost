@@ -44,10 +44,19 @@ vi.mock("@/lib/openai", () => ({
   generatePost: (...args: unknown[]) => mockGeneratePost(...args),
 }));
 
-// Subscription mock
+// Subscription mock. textQuotaFor must be a real implementation here because
+// the route uses it to compute the limit passed to reserveGeneration; the
+// mock mirrors src/lib/subscription.ts (free 10 / pro 100). It derives from
+// the status string directly (NOT the mockIsProSubscription once-mock) so it
+// doesn't consume the mockReturnValueOnce the route also reads via
+// isProSubscription.
 const mockIsProSubscription = vi.fn();
 vi.mock("@/lib/subscription", () => ({
   isProSubscription: (...args: unknown[]) => mockIsProSubscription(...args),
+  TEXT_QUOTA_FREE: 10,
+  TEXT_QUOTA_PRO: 100,
+  textQuotaFor: (status: string | null | undefined) =>
+    status === "active" || status === "past_due" ? 100 : 10,
 }));
 
 // Email mock
@@ -169,7 +178,7 @@ describe("POST /api/generate", () => {
     expect(json.error).toBe("Profile not found");
   });
 
-  it("returns 403 if free generation limit is reached", async () => {
+  it("returns 429 if free generation limit is reached (reserve denied)", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
@@ -177,6 +186,8 @@ describe("POST /api/generate", () => {
     mockSingle.mockResolvedValueOnce({
       data: { generation_count: 10, subscription_status: "free" },
     });
+    // reserve_generation returns false → over limit, no OpenAI call.
+    mockRpc.mockResolvedValueOnce({ data: false, error: null });
 
     const request = createRequest({
       platform: "linkedin",
@@ -186,11 +197,14 @@ describe("POST /api/generate", () => {
     const response = await POST(request);
     const json = await response.json();
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(429);
     expect(json.error).toContain("Monthly limit reached");
+    // Reserve-before-spend: OpenAI is NOT called when the reserve fails.
+    expect(mockGeneratePost).not.toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledWith("reserve_generation", expect.any(Object));
   });
 
-  it("returns 403 if pro generation limit is reached", async () => {
+  it("returns 429 if pro generation limit is reached (reserve denied)", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
@@ -199,6 +213,7 @@ describe("POST /api/generate", () => {
       data: { generation_count: 100, subscription_status: "active" },
     });
     mockIsProSubscription.mockReturnValueOnce(true);
+    mockRpc.mockResolvedValueOnce({ data: false, error: null });
 
     const request = createRequest({
       platform: "linkedin",
@@ -208,11 +223,12 @@ describe("POST /api/generate", () => {
     const response = await POST(request);
     const json = await response.json();
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(429);
     expect(json.error).toContain("Monthly limit reached");
+    expect(mockGeneratePost).not.toHaveBeenCalled();
   });
 
-  it("returns generated post on success", async () => {
+  it("reserves before spending and returns generated post on success", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
@@ -220,11 +236,12 @@ describe("POST /api/generate", () => {
     mockSingle.mockResolvedValueOnce({
       data: { generation_count: 3, subscription_status: "free" },
     });
+    // reserve_generation succeeds (returns true) BEFORE generatePost runs.
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
     mockGeneratePost.mockResolvedValueOnce({
       content: "Great post!",
       hashtags: ["#test"],
     });
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
 
     const request = createRequest({
       platform: "linkedin",
@@ -238,6 +255,9 @@ describe("POST /api/generate", () => {
     expect(response.status).toBe(200);
     expect(json.content).toBe("Great post!");
     expect(json.hashtags).toEqual(["#test"]);
+    // The reserve RPC is the only quota mutation; no post-spend increment.
+    expect(mockRpc).toHaveBeenCalledWith("reserve_generation", expect.any(Object));
+    expect(mockRpc).not.toHaveBeenCalledWith("increment_generation_count", expect.anything());
     expect(mockGeneratePost).toHaveBeenCalledWith(
       expect.objectContaining({
         platform: "linkedin",
@@ -246,6 +266,31 @@ describe("POST /api/generate", () => {
         language: "English",
       })
     );
+  });
+
+  it("refunds the reserved slot when generation fails", async () => {
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: "user-123" } },
+    });
+    mockRateLimit.mockResolvedValueOnce({ success: true, remaining: 5 });
+    mockSingle.mockResolvedValueOnce({
+      data: { generation_count: 3, subscription_status: "free" },
+    });
+    // reserve succeeds, then generatePost throws → route must refund.
+    mockRpc.mockResolvedValueOnce({ data: true, error: null }); // reserve_generation
+    mockRpc.mockResolvedValueOnce({ data: null, error: null }); // refund_generation
+    mockGeneratePost.mockRejectedValueOnce(new Error("OpenAI down"));
+
+    const request = createRequest({
+      platform: "linkedin",
+      topic: "test topic",
+      tone: "professional",
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(500);
+    expect(mockRpc).toHaveBeenCalledWith("reserve_generation", expect.any(Object));
+    expect(mockRpc).toHaveBeenCalledWith("refund_generation", expect.any(Object));
   });
 
   it("uses default model for Pro users without preferred_model", async () => {
@@ -263,8 +308,8 @@ describe("POST /api/generate", () => {
       },
     });
     mockIsProSubscription.mockReturnValueOnce(true);
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
     mockGeneratePost.mockResolvedValueOnce({ content: "Pro post", hashtags: [] });
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
 
     const request = createRequest({
       platform: "linkedin",
@@ -293,11 +338,11 @@ describe("POST /api/generate", () => {
       },
     });
     mockIsProSubscription.mockReturnValueOnce(true);
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
     mockGeneratePost.mockResolvedValueOnce({
       content: "Pro post",
       hashtags: ["#pro"],
     });
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
 
     const request = createRequest({
       platform: "linkedin",
@@ -325,11 +370,11 @@ describe("POST /api/generate", () => {
     mockSingle.mockResolvedValueOnce({
       data: { generation_count: 0, subscription_status: "free" },
     });
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
     mockGeneratePost.mockResolvedValueOnce({
       content: "Post",
       hashtags: [],
     });
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
 
     const request = createRequest({
       platform: "twitter",

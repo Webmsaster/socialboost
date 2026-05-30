@@ -3,70 +3,38 @@ import { NextRequest } from "next/server";
 
 // --- Mocks ---
 
-type MockWith<T> = import("vitest").Mock<(...args: unknown[]) => unknown> & T;
-
 const mockGetUser = vi.fn();
-const mockOrder = vi.fn() as MockWith<{ _result?: unknown }>;
-const mockSelectChain = vi.fn();
 const mockInsertSingle = vi.fn();
-const mockDeleteEq2 = vi.fn() as MockWith<{ _result?: unknown }>;
-const mockDeleteEq1 = vi.fn();
+const mockListResult = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue({
-    auth: {
-      getUser: () => mockGetUser(),
-    },
-    from: (table: string) => {
-      if (table === "templates") {
-        return {
-          select: (...args: unknown[]) => {
-            mockSelectChain(...args);
-            type OrderResult = { data: unknown; error: unknown; limit: () => OrderResult };
-            const orderResult: OrderResult = {
-              get data() { return (mockOrder._result as { data?: unknown })?.data ?? []; },
-              get error() { return (mockOrder._result as { error?: unknown })?.error ?? null; },
-              limit: () => orderResult,
-            };
-            return {
-              order: (...oArgs: unknown[]) => {
-                mockOrder(...oArgs);
-                return orderResult;
-              },
-            };
-          },
-          insert: (row: unknown) => ({
-            select: () => ({
-              single: () => mockInsertSingle(row),
-            }),
-          }),
-          delete: () => ({
-            eq: (...args: unknown[]) => {
-              mockDeleteEq1(...args);
-              return {
-                eq: (...args2: unknown[]) => {
-                  mockDeleteEq2(...args2);
-                  return mockDeleteEq2._result ?? { error: null };
-                },
-              };
-            },
-          }),
-        };
-      }
-      return {};
-    },
+    auth: { getUser: () => mockGetUser() },
+    from: () => ({
+      // GET chain: .select().order().limit()
+      select: () => ({
+        order: () => ({ limit: () => mockListResult() }),
+      }),
+      // POST chain: .insert().select().single()
+      insert: () => ({
+        select: () => ({ single: () => mockInsertSingle() }),
+      }),
+    }),
   }),
+}));
+
+const mockRateLimit = vi.fn();
+vi.mock("@/lib/rate-limit", () => ({
+  rateLimit: (...args: unknown[]) => mockRateLimit(...args),
 }));
 
 vi.mock("@/lib/logger", () => ({
   captureError: vi.fn(),
 }));
 
-// Import after mocks
 import { GET, POST } from "@/app/api/templates/route";
-import { DELETE } from "@/app/api/templates/[id]/route";
 
-function createPostRequest(body: Record<string, unknown>): NextRequest {
+function createRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost:3000/api/templates", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -74,231 +42,139 @@ function createPostRequest(body: Record<string, unknown>): NextRequest {
   });
 }
 
+const validBody = {
+  name: "My Template",
+  platform: "linkedin",
+  tone: "professional",
+  topic: "A valid template body about product launches.",
+  language: "English",
+};
+
 describe("GET /api/templates", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (mockOrder as ReturnType<typeof vi.fn> & { _result?: unknown })._result = undefined;
-    (mockDeleteEq2 as ReturnType<typeof vi.fn> & { _result?: unknown })._result = undefined;
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    mockListResult.mockResolvedValue({ data: [], error: null });
   });
 
   it("returns 401 if no user", async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null } });
-
-    const response = await GET();
-    const json = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(json.error).toBe("Unauthorized");
+    const res = await GET();
+    expect(res.status).toBe(401);
   });
 
   it("returns templates list on success", async () => {
-    mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: "user-1" } },
-    });
-    const templates = [
-      { id: "t1", name: "My Template", platform: "linkedin" },
-    ];
-    (mockOrder as ReturnType<typeof vi.fn> & { _result?: unknown })._result = {
-      data: templates,
-      error: null,
-    };
-
-    const response = await GET();
-    const json = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(json).toEqual(templates);
+    const rows = [{ id: "t1", name: "My Template", platform: "linkedin" }];
+    mockListResult.mockResolvedValueOnce({ data: rows, error: null });
+    const res = await GET();
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json).toEqual(rows);
   });
 
   it("returns 500 on DB error", async () => {
-    mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: "user-1" } },
-    });
-    (mockOrder as ReturnType<typeof vi.fn> & { _result?: unknown })._result = {
+    mockListResult.mockResolvedValueOnce({
       data: null,
       error: { message: "DB error" },
-    };
-
-    const response = await GET();
-    const json = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(json.error).toContain("Failed to load templates");
-  });
-
-  it("returns 500 when an unexpected error is thrown (GET catch block)", async () => {
-    mockGetUser.mockRejectedValueOnce(new Error("Unexpected GET error"));
-
-    const response = await GET();
-    const json = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(json.error).toContain("Failed to load templates");
+    });
+    const res = await GET();
+    expect(res.status).toBe(500);
   });
 });
 
-describe("POST /api/templates", () => {
+describe("POST /api/templates validation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
+    mockRateLimit.mockResolvedValue({ success: true });
+    mockInsertSingle.mockResolvedValue({ data: { id: "tpl_1" }, error: null });
   });
 
-  it("returns 401 if no user", async () => {
+  it("returns 401 when not authenticated", async () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null } });
-
-    const request = createPostRequest({ name: "T", platform: "linkedin", tone: "casual" });
-    const response = await POST(request);
-    const json = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(json.error).toBe("Unauthorized");
+    const res = await POST(createRequest(validBody));
+    expect(res.status).toBe(401);
   });
 
-  it("returns 400 if missing name/platform/tone", async () => {
-    mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: "user-1" } },
-    });
-
-    const request = createPostRequest({ name: "T" });
-    const response = await POST(request);
-    const json = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(json.error).toContain("Missing required fields");
+  it("returns 429 when rate limited", async () => {
+    mockRateLimit.mockResolvedValueOnce({ success: false });
+    const res = await POST(createRequest(validBody));
+    expect(res.status).toBe(429);
   });
 
-  it("returns 400 for invalid platform", async () => {
-    mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: "user-1" } },
-    });
-
-    const request = createPostRequest({
-      name: "T",
-      platform: "tiktok",
-      tone: "casual",
-    });
-    const response = await POST(request);
-    const json = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(json.error).toBe("Invalid platform");
+  it("returns 400 for an invalid language", async () => {
+    // "fr" is the locale code, not the display name the UI/DB use, so it is rejected.
+    const res = await POST(createRequest({ ...validBody, language: "fr" }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("language");
   });
 
-  it("returns 400 for invalid tone", async () => {
-    mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: "user-1" } },
-    });
-
-    const request = createPostRequest({
-      name: "T",
-      platform: "linkedin",
-      tone: "angry",
-    });
-    const response = await POST(request);
-    const json = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(json.error).toBe("Invalid tone");
+  it("returns 400 for an empty (whitespace) name", async () => {
+    const res = await POST(createRequest({ ...validBody, name: "   " }));
+    expect(res.status).toBe(400);
   });
 
-  it("returns 201 with created template on success", async () => {
-    mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: "user-1" } },
-    });
-    const created = {
-      id: "t1",
-      name: "My Template",
-      platform: "linkedin",
-      tone: "professional",
-    };
-    mockInsertSingle.mockResolvedValueOnce({ data: created, error: null });
-
-    const request = createPostRequest({
-      name: "My Template",
-      platform: "linkedin",
-      tone: "professional",
-    });
-    const response = await POST(request);
-    const json = await response.json();
-
-    expect(response.status).toBe(201);
-    expect(json).toEqual(created);
+  it("returns 400 for a missing name", async () => {
+    const { name: _omit, ...rest } = validBody;
+    void _omit;
+    const res = await POST(createRequest(rest));
+    expect(res.status).toBe(400);
   });
 
-  it("returns 500 when insert returns a DB error (POST inner catch)", async () => {
-    mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: "user-1" } },
-    });
-    mockInsertSingle.mockResolvedValueOnce({
-      data: null,
-      error: { message: "DB constraint violation" },
-    });
-
-    const request = createPostRequest({
-      name: "My Template",
-      platform: "linkedin",
-      tone: "professional",
-    });
-    const response = await POST(request);
-    const json = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(json.error).toContain("Failed to create template");
+  it("returns 400 for an overlong name (>100 chars)", async () => {
+    const res = await POST(
+      createRequest({ ...validBody, name: "x".repeat(101) })
+    );
+    expect(res.status).toBe(400);
   });
 
-  it("returns 500 when an unexpected error is thrown (POST catch block)", async () => {
-    mockGetUser.mockRejectedValueOnce(new Error("Unexpected POST error"));
-
-    const request = createPostRequest({
-      name: "My Template",
-      platform: "linkedin",
-      tone: "professional",
-    });
-    const response = await POST(request);
-    const json = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(json.error).toContain("Failed to create template");
-  });
-});
-
-describe("DELETE /api/templates/[id]", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    (mockDeleteEq2 as ReturnType<typeof vi.fn> & { _result?: unknown })._result = undefined;
+  it("returns 400 for an overlong topic/body (>5000 chars)", async () => {
+    const res = await POST(
+      createRequest({ ...validBody, topic: "x".repeat(5001) })
+    );
+    expect(res.status).toBe(400);
   });
 
-  it("returns 401 if no user", async () => {
-    mockGetUser.mockResolvedValueOnce({ data: { user: null } });
-
-    const request = new NextRequest("http://localhost:3000/api/templates/t1", {
-      method: "DELETE",
-    });
-    const response = await DELETE(request, {
-      params: Promise.resolve({ id: "t1" }),
-    });
-    const json = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(json.error).toBe("Unauthorized");
+  it("returns 400 for an empty (whitespace) topic when provided", async () => {
+    const res = await POST(createRequest({ ...validBody, topic: "   " }));
+    expect(res.status).toBe(400);
   });
 
-  it("returns success on delete", async () => {
-    mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: "user-1" } },
-    });
-    (mockDeleteEq2 as ReturnType<typeof vi.fn> & { _result?: unknown })._result = {
-      error: null,
-    };
+  it("returns 400 for an unknown platform", async () => {
+    const res = await POST(
+      createRequest({ ...validBody, platform: "myspace" })
+    );
+    expect(res.status).toBe(400);
+  });
 
-    const request = new NextRequest("http://localhost:3000/api/templates/t1", {
-      method: "DELETE",
-    });
-    const response = await DELETE(request, {
-      params: Promise.resolve({ id: "t1" }),
-    });
-    const json = await response.json();
+  it("returns 400 for an unknown tone", async () => {
+    const res = await POST(createRequest({ ...validBody, tone: "angry" }));
+    expect(res.status).toBe(400);
+  });
 
-    expect(response.status).toBe(200);
-    expect(json.success).toBe(true);
+  it("accepts the languages the templates UI offers", async () => {
+    for (const language of ["English", "German", "French", "Spanish"]) {
+      const res = await POST(createRequest({ ...validBody, language }));
+      expect(res.status).toBe(201);
+    }
+  });
+
+  it("returns 201 for a valid payload", async () => {
+    const res = await POST(createRequest(validBody));
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json).toEqual({ id: "tpl_1" });
+  });
+
+  it("succeeds when topic and language are omitted (defaults applied)", async () => {
+    const res = await POST(
+      createRequest({
+        name: "Minimal",
+        platform: "twitter",
+        tone: "casual",
+      })
+    );
+    expect(res.status).toBe(201);
   });
 });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
 import { logAudit } from "@/lib/audit-log";
@@ -12,9 +13,11 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    // Never return `secret` in list responses — it is shown exactly once at
+    // creation time. Listing only exposes non-sensitive metadata.
     const { data, error } = await supabase
       .from("user_webhooks")
-      .select("*")
+      .select("id, url, events, is_active, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -79,6 +82,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Max 5 webhooks per account" }, { status: 400 });
     }
 
+    // Per-endpoint HMAC signing secret. Generated here so we can return it to
+    // the user exactly once; outbound deliveries sign their body with it.
+    const secret = randomBytes(24).toString("hex");
+
     const { data, error } = await supabase
       .from("user_webhooks")
       .insert({
@@ -86,8 +93,9 @@ export async function POST(request: NextRequest) {
         url: url.trim(),
         events: filteredEvents,
         is_active: true,
+        secret,
       })
-      .select()
+      .select("id, url, events, is_active, created_at")
       .single();
 
     if (error) {
@@ -97,7 +105,9 @@ export async function POST(request: NextRequest) {
 
     await logAudit(user.id, "webhook.created", { webhookId: data.id, url: data.url, events: filteredEvents });
 
-    return NextResponse.json(data);
+    // Return the secret ONCE so the user can configure their receiver. It is
+    // never exposed again (GET excludes it).
+    return NextResponse.json({ ...data, secret });
   } catch (error) {
     captureError("Webhook create error", error);
     return NextResponse.json({ error: "Failed" }, { status: 500 });

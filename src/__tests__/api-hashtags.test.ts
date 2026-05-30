@@ -66,7 +66,9 @@ describe("POST /api/hashtags", () => {
     mockProfileSingle.mockResolvedValue({
       data: { generation_count: 0, subscription_status: "active", bonus_generations: 0 },
     });
-    mockRpc.mockResolvedValue({ data: null, error: null });
+    // reserve_generation returns true (slot reserved) by default; refund (if
+    // called on the failure path) also resolves cleanly.
+    mockRpc.mockResolvedValue({ data: true, error: null });
   });
 
   it("returns 401 if no user is authenticated", async () => {
@@ -138,6 +140,39 @@ describe("POST /api/hashtags", () => {
     expect(json.niche).toHaveLength(5);
     expect(json.broad).toHaveLength(5);
     expect(json.trending[0]).toBe("#AI");
+    // Reserve-before-spend: reserve RPC used, no post-spend increment.
+    expect(mockRpc).toHaveBeenCalledWith("reserve_generation", expect.any(Object));
+    expect(mockRpc).not.toHaveBeenCalledWith("increment_generation_count", expect.anything());
+  });
+
+  it("returns 429 and does not call OpenAI when reserve is denied", async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "user-123" } } });
+    mockRateLimit.mockResolvedValueOnce({ success: true });
+    // reserve_generation returns false → over limit.
+    mockRpc.mockResolvedValueOnce({ data: false, error: null });
+
+    const request = createRequest({ topic: "AI trends", platform: "linkedin" });
+    const response = await POST(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(json.error).toContain("Monthly limit reached");
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it("refunds the reserved slot when OpenAI returns empty content", async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "user-123" } } });
+    mockRateLimit.mockResolvedValueOnce({ success: true });
+    mockRpc.mockResolvedValueOnce({ data: true, error: null }); // reserve_generation
+    mockRpc.mockResolvedValueOnce({ data: null, error: null }); // refund_generation
+    mockCreate.mockResolvedValueOnce({ choices: [{ message: { content: null } }] });
+
+    const request = createRequest({ topic: "AI trends", platform: "linkedin" });
+    const response = await POST(request);
+
+    expect(response.status).toBe(500);
+    expect(mockRpc).toHaveBeenCalledWith("reserve_generation", expect.any(Object));
+    expect(mockRpc).toHaveBeenCalledWith("refund_generation", expect.any(Object));
   });
 
   it("uses 'general' when platform is falsy (empty string)", async () => {

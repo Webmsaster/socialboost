@@ -63,9 +63,17 @@ export async function GET(request: NextRequest) {
       // Tokens are encrypted at rest — decrypt before handing them to the
       // refresher / fetchMetrics, or the platform API gets a `gcm1:` ciphertext
       // Bearer, 401s, and every metric sync silently fails.
-      a.access_token = decryptToken(a.access_token) ?? a.access_token;
-      a.refresh_token = decryptToken(a.refresh_token);
-      accountMap.set(a.id, a);
+      // decryptToken THROWS on malformed ciphertext; isolate it per-account so
+      // one corrupt token skips just that account (its posts fall through to the
+      // `if (!account) { skipped++ }` branch below) instead of aborting the
+      // whole batch-load and every metric sync in this run.
+      try {
+        a.access_token = decryptToken(a.access_token) ?? a.access_token;
+        a.refresh_token = decryptToken(a.refresh_token);
+        accountMap.set(a.id, a);
+      } catch (err) {
+        captureError("Cron: token decrypt failed", err, { accountId: a.id, platform: a.platform });
+      }
     }
   }
 

@@ -17,9 +17,13 @@ create table if not exists public.templates (
 
 alter table public.templates enable row level security;
 
+drop policy if exists "Users can read own templates" on public.templates;
 create policy "Users can read own templates" on public.templates for select using (auth.uid() = user_id);
+drop policy if exists "Users can insert own templates" on public.templates;
 create policy "Users can insert own templates" on public.templates for insert with check (auth.uid() = user_id);
+drop policy if exists "Users can delete own templates" on public.templates;
 create policy "Users can delete own templates" on public.templates for delete using (auth.uid() = user_id);
+drop policy if exists "Service role full access on templates" on public.templates;
 create policy "Service role full access on templates" on public.templates for all using (auth.role() = 'service_role');
 
 create index if not exists idx_templates_user on public.templates(user_id);

@@ -18,15 +18,18 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
+drop policy if exists "Users can read own profile" on public.profiles;
 create policy "Users can read own profile"
   on public.profiles for select
   using (auth.uid() = id);
 
+drop policy if exists "Users can update own profile (restricted)" on public.profiles;
 create policy "Users can update own profile (restricted)"
   on public.profiles for update
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
+drop policy if exists "Service role full access" on public.profiles;
 create policy "Service role full access"
   on public.profiles for all
   using (auth.role() = 'service_role');
@@ -66,20 +69,25 @@ create table if not exists public.posts (
 
 alter table public.posts enable row level security;
 
+drop policy if exists "Users can read own posts" on public.posts;
 create policy "Users can read own posts"
   on public.posts for select using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own posts" on public.posts;
 create policy "Users can insert own posts"
   on public.posts for insert with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update own posts" on public.posts;
 create policy "Users can update own posts"
   on public.posts for update
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can delete own posts" on public.posts;
 create policy "Users can delete own posts"
   on public.posts for delete using (auth.uid() = user_id);
 
+drop policy if exists "Service role full access on posts" on public.posts;
 create policy "Service role full access on posts"
   on public.posts for all
   using (auth.role() = 'service_role');
@@ -103,18 +111,22 @@ create table if not exists public.connected_accounts (
 
 alter table public.connected_accounts enable row level security;
 
+drop policy if exists "Users can read own connected accounts" on public.connected_accounts;
 create policy "Users can read own connected accounts"
   on public.connected_accounts for select
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own connected accounts" on public.connected_accounts;
 create policy "Users can insert own connected accounts"
   on public.connected_accounts for insert
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can delete own connected accounts" on public.connected_accounts;
 create policy "Users can delete own connected accounts"
   on public.connected_accounts for delete
   using (auth.uid() = user_id);
 
+drop policy if exists "Service role full access on connected_accounts" on public.connected_accounts;
 create policy "Service role full access on connected_accounts"
   on public.connected_accounts for all
   using (auth.role() = 'service_role');
@@ -135,11 +147,19 @@ begin
   end if;
 end $$;
 
--- Add foreign key from posts to connected_accounts
-alter table public.posts
-  add constraint fk_posts_connected_account
-  foreign key (connected_account_id) references public.connected_accounts(id)
-  on delete set null;
+-- Add foreign key from posts to connected_accounts (idempotent: guard so a
+-- re-apply on an existing DB doesn't error with "constraint already exists").
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'fk_posts_connected_account'
+  ) then
+    alter table public.posts
+      add constraint fk_posts_connected_account
+      foreign key (connected_account_id) references public.connected_accounts(id)
+      on delete set null;
+  end if;
+end $$;
 
 -- Idempotent: add media_url column for existing deployments
 alter table public.posts add column if not exists media_url text;
@@ -306,10 +326,12 @@ create table if not exists public.referrals (
 
 alter table public.referrals enable row level security;
 
+drop policy if exists "Users can read own referrals" on public.referrals;
 create policy "Users can read own referrals"
   on public.referrals for select
   using (auth.uid() = referrer_id);
 
+drop policy if exists "Service role full access on referrals" on public.referrals;
 create policy "Service role full access on referrals"
   on public.referrals for all
   using (auth.role() = 'service_role');
@@ -373,15 +395,20 @@ create table if not exists public.content_series (
 
 alter table public.content_series enable row level security;
 
+drop policy if exists "Users can read own series" on public.content_series;
 create policy "Users can read own series"
   on public.content_series for select using (auth.uid() = user_id);
+drop policy if exists "Users can insert own series" on public.content_series;
 create policy "Users can insert own series"
   on public.content_series for insert with check (auth.uid() = user_id);
+drop policy if exists "Users can update own series" on public.content_series;
 create policy "Users can update own series"
   on public.content_series for update
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "Users can delete own series" on public.content_series;
 create policy "Users can delete own series"
   on public.content_series for delete using (auth.uid() = user_id);
+drop policy if exists "Service role full access on content_series" on public.content_series;
 create policy "Service role full access on content_series"
   on public.content_series for all
   using (auth.role() = 'service_role');
@@ -418,13 +445,17 @@ create table if not exists public.org_members (
 
 alter table public.org_members enable row level security;
 
+drop policy if exists "Org members can read org" on public.organizations;
 create policy "Org members can read org"
   on public.organizations for select
   using (id in (select org_id from public.org_members where user_id = auth.uid()));
+drop policy if exists "Owner can update org" on public.organizations;
 create policy "Owner can update org"
   on public.organizations for update using (owner_id = auth.uid());
+drop policy if exists "Users can create orgs" on public.organizations;
 create policy "Users can create orgs"
   on public.organizations for insert with check (auth.uid() = owner_id);
+drop policy if exists "Service role full access on organizations" on public.organizations;
 create policy "Service role full access on organizations"
   on public.organizations for all
   using (auth.role() = 'service_role');
@@ -450,9 +481,11 @@ grant execute on function public.is_org_member(uuid) to authenticated, service_r
 -- (create-owner, invite, accept, remove) goes through the server via the
 -- service-role client after app-layer authorization, so a user cannot
 -- self-escalate to owner/admin by hitting the REST API directly.
+drop policy if exists "Members can read own org roster" on public.org_members;
 create policy "Members can read own org roster"
   on public.org_members for select
   using (user_id = auth.uid() or public.is_org_member(org_id));
+drop policy if exists "Service role full access on org_members" on public.org_members;
 create policy "Service role full access on org_members"
   on public.org_members for all
   using (auth.role() = 'service_role');
@@ -488,6 +521,7 @@ create table if not exists public.stripe_events (
   received_at timestamptz not null default now()
 );
 alter table public.stripe_events enable row level security;
+drop policy if exists "Service role full access on stripe_events" on public.stripe_events;
 create policy "Service role full access on stripe_events"
   on public.stripe_events for all
   using (auth.role() = 'service_role');

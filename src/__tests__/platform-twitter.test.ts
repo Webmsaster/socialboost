@@ -82,16 +82,17 @@ describe("twitterPublisher", () => {
   });
 
   describe("getAuthUrl", () => {
-    it("returns a Twitter authorization URL with PKCE", () => {
-      const url = twitterPublisher.getAuthUrl("https://app/callback", "state-abc");
+    it("returns a Twitter authorization URL with S256 PKCE", () => {
+      const url = twitterPublisher.getAuthUrl("https://app/callback", "state-abc", "test-challenge");
       expect(url).toContain("https://twitter.com/i/oauth2/authorize");
       expect(url).toContain("client_id=tw-client-id");
-      expect(url).toContain("code_challenge=challenge");
+      expect(url).toContain("code_challenge=test-challenge");
+      expect(url).toContain("code_challenge_method=S256");
     });
 
     it("throws if TWITTER_CLIENT_ID is not set", () => {
       delete process.env.TWITTER_CLIENT_ID;
-      expect(() => twitterPublisher.getAuthUrl("https://cb", "state"))
+      expect(() => twitterPublisher.getAuthUrl("https://cb", "state", "test-challenge"))
         .toThrow("TWITTER_CLIENT_ID not configured");
     });
   });
@@ -108,7 +109,7 @@ describe("twitterPublisher", () => {
           json: () => Promise.resolve({ data: { id: "tw-id", username: "testuser" } }),
         });
 
-      const result = await twitterPublisher.exchangeCode("code-123", "https://app/callback");
+      const result = await twitterPublisher.exchangeCode("code-123", "https://app/callback", "test-verifier");
       expect(result.accessToken).toBe("at-123");
       expect(result.refreshToken).toBe("rt-456");
       expect(result.platformUserId).toBe("tw-id");
@@ -117,7 +118,7 @@ describe("twitterPublisher", () => {
 
     it("throws on token exchange failure", async () => {
       (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, status: 401 });
-      await expect(twitterPublisher.exchangeCode("bad", "https://cb"))
+      await expect(twitterPublisher.exchangeCode("bad", "https://cb", "test-verifier"))
         .rejects.toThrow("Twitter token exchange failed: 401");
     });
 
@@ -132,7 +133,7 @@ describe("twitterPublisher", () => {
           json: () => Promise.resolve({ data: { id: "tw-noexp", username: "noexp" } }),
         });
 
-      const result = await twitterPublisher.exchangeCode("code-noexp", "https://app/callback");
+      const result = await twitterPublisher.exchangeCode("code-noexp", "https://app/callback", "test-verifier");
       expect(result.accessToken).toBe("at-noexp");
       expect(result.expiresAt).toBeUndefined();
       expect(result.refreshToken).toBeUndefined();

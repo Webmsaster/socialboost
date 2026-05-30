@@ -4,7 +4,8 @@ import { validateApiKey } from "@/lib/api-keys";
 import { generatePost, type Platform, type Tone } from "@/lib/openai";
 import { captureError } from "@/lib/logger";
 import { rateLimit } from "@/lib/rate-limit";
-import { isProSubscription } from "@/lib/subscription";
+import { isProSubscription, textQuotaFor } from "@/lib/subscription";
+import { reserveGeneration, refundGeneration } from "@/lib/quota";
 
 function getAdmin() {
   return createClient(
@@ -76,28 +77,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    const limit = (isProSubscription(profile.subscription_status) ? 100 : 10) + (profile.bonus_generations ?? 0);
-    if (profile.generation_count >= limit) {
-      return NextResponse.json({ error: `Monthly limit reached (${limit})` }, { status: 403 });
+    const limit = textQuotaFor(profile.subscription_status) + (profile.bonus_generations ?? 0);
+
+    // Reserve atomically before the OpenAI call (TOCTOU-safe). false = over
+    // limit → 429 without spending.
+    const reserved = await reserveGeneration(supabase, userId, limit);
+    if (!reserved) {
+      return NextResponse.json({ error: `Monthly limit reached (${limit})` }, { status: 429 });
     }
 
-    const result = await generatePost({
-      platform: platform as Platform,
-      topic,
-      tone: (tone || "professional") as Tone,
-      language: language || "English",
-      brandVoice: profile.brand_voice || undefined,
-      model: isProSubscription(profile.subscription_status)
-        ? (profile.preferred_model || "gpt-4o-mini")
-        : "gpt-4o-mini",
-    });
-
-    const { error: incError } = await supabase.rpc("increment_generation_count", {
-      p_user_id: userId,
-      p_limit: limit,
-    });
-    if (incError) {
-      captureError("v1 generate: increment_generation_count failed", incError, { userId });
+    let result;
+    try {
+      result = await generatePost({
+        platform: platform as Platform,
+        topic,
+        tone: (tone || "professional") as Tone,
+        language: language || "English",
+        brandVoice: profile.brand_voice || undefined,
+        model: isProSubscription(profile.subscription_status)
+          ? (profile.preferred_model || "gpt-4o-mini")
+          : "gpt-4o-mini",
+      });
+    } catch (genError) {
+      await refundGeneration(supabase, userId).catch((err) =>
+        captureError("v1 generate: refund_generation failed", err, { userId })
+      );
+      throw genError;
     }
 
     return NextResponse.json({

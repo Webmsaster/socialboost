@@ -205,7 +205,7 @@ export default function SettingsPage() {
         .eq("id", user.id);
 
       if (error) throw error;
-      toast.success(t("settings.preferencesSaved") || "Notification preferences saved");
+      toast.success(t("settings.preferencesSaved"));
     } catch {
       toast.error("Failed to save preferences");
     }

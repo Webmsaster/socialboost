@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
 import { rateLimit } from "@/lib/rate-limit";
+import { validateTemplateInput } from "@/lib/validate-template";
 
 export async function GET() {
   try {
@@ -55,37 +56,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, platform, tone, topic, language } = body as {
-      name: string;
-      platform: string;
-      tone: string;
-      topic: string;
-      language: string;
-    };
-
-    if (!name || !platform || !tone) {
-      return NextResponse.json(
-        { error: "Missing required fields: name, platform, tone" },
-        { status: 400 }
-      );
+    const validation = validateTemplateInput(body);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-
-    const validPlatforms = ["linkedin", "facebook", "instagram", "pinterest", "twitter"];
-    const validTones = ["professional", "casual", "inspirational", "humorous", "educational"];
-
-    if (!validPlatforms.includes(platform)) {
-      return NextResponse.json(
-        { error: "Invalid platform" },
-        { status: 400 }
-      );
-    }
-
-    if (!validTones.includes(tone)) {
-      return NextResponse.json(
-        { error: "Invalid tone" },
-        { status: 400 }
-      );
-    }
+    const { name, platform, tone, topic, language } = validation.value;
 
     const { data, error } = await supabase
       .from("templates")
@@ -94,8 +69,8 @@ export async function POST(request: NextRequest) {
         name,
         platform,
         tone,
-        topic: topic || "",
-        language: language || "English",
+        topic,
+        language,
       })
       .select()
       .single();

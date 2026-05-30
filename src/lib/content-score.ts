@@ -45,6 +45,54 @@ export interface ScoreContentInput {
   hashtags?: string[];
 }
 
+// --- Concrete AI-cliché detection ---
+// The general STYLE_GUARDS prompt asks the model to avoid these, but it
+// doesn't always comply. When a slip-through lands in the user's draft, it's
+// far more useful to tell them WHICH word to fix and what to replace it
+// with than a vague "make it less generic".
+const CLICHE_REPLACEMENTS: Record<string, string> = {
+  leverage: "use",
+  harness: "use",
+  unlock: "open up",
+  "dive into": "look at",
+  "embark on": "start",
+  embrace: "adopt",
+  elevate: "improve",
+  empower: "help",
+  unprecedented: "unique",
+  "pave the way": "set up",
+  "game-changer": "shift",
+  "game changer": "shift",
+  revolutionize: "change",
+  "delve into": "explore",
+  tapestry: "mix",
+  realm: "area",
+  robust: "solid",
+  "ever-evolving": "changing",
+  transformative: "useful",
+  synergy: "fit",
+  seamless: "smooth",
+  "cutting-edge": "new",
+  "in today's fast-paced world": "today",
+};
+
+// Escape regex metacharacters so phrases are matched literally. Note: '-' is a
+// literal outside a character class, so it is intentionally NOT escaped —
+// phrases like "game-changer" still match.
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Precompile word-boundary regexes once at module scope. Using \b...\b avoids
+// substring false positives (e.g. "elevate" inside "elevated", "transform"
+// inside "transformation").
+const CLICHE_PATTERNS: { phrase: string; regex: RegExp }[] = Object.keys(
+  CLICHE_REPLACEMENTS,
+).map((phrase) => ({
+  phrase,
+  regex: new RegExp("\\b" + escapeRegExp(phrase) + "\\b", "i"),
+}));
+
 export function scoreContent({
   content,
   platform,
@@ -112,40 +160,11 @@ export function scoreContent({
     );
   }
 
-  // --- Concrete AI-cliché detection ---
-  // The general STYLE_GUARDS prompt asks the model to avoid these, but it
-  // doesn't always comply. When a slip-through lands in the user's draft, it's
-  // far more useful to tell them WHICH word to fix and what to replace it
-  // with than a vague "make it less generic".
-  const CLICHE_REPLACEMENTS: Record<string, string> = {
-    leverage: "use",
-    harness: "use",
-    unlock: "open up",
-    "dive into": "look at",
-    "embark on": "start",
-    embrace: "adopt",
-    elevate: "improve",
-    empower: "help",
-    unprecedented: "unique",
-    "pave the way": "set up",
-    "game-changer": "shift",
-    "game changer": "shift",
-    revolutionize: "change",
-    "delve into": "explore",
-    tapestry: "mix",
-    realm: "area",
-    robust: "solid",
-    "ever-evolving": "changing",
-    transformative: "useful",
-    synergy: "fit",
-    seamless: "smooth",
-    "cutting-edge": "new",
-    "in today's fast-paced world": "today",
-  };
-  const lc = content.toLowerCase();
+  // Match clichés on word boundaries (regex is case-insensitive) so we don't
+  // flag legitimate longer words that merely contain a cliché as a substring.
   const clicheHits: string[] = [];
-  for (const word of Object.keys(CLICHE_REPLACEMENTS)) {
-    if (lc.includes(word)) clicheHits.push(word);
+  for (const { phrase, regex } of CLICHE_PATTERNS) {
+    if (regex.test(content)) clicheHits.push(phrase);
   }
   if (clicheHits.length > 0) {
     score -= Math.min(15, clicheHits.length * 3);

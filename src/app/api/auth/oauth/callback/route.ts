@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
     if (!stateNonce || !cookieNonce || stateNonce !== cookieNonce || stateUserId !== user.id) {
       const res = NextResponse.redirect(new URL("/accounts?error=invalid_state", request.url));
       res.cookies.set("oauth_state", "", { maxAge: 0, path: "/" });
+      res.cookies.set("oauth_pkce_verifier", "", { maxAge: 0, path: "/" });
       return res;
     }
 
@@ -60,7 +61,10 @@ export async function GET(request: NextRequest) {
       new URL(request.url).origin;
     const redirectUri = `${baseUrl}/api/auth/oauth/callback`;
 
-    const result = await publisher.exchangeCode(code, redirectUri);
+    // Twitter/X PKCE: hand the stored verifier back during token exchange.
+    const codeVerifier = request.cookies.get("oauth_pkce_verifier")?.value;
+
+    const result = await publisher.exchangeCode(code, redirectUri, codeVerifier);
 
     // Upsert connected account
     const { error: dbError } = await supabase
@@ -85,9 +89,12 @@ export async function GET(request: NextRequest) {
 
     const res = NextResponse.redirect(new URL("/accounts?success=connected", request.url));
     res.cookies.set("oauth_state", "", { maxAge: 0, path: "/" });
+    res.cookies.set("oauth_pkce_verifier", "", { maxAge: 0, path: "/" });
     return res;
   } catch (err) {
     captureError("OAuth callback failed", err, { platform });
-    return NextResponse.redirect(new URL("/accounts?error=exchange_failed", request.url));
+    const res = NextResponse.redirect(new URL("/accounts?error=exchange_failed", request.url));
+    res.cookies.set("oauth_pkce_verifier", "", { maxAge: 0, path: "/" });
+    return res;
   }
 }

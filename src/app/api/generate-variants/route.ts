@@ -4,9 +4,8 @@ import { generateVariants, type Platform, type Tone } from "@/lib/openai";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
 import { trackEvent } from "@/lib/analytics";
-import { isProSubscription } from "@/lib/subscription";
-
-const PRO_LIMIT = 100;
+import { isProSubscription, textQuotaFor } from "@/lib/subscription";
+import { reserveGeneration, refundGeneration } from "@/lib/quota";
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,7 +51,7 @@ export async function POST(request: NextRequest) {
     // Check generation limit
     const { data: profile } = await supabase
       .from("profiles")
-      .select("generation_count, subscription_status, brand_voice, preferred_model")
+      .select("generation_count, subscription_status, brand_voice, preferred_model, bonus_generations")
       .eq("id", user.id)
       .single();
 
@@ -67,33 +66,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const limit = PRO_LIMIT;
+    // Same limit derivation as /api/generate: base plan quota (never hardcoded)
+    // plus referral bonus_generations. A variant request counts as 1 generation.
+    const limit = textQuotaFor(profile.subscription_status) + (profile.bonus_generations ?? 0);
 
-    if (profile.generation_count >= limit) {
+    // Reserve BEFORE the expensive OpenAI call to close the TOCTOU gap: the RPC
+    // atomically increments only if still under the limit, so concurrent
+    // requests can't both pass a stale read and over-spend. false = at/over
+    // limit → 429, without calling OpenAI.
+    const reserved = await reserveGeneration(supabase, user.id, limit);
+    if (!reserved) {
       return NextResponse.json(
         { error: `Monthly limit reached (${limit}). Upgrade to Pro for more.` },
-        { status: 403 }
+        { status: 429 }
       );
     }
 
     // Pro-only endpoint (guarded above) — always honor preferred_model
     const model = profile.preferred_model || "gpt-4o-mini";
 
-    const variants = await generateVariants({
-      platform,
-      topic,
-      tone,
-      language: language || "English",
-      count: validCount,
-      brandVoice: profile.brand_voice || undefined,
-      model,
-    });
-
-    // Counts as 1 generation, not per variant
-    await supabase.rpc("increment_generation_count", {
-      p_user_id: user.id,
-      p_limit: limit,
-    });
+    let variants;
+    try {
+      variants = await generateVariants({
+        platform,
+        topic,
+        tone,
+        language: language || "English",
+        count: validCount,
+        brandVoice: profile.brand_voice || undefined,
+        model,
+      });
+    } catch (genError) {
+      // Refund the reserved slot so a failed generation doesn't burn quota.
+      await refundGeneration(supabase, user.id).catch((err) =>
+        captureError("Failed to refund generation count", err, { userId: user.id })
+      );
+      throw genError;
+    }
 
     trackEvent({ event: "generate_variants", userId: user.id, properties: { platform, tone, count: validCount } });
 

@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
 import { trackEvent } from "@/lib/analytics";
-import { isProSubscription } from "@/lib/subscription";
+import { isProSubscription, TEXT_QUOTA_PRO } from "@/lib/subscription";
+import { reserveGeneration, refundGeneration } from "@/lib/quota";
 import { analyzeBrandVoice, brandVoiceProfileToText } from "@/lib/openai";
 
 const MAX_EXAMPLES = 20;
@@ -36,11 +37,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Voice extraction is a paid OpenAI call → count it against the monthly quota.
-    const limit = 100 + (profile.bonus_generations ?? 0);
-    if (profile.generation_count >= limit) {
-      return NextResponse.json({ error: `Monthly limit reached (${limit}).` }, { status: 403 });
-    }
+    // Voice extraction is a paid OpenAI call → count it against the monthly
+    // quota. Pro-only route, so the base is always the Pro text limit.
+    const limit = TEXT_QUOTA_PRO + (profile.bonus_generations ?? 0);
 
     const body = await request.json();
     const examplesRaw: unknown = body?.examples;
@@ -79,14 +78,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Reserve before the OpenAI call (TOCTOU-safe). false = over limit → 429.
+    const reserved = await reserveGeneration(supabase, user.id, limit);
+    if (!reserved) {
+      return NextResponse.json({ error: `Monthly limit reached (${limit}).` }, { status: 429 });
+    }
+
     // Use the Pro user's chosen model — voice extraction is exactly where the
     // higher-quality model matters most, and the result feeds every later
     // generation that uses this profile.
     const model = profile.preferred_model || "gpt-4o-mini";
-    const analyzed = await analyzeBrandVoice({ examples, model });
-    const text = brandVoiceProfileToText(analyzed);
-
-    await supabase.rpc("increment_generation_count", { p_user_id: user.id, p_limit: limit });
+    let analyzed;
+    let text;
+    try {
+      analyzed = await analyzeBrandVoice({ examples, model });
+      text = brandVoiceProfileToText(analyzed);
+    } catch (genError) {
+      await refundGeneration(supabase, user.id).catch((err) =>
+        captureError("brand-voice analyze: refund_generation failed", err, { userId: user.id })
+      );
+      throw genError;
+    }
 
     trackEvent({
       event: "brand_voice_trained",

@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
-import { isProSubscription } from "@/lib/subscription";
+import { isProSubscription, TEXT_QUOTA_PRO } from "@/lib/subscription";
+import { reserveGeneration, refundGeneration } from "@/lib/quota";
 import { parseSafeUrl } from "@/lib/ssrf";
-
-const PRO_LIMIT = 100;
 
 interface SceneInput {
   imageUrl: string;
@@ -47,12 +46,6 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       );
     }
-    if (profile.generation_count >= PRO_LIMIT) {
-      return NextResponse.json(
-        { error: `Monthly limit reached (${PRO_LIMIT}).` },
-        { status: 403 },
-      );
-    }
 
     const body = await request.json();
     const scenes: SceneInput[] = Array.isArray(body.scenes) ? body.scenes : [];
@@ -72,6 +65,17 @@ export async function POST(request: NextRequest) {
 
     const aspect =
       body.aspect === "16:9" || body.aspect === "1:1" ? body.aspect : "9:16";
+
+    // Reserve BEFORE invoking the render worker (TOCTOU-safe). false = over
+    // limit → 429 without rendering. Refunded below if the render fails or
+    // returns no usable URL, so failures never burn quota.
+    const reserved = await reserveGeneration(supabase, user.id, TEXT_QUOTA_PRO);
+    if (!reserved) {
+      return NextResponse.json(
+        { error: `Monthly limit reached (${TEXT_QUOTA_PRO}).` },
+        { status: 429 },
+      );
+    }
 
     const workerRes = await fetch(`${renderUrl.replace(/\/$/, "")}/render`, {
       method: "POST",
@@ -100,6 +104,10 @@ export async function POST(request: NextRequest) {
         status: workerRes.status,
         userId: user.id,
       });
+      // Refund the reserved slot — a failed render must not burn quota.
+      await refundGeneration(supabase, user.id).catch((err) =>
+        captureError("render-video: refund_generation failed", err, { userId: user.id })
+      );
       return NextResponse.json(
         { error: "Render failed. Please try again later." },
         { status: 502 },
@@ -110,22 +118,21 @@ export async function POST(request: NextRequest) {
       .json()
       .catch(() => ({ videoUrl: null }))) as { videoUrl: string | null };
 
-    // Only charge a generation if the worker actually returned a usable URL —
-    // a 200 with an empty/garbage body must not burn quota or show a fake success.
+    // Only keep the reserved generation if the worker actually returned a usable
+    // URL — a 200 with an empty/garbage body must refund and not show a fake
+    // success.
     if (!videoUrl || typeof videoUrl !== "string") {
       captureError("Render worker returned no videoUrl", new Error("missing videoUrl"), {
         userId: user.id,
       });
+      await refundGeneration(supabase, user.id).catch((err) =>
+        captureError("render-video: refund_generation failed", err, { userId: user.id })
+      );
       return NextResponse.json(
         { error: "Render failed. Please try again later." },
         { status: 502 },
       );
     }
-
-    await supabase.rpc("increment_generation_count", {
-      p_user_id: user.id,
-      p_limit: PRO_LIMIT,
-    });
 
     return NextResponse.json({ videoUrl });
   } catch (error) {

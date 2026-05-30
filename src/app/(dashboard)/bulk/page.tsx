@@ -22,6 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useRecentWebsites } from "@/lib/use-recent-websites";
+import { scoreContent } from "@/lib/content-score";
 
 const PLATFORMS = [
   { id: "linkedin", label: "LinkedIn" },
@@ -350,6 +351,12 @@ export default function BulkPage() {
         content: post.content,
         hashtags: post.hashtags,
         status: "draft",
+        // Score with THIS post's platform + hashtags, not a shared value.
+        content_score: scoreContent({
+          content: post.content,
+          platform: post.platform,
+          hashtags: post.hashtags,
+        }).score,
       });
 
       if (error) {
@@ -396,6 +403,12 @@ export default function BulkPage() {
         content: post.content,
         hashtags: post.hashtags,
         status: "draft" as const,
+        // Score each row with its own platform + hashtags.
+        content_score: scoreContent({
+          content: post.content,
+          platform: post.platform,
+          hashtags: post.hashtags,
+        }).score,
       }));
 
       const { error } = await supabase.from("posts").insert(rows);

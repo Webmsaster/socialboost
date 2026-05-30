@@ -4,7 +4,8 @@ import { repurposePost, type Platform } from "@/lib/openai";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
 import { trackEvent } from "@/lib/analytics";
-import { isProSubscription } from "@/lib/subscription";
+import { isProSubscription, textQuotaFor } from "@/lib/subscription";
+import { reserveGeneration, refundGeneration } from "@/lib/quota";
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,9 +41,18 @@ export async function POST(request: NextRequest) {
 
     if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
-    const limit = (isProSubscription(profile.subscription_status) ? 100 : 10) + (profile.bonus_generations ?? 0);
-    if (profile.generation_count >= limit) {
-      return NextResponse.json({ error: `Monthly limit reached (${limit})` }, { status: 403 });
+    // Referral rewards (bonus_generations) extend the monthly allowance on top
+    // of the base plan limit. Single source of truth in subscription.ts; never
+    // hardcode 10/100 here.
+    const limit = textQuotaFor(profile.subscription_status) + (profile.bonus_generations ?? 0);
+
+    // Reserve BEFORE the expensive OpenAI call to close the TOCTOU gap: the RPC
+    // atomically increments only if still under the limit, so concurrent
+    // requests can't both pass a stale read and over-spend. false = at/over
+    // limit → 429, without calling OpenAI.
+    const reserved = await reserveGeneration(supabase, user.id, limit);
+    if (!reserved) {
+      return NextResponse.json({ error: `Monthly limit reached (${limit})` }, { status: 429 });
     }
 
     const model = isProSubscription(profile.subscription_status)
@@ -51,20 +61,27 @@ export async function POST(request: NextRequest) {
 
     const results: Record<string, { content: string; hashtags: string[] }> = {};
 
-    for (const targetPlatform of targetPlatforms) {
-      if (targetPlatform === sourcePlatform) continue;
-      const result = await repurposePost({
-        original: content,
-        sourcePlatform,
-        targetPlatform,
-        language: language || "English",
-        brandVoice: profile.brand_voice || undefined,
-        model,
-      });
-      results[targetPlatform] = result;
+    try {
+      for (const targetPlatform of targetPlatforms) {
+        if (targetPlatform === sourcePlatform) continue;
+        const result = await repurposePost({
+          original: content,
+          sourcePlatform,
+          targetPlatform,
+          language: language || "English",
+          brandVoice: profile.brand_voice || undefined,
+          model,
+        });
+        results[targetPlatform] = result;
+      }
+    } catch (genError) {
+      // Refund the reserved slot so a failed repurpose doesn't burn quota.
+      await refundGeneration(supabase, user.id).catch((err) =>
+        captureError("Failed to refund generation count", err, { userId: user.id })
+      );
+      throw genError;
     }
 
-    await supabase.rpc("increment_generation_count", { p_user_id: user.id, p_limit: limit });
     trackEvent({ event: "repurpose_content", userId: user.id, properties: { sourcePlatform, targetCount: targetPlatforms.length } });
 
     return NextResponse.json({ results });

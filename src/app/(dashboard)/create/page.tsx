@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useRecentWebsites } from "@/lib/use-recent-websites";
 import { trackClient } from "@/lib/track-client";
+import { scoreContent } from "@/lib/content-score";
 import { PostPreview } from "@/components/post-preview";
 import {
   PLATFORM_LIMITS,
@@ -469,6 +470,11 @@ export default function CreatePage() {
     } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Score this specific content at save time. The single-post `contentScore`
+    // state is null for variants/carousel (and may be stale), so we always
+    // re-score from the exact content + hashtags being saved for THIS post.
+    const score = scoreContent({ content, platform, hashtags }).score;
+
     const { error } = await supabase.from("posts").insert({
       user_id: user.id,
       platform,
@@ -477,7 +483,7 @@ export default function CreatePage() {
       content,
       hashtags,
       status: "draft",
-      content_score: contentScore?.score ?? 0,
+      content_score: score,
     });
 
     if (error) {
@@ -488,7 +494,7 @@ export default function CreatePage() {
         platform,
         tone,
         contentType,
-        score: contentScore?.score ?? null,
+        score,
       });
     }
   }
