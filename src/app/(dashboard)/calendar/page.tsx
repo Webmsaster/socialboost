@@ -84,7 +84,7 @@ export default function CalendarPage() {
     const to = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from("posts")
-      .select("*")
+      .select("id, platform, topic, content, hashtags, tone, status, scheduled_for, created_at")
       .or(`and(created_at.gte.${from},created_at.lte.${to}),and(scheduled_for.gte.${from},scheduled_for.lte.${to})`)
       .order("created_at", { ascending: false })
       .limit(500);
