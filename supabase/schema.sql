@@ -50,7 +50,10 @@ create table if not exists public.posts (
   is_favorite boolean not null default false,
   status text not null default 'draft'
     check (status in ('draft', 'pending_review', 'approved', 'scheduled', 'published', 'failed')),
-  reviewed_by uuid references public.profiles(id),
+  -- Audit metadata, not ownership: when a reviewer's account is deleted the
+  -- reviewed post must survive, so SET NULL (RESTRICT would block deleting any
+  -- user who ever reviewed someone else's post).
+  reviewed_by uuid references public.profiles(id) on delete set null,
   reviewed_at timestamptz,
   review_note text,
   scheduled_for timestamptz,
@@ -525,3 +528,24 @@ drop policy if exists "Service role full access on stripe_events" on public.stri
 create policy "Service role full access on stripe_events"
   on public.stripe_events for all
   using (auth.role() = 'service_role');
+
+-- ============================================
+-- 16. Contact form submissions
+-- ============================================
+-- The public /api/contact endpoint persists submissions here via the
+-- service-role client. No user-facing access: only the service role (and admins
+-- through it) reads/writes, so RLS denies everything else by default.
+create table if not exists public.contact_messages (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  email text not null,
+  subject text not null,
+  message text not null,
+  created_at timestamptz not null default now()
+);
+alter table public.contact_messages enable row level security;
+drop policy if exists "Service role full access on contact_messages" on public.contact_messages;
+create policy "Service role full access on contact_messages"
+  on public.contact_messages for all
+  using (auth.role() = 'service_role');
+create index if not exists idx_contact_messages_created on public.contact_messages(created_at desc);

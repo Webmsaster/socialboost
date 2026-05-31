@@ -39,7 +39,9 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_content_series_user ON public.content_series(user_id);
 
 ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS media_url text;
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS reviewed_by uuid REFERENCES public.profiles(id);
+-- reviewed_by is audit metadata: SET NULL on reviewer deletion (not RESTRICT,
+-- which would block deleting any user who reviewed someone else's post).
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS reviewed_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL;
 ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS reviewed_at timestamptz;
 ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS review_note text;
 
