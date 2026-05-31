@@ -7,6 +7,7 @@ const mockEq = vi.fn();
 const mockSingle = vi.fn();
 const mockOrder = vi.fn();
 const mockDelete = vi.fn();
+const mockAdminDelete = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue({
@@ -47,6 +48,15 @@ vi.mock("@/lib/supabase/server", () => ({
         select: () => ({ eq: () => ({ single: () => mockSingle() }) }),
       };
     },
+  }),
+}));
+
+// org_members DELETE now goes through the service-role admin client.
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: () => ({
+    from: () => ({
+      delete: () => ({ eq: () => ({ eq: () => Promise.resolve(mockAdminDelete() ?? { error: null }) }) }),
+    }),
   }),
 }));
 
@@ -138,7 +148,7 @@ describe("/api/team/members", () => {
       mockSingle
         .mockResolvedValueOnce({ data: { role: "owner" } })
         .mockResolvedValueOnce({ data: { role: "member", user_id: "u2" } });
-      mockDelete.mockResolvedValueOnce({ error: null });
+      mockAdminDelete.mockReturnValueOnce({ error: null });
       const res = await DELETE(createDeleteRequest({ orgId: "org1", memberId: "m2" }));
       const json = await res.json();
       expect(res.status).toBe(200);

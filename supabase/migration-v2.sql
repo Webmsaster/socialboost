@@ -16,11 +16,16 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS preferred_model text NOT NU
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referral_code text UNIQUE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bonus_generations integer NOT NULL DEFAULT 0;
 
--- Protect new fields from client-side manipulation
+-- Protect new fields from client-side manipulation. Privileged writes pass when
+-- app.bypass_field_guard='on' (set by the SECURITY DEFINER RPCs — PG16+ forbids
+-- setting `role` inside SECDEF) or role='service_role' (admin client).
+-- migration-video-quota.sql extends this list with the video-quota columns
+-- (canonical final version).
 CREATE OR REPLACE FUNCTION public.protect_profile_fields()
 RETURNS trigger AS $$
 BEGIN
-  IF current_setting('role') != 'service_role' THEN
+  IF current_setting('app.bypass_field_guard', true) IS DISTINCT FROM 'on'
+     AND current_setting('role', true) IS DISTINCT FROM 'service_role' THEN
     new.subscription_status := old.subscription_status;
     new.generation_count := old.generation_count;
     new.generation_reset_at := old.generation_reset_at;
@@ -46,14 +51,8 @@ CREATE TABLE IF NOT EXISTS public.referrals (
 );
 
 ALTER TABLE public.referrals ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can read own referrals"
-  ON public.referrals FOR SELECT
-  USING (auth.uid() = referrer_id);
-
-CREATE POLICY "Service role full access on referrals"
-  ON public.referrals FOR ALL
-  USING (auth.role() = 'service_role');
+-- RLS policies for referrals are defined canonically in schema.sql; removed here
+-- to avoid duplicate "already exists" errors on a clean restore (schema.sql runs first).
 
 -- ============================================
 -- 3. Organizations (Team/Agency Plan)
@@ -74,7 +73,7 @@ ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS public.org_members (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
-  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE,  -- nullable: pending invites have no user_id yet (matches schema.sql)
   role text NOT NULL DEFAULT 'member'
     CHECK (role IN ('owner', 'admin', 'member')),
   invited_email text,
@@ -85,21 +84,15 @@ CREATE TABLE IF NOT EXISTS public.org_members (
 
 ALTER TABLE public.org_members ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Org members can read own org"
-  ON public.organizations FOR SELECT
-  USING (id IN (SELECT org_id FROM public.org_members WHERE user_id = auth.uid()));
+-- NOTE: these org_members/organizations SELECT policies were self-referential
+-- (org_members subqueried from inside an org_members policy) → 42P17 infinite
+-- recursion that broke the entire Teams feature. They are no longer defined
+-- here. The canonical, non-recursive policy set lives in schema.sql +
+-- migration-teams-rls-fix.sql (via the SECURITY DEFINER helper public.is_org_member).
+-- Do NOT re-add a recursive org_members policy.
 
-CREATE POLICY "Org members can read membership"
-  ON public.org_members FOR SELECT
-  USING (org_id IN (SELECT org_id FROM public.org_members WHERE user_id = auth.uid()));
-
-CREATE POLICY "Service role full access on organizations"
-  ON public.organizations FOR ALL
-  USING (auth.role() = 'service_role');
-
-CREATE POLICY "Service role full access on org_members"
-  ON public.org_members FOR ALL
-  USING (auth.role() = 'service_role');
+-- Service-role policies for organizations/org_members are defined canonically in
+-- schema.sql; removed here to avoid duplicate-policy errors on a clean restore.
 
 -- ============================================
 -- 4. Post metrics for performance tracking

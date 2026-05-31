@@ -42,8 +42,11 @@ export interface PlatformPublisher {
     hashtags?: string[],
     options?: PublishOptions
   ): Promise<PublishResult>;
-  getAuthUrl(redirectUri: string, state: string): string;
-  exchangeCode(code: string, redirectUri: string): Promise<{
+  // `codeChallenge` is only used by providers that require PKCE (Twitter/X);
+  // other providers ignore it, keeping the signature backward-compatible.
+  getAuthUrl(redirectUri: string, state: string, codeChallenge?: string): string;
+  // `codeVerifier` is the PKCE verifier paired with the challenge above.
+  exchangeCode(code: string, redirectUri: string, codeVerifier?: string): Promise<{
     accessToken: string;
     refreshToken?: string;
     expiresAt?: Date;

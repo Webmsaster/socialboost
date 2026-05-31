@@ -27,10 +27,13 @@ describe("isProSubscription", () => {
     expect(isProSubscription("active")).toBe(true);
   });
 
+  it("returns true for past_due (Stripe dunning grace period)", () => {
+    expect(isProSubscription("past_due")).toBe(true);
+  });
+
   it("returns false for other statuses", () => {
     expect(isProSubscription("canceled")).toBe(false);
     expect(isProSubscription("trialing")).toBe(false);
-    expect(isProSubscription("past_due")).toBe(false);
     expect(isProSubscription("unpaid")).toBe(false);
     expect(isProSubscription("incomplete")).toBe(false);
   });

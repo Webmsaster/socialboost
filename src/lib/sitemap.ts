@@ -1,5 +1,5 @@
 import { captureError } from "./logger";
-import { parseSafeUrl } from "./ssrf";
+import { parseSafeUrl, safeFetch } from "./ssrf";
 
 const MAX_XML_BYTES = 2_000_000; // 2 MB — enough for a few thousand URLs
 const FETCH_TIMEOUT_MS = 10_000;
@@ -38,8 +38,7 @@ async function fetchXml(url: string): Promise<string | null> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      redirect: "follow",
+    const res = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         "user-agent": "SocialBoost/1.0 (+https://socialboost.app)",

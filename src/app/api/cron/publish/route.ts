@@ -5,6 +5,7 @@ import { sendPostPublishedEmail, sendPublishFailedEmail, sendScheduledReminderEm
 import { logAudit } from "@/lib/audit-log";
 import { dispatchWebhooks } from "@/lib/webhook-dispatcher";
 import { trackEvent } from "@/lib/analytics";
+import { encryptToken, decryptToken } from "@/lib/token-crypto";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -15,7 +16,10 @@ function getSupabaseAdmin() {
 
 /**
  * Cron-ready endpoint: processes posts that are scheduled and past due.
- * Call via Vercel Cron or external scheduler every 5 minutes.
+ * Scheduled daily at 08:00 UTC (vercel.json) on the Hobby tier, which caps
+ * crons at 1×/day — so a post can publish up to ~24h after its scheduled time.
+ * For near-real-time publishing, point an external scheduler (e.g. cron-job.org)
+ * at this route every few minutes with the same CRON_SECRET bearer token.
  * Secured via CRON_SECRET header.
  *
  * For users without an OAuth-connected account on the post's platform we
@@ -31,15 +35,12 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabaseAdmin();
 
-  // Reset generation counts for users whose reset date has passed
-  const { error: resetError } = await supabase
-    .from("profiles")
-    .update({ generation_count: 0, generation_reset_at: new Date().toISOString() })
-    .lt("generation_reset_at", new Date().toISOString());
-
-  if (resetError) {
-    captureError("Cron: failed to reset generation counts", resetError);
-  }
+  // NOTE: monthly quota reset is handled lazily inside the
+  // increment_generation_count / increment_video_generation_count RPCs
+  // (calendar-month check on the first call of a new month). We must NOT
+  // mass-reset here: `generation_reset_at < now()` matches every row on
+  // every run, so this would zero every user's quota on each cron tick and
+  // effectively grant unlimited free generations.
 
   // Find all posts scheduled for a time in the past that are still "scheduled"
   const { data: posts, error: fetchError } = await supabase
@@ -88,25 +89,68 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Tokens are encrypted at rest — decrypt before handing them to the
+      // token refresher and the platform publisher (which call the live APIs).
+      // decryptToken THROWS on malformed ciphertext; isolate it per-row so one
+      // corrupt token marks just this post failed instead of aborting the batch.
+      try {
+        account.access_token = decryptToken(account.access_token);
+        account.refresh_token = decryptToken(account.refresh_token);
+      } catch (err) {
+        captureError("Cron: token decrypt failed", err, { postId: post.id, platform: post.platform });
+        await supabase
+          .from("posts")
+          .update({ status: "failed", error_message: "token_decrypt_failed" })
+          .eq("id", post.id);
+        failed++;
+
+        const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
+        if (profile?.email) {
+          sendPublishFailedEmail(profile.email, post.platform, "token_decrypt_failed").catch(
+            (err) => captureError("Cron: sendPublishFailedEmail failed", err)
+          );
+        }
+        continue;
+      }
+
       const { getPublisher, ensureFreshToken } = await import("@/lib/platforms/registry");
       const publisher = getPublisher(account.platform);
 
-      // Refresh expiring tokens before publishing
+      // Refresh expiring tokens before publishing. If the refresh FAILS we must
+      // NOT hand the stale/empty token to the publisher — skip publishing,
+      // mark the post failed (surfaced via the History "Retry" affordance) and
+      // continue to the next post.
       try {
         const { account: freshAccount, refreshed } = await ensureFreshToken(account);
         if (refreshed) {
+          if (!freshAccount.access_token) {
+            throw new Error("token refresh returned no access token");
+          }
           await supabase
             .from("connected_accounts")
             .update({
-              access_token: freshAccount.access_token,
-              refresh_token: freshAccount.refresh_token,
+              access_token: encryptToken(freshAccount.access_token),
+              refresh_token: encryptToken(freshAccount.refresh_token),
               token_expires_at: freshAccount.token_expires_at,
             })
             .eq("id", freshAccount.id);
           Object.assign(account, freshAccount);
         }
       } catch (err) {
-        captureError("Cron: token refresh failed", err, { platform: account.platform });
+        captureError("Cron: token refresh failed", err, { postId: post.id, platform: account.platform });
+        await supabase
+          .from("posts")
+          .update({ status: "failed", error_message: "token_refresh_failed" })
+          .eq("id", post.id);
+        failed++;
+
+        const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
+        if (profile?.email) {
+          sendPublishFailedEmail(profile.email, post.platform, "token_refresh_failed").catch(
+            (err) => captureError("Cron: sendPublishFailedEmail failed", err)
+          );
+        }
+        continue;
       }
 
       if (!publisher) {

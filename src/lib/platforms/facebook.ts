@@ -72,7 +72,9 @@ export const facebookPublisher: PlatformPublisher = {
     const tokens = await tokenRes.json();
 
     const userRes = await fetch(`https://graph.facebook.com/v19.0/me?access_token=${tokens.access_token}`);
+    if (!userRes.ok) throw new Error(`Facebook profile fetch failed: ${userRes.status}`);
     const user = await userRes.json();
+    if (!user?.id) throw new Error("Facebook profile response missing id");
 
     return {
       accessToken: tokens.access_token,

@@ -19,7 +19,8 @@ export function getStripe() {
 export async function createCheckoutSession(
   userId: string,
   email: string,
-  plan: "monthly" | "annual" = "monthly"
+  plan: "monthly" | "annual" = "monthly",
+  customerId?: string | null
 ) {
   const stripe = getStripe();
 
@@ -31,7 +32,13 @@ export async function createCheckoutSession(
         process.env.NEXT_PUBLIC_STRIPE_PRICE_ID!;
 
   return stripe.checkout.sessions.create({
-    customer_email: email,
+    // Reuse the existing Stripe customer when we already have one so a
+    // re-subscribe (cancel → subscribe again) doesn't mint a duplicate
+    // customer. Duplicates fragment billing history and, worse, cause later
+    // subscription events keyed on the old customer id to match no profile
+    // (so a cancellation never revokes access). Fall back to customer_email
+    // only for a first-time checkout.
+    ...(customerId ? { customer: customerId } : { customer_email: email }),
     mode: "subscription",
     line_items: [
       {

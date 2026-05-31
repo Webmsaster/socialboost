@@ -36,7 +36,20 @@ export async function POST(request: NextRequest) {
       // No body or invalid JSON — default to monthly
     }
 
-    const session = await createCheckoutSession(user.id, user.email, plan);
+    // Reuse an existing Stripe customer if this user already has one, so a
+    // re-subscribe (cancel → subscribe again) doesn't mint a duplicate customer.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("stripe_customer_id")
+      .eq("id", user.id)
+      .single();
+
+    const session = await createCheckoutSession(
+      user.id,
+      user.email,
+      plan,
+      profile?.stripe_customer_id ?? null,
+    );
     return NextResponse.json({ url: session.url });
   } catch (error) {
     captureError("Checkout error", error);

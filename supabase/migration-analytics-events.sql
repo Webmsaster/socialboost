@@ -23,13 +23,16 @@ CREATE TABLE IF NOT EXISTS public.analytics_events (
 
 ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
 
--- Writes only happen via service-role from the server (see src/lib/analytics.ts
--- and the /api/track endpoint). End users have no need to read the raw events.
--- Authenticated users may insert their own events via /api/track which validates
--- the user_id matches auth.uid().
+-- Writes only happen via service-role from the server (see src/lib/analytics.ts,
+-- which /api/track also calls) — and service-role bypasses RLS, so no end-user
+-- INSERT/SELECT policy is needed. RLS stays enabled with NO end-user policy,
+-- which blocks direct client access entirely.
+--
+-- The previous `WITH CHECK (user_id = auth.uid() OR user_id IS NULL)` policy let
+-- any authenticated user INSERT rows directly with their anon key — forging
+-- events for anyone (or anonymous via user_id IS NULL) and flooding the table,
+-- bypassing the event whitelist + rate limit in /api/track. Dropped.
 DROP POLICY IF EXISTS analytics_events_owner_insert ON public.analytics_events;
-CREATE POLICY analytics_events_owner_insert ON public.analytics_events
-  FOR INSERT WITH CHECK (user_id = auth.uid() OR user_id IS NULL);
 
 -- Common access patterns for the analytics dashboard / ad-hoc queries.
 CREATE INDEX IF NOT EXISTS idx_analytics_events_event_created

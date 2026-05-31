@@ -28,15 +28,36 @@ const ASPECT_DIMENSIONS: Record<Aspect, { w: number; h: number }> = {
 const FPS = 30;
 const FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
 
+// Internal DoS caps for the standalone worker.
+const MAX_DOWNLOAD_BYTES = 10 * 1024 * 1024; // 10MB per fetched asset
+const FFMPEG_TIMEOUT_MS = 120_000; // kill ffmpeg after 120s
+
 function ffmpegRun(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const proc = spawn("ffmpeg", args, { stdio: ["ignore", "pipe", "pipe"] });
     let stderr = "";
+    let timedOut = false;
+
+    // Kill runaway ffmpeg processes so a single job cannot pin the worker.
+    const timer = setTimeout(() => {
+      timedOut = true;
+      proc.kill("SIGKILL");
+    }, FFMPEG_TIMEOUT_MS);
+
     proc.stderr.on("data", (d) => (stderr += d.toString()));
-    proc.on("error", reject);
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
     proc.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`ffmpeg exit ${code}: ${stderr.slice(-1200)}`));
+      clearTimeout(timer);
+      if (timedOut) {
+        reject(new Error(`ffmpeg timed out after ${FFMPEG_TIMEOUT_MS}ms`));
+      } else if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`ffmpeg exit ${code}: ${stderr.slice(-1200)}`));
+      }
     });
   });
 }
@@ -44,8 +65,39 @@ function ffmpegRun(args: string[]): Promise<void> {
 async function downloadToFile(url: string, dest: string): Promise<void> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Download ${url} failed: ${res.status}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  await writeFile(dest, buf);
+
+  // Fast path: reject before reading the body if Content-Length is too large.
+  const declared = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_DOWNLOAD_BYTES) {
+    throw new Error(`Download ${url} too large: ${declared} bytes (max ${MAX_DOWNLOAD_BYTES})`);
+  }
+
+  // Stream the body and abort once the cumulative size exceeds the cap, in case
+  // Content-Length is missing or lies.
+  const body = res.body;
+  if (!body) throw new Error(`Download ${url} failed: empty body`);
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const reader = body.getReader();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+        if (total > MAX_DOWNLOAD_BYTES) {
+          await reader.cancel();
+          throw new Error(`Download ${url} exceeded ${MAX_DOWNLOAD_BYTES} bytes`);
+        }
+        chunks.push(value);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  await writeFile(dest, Buffer.concat(chunks));
 }
 
 export async function renderVideo(req: RenderRequest): Promise<string> {

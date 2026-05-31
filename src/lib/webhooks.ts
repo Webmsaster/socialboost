@@ -1,5 +1,5 @@
 import { captureError } from "@/lib/logger";
-import { parseSafeUrl } from "@/lib/ssrf";
+import { parseSafeUrl, safeFetch } from "@/lib/ssrf";
 
 interface WebhookPayload {
   event: string;
@@ -31,7 +31,7 @@ export async function fireWebhook(
   };
 
   try {
-    const res = await fetch(safe.toString(), {
+    const res = await safeFetch(safe.toString(), {
       method: "POST",
       headers: { "Content-Type": "application/json", "User-Agent": "SocialBoost-Webhook/1.0" },
       body: JSON.stringify(payload),

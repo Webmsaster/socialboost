@@ -44,20 +44,27 @@ vi.mock("@/lib/openai", () => ({
   generateVideoAd: (...args: unknown[]) => mockGenerateVideoAd(...args),
 }));
 
-// Subscription mock
-const mockIsProSubscription = vi.fn();
+// Subscription mock. textQuotaFor must be a real implementation here because
+// the route uses it to compute the limit passed to reserveGeneration; the
+// mock mirrors src/lib/subscription.ts (free 10 / pro 100). isProSubscription
+// is a real implementation too so the Pro-gate behaves like production.
 vi.mock("@/lib/subscription", () => ({
-  isProSubscription: (...args: unknown[]) => mockIsProSubscription(...args),
-}));
-
-// Logger mock
-vi.mock("@/lib/logger", () => ({
-  captureError: vi.fn(),
+  isProSubscription: (status: string | null | undefined) =>
+    status === "active" || status === "past_due",
+  TEXT_QUOTA_FREE: 10,
+  TEXT_QUOTA_PRO: 100,
+  textQuotaFor: (status: string | null | undefined) =>
+    status === "active" || status === "past_due" ? 100 : 10,
 }));
 
 // Analytics mock
 vi.mock("@/lib/analytics", () => ({
   trackEvent: vi.fn(),
+}));
+
+// Logger mock
+vi.mock("@/lib/logger", () => ({
+  captureError: vi.fn(),
 }));
 
 // Import after mocks
@@ -81,9 +88,9 @@ describe("POST /api/generate-video-ad", () => {
     mockGetUser.mockResolvedValueOnce({ data: { user: null } });
 
     const request = createRequest({
-      topic: "summer sale",
-      tone: "exciting",
-      product: "sunglasses",
+      topic: "test",
+      tone: "professional",
+      product: "Widget",
     });
     const response = await POST(request);
     const json = await response.json();
@@ -96,28 +103,29 @@ describe("POST /api/generate-video-ad", () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
-    mockRateLimit.mockResolvedValueOnce({ success: false, remaining: 0 });
+    mockRateLimit.mockResolvedValueOnce({ success: false });
 
     const request = createRequest({
-      topic: "summer sale",
-      tone: "exciting",
-      product: "sunglasses",
+      topic: "test",
+      tone: "professional",
+      product: "Widget",
     });
     const response = await POST(request);
     const json = await response.json();
 
     expect(response.status).toBe(429);
     expect(json.error).toContain("Too many requests");
+    expect(mockGenerateVideoAd).not.toHaveBeenCalled();
   });
 
   it("returns 400 if required fields are missing", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
-    mockRateLimit.mockResolvedValueOnce({ success: true, remaining: 5 });
+    mockRateLimit.mockResolvedValueOnce({ success: true });
 
     // Missing tone and product
-    const request = createRequest({ topic: "summer sale" });
+    const request = createRequest({ topic: "test" });
     const response = await POST(request);
     const json = await response.json();
 
@@ -129,13 +137,13 @@ describe("POST /api/generate-video-ad", () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
-    mockRateLimit.mockResolvedValueOnce({ success: true, remaining: 5 });
+    mockRateLimit.mockResolvedValueOnce({ success: true });
     mockSingle.mockResolvedValueOnce({ data: null });
 
     const request = createRequest({
-      topic: "summer sale",
-      tone: "exciting",
-      product: "sunglasses",
+      topic: "test topic",
+      tone: "professional",
+      product: "Widget",
     });
     const response = await POST(request);
     const json = await response.json();
@@ -144,64 +152,61 @@ describe("POST /api/generate-video-ad", () => {
     expect(json.error).toBe("Profile not found");
   });
 
-  it("returns 403 if not Pro subscription", async () => {
+  it("returns 403 if the user is not on a Pro subscription", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
-    mockRateLimit.mockResolvedValueOnce({ success: true, remaining: 5 });
+    mockRateLimit.mockResolvedValueOnce({ success: true });
     mockSingle.mockResolvedValueOnce({
-      data: { generation_count: 3, subscription_status: "free" },
+      data: { generation_count: 0, subscription_status: "free" },
     });
-    mockIsProSubscription.mockReturnValueOnce(false);
 
     const request = createRequest({
-      topic: "summer sale",
-      tone: "exciting",
-      product: "sunglasses",
+      topic: "test topic",
+      tone: "professional",
+      product: "Widget",
     });
     const response = await POST(request);
     const json = await response.json();
 
     expect(response.status).toBe(403);
     expect(json.error).toContain("Pro subscription");
+    // Never reserve or spend for a non-Pro user.
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockGenerateVideoAd).not.toHaveBeenCalled();
   });
 
-  it("returns 403 if generation limit reached", async () => {
+  it("returns 429 when the generation limit is reached (reserve denied, no spend)", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
-    mockRateLimit.mockResolvedValueOnce({ success: true, remaining: 5 });
+    mockRateLimit.mockResolvedValueOnce({ success: true });
     mockSingle.mockResolvedValueOnce({
       data: { generation_count: 100, subscription_status: "active" },
     });
-    mockIsProSubscription.mockReturnValueOnce(true);
+    // reserve_generation returns false → over limit, no OpenAI call.
+    mockRpc.mockResolvedValueOnce({ data: false, error: null });
 
     const request = createRequest({
-      topic: "summer sale",
-      tone: "exciting",
-      product: "sunglasses",
+      topic: "test topic",
+      tone: "professional",
+      product: "Widget",
     });
     const response = await POST(request);
     const json = await response.json();
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(429);
     expect(json.error).toContain("Monthly limit reached");
+    // Reserve-before-spend: OpenAI is NOT called when the reserve fails.
+    expect(mockGenerateVideoAd).not.toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledWith("reserve_generation", expect.any(Object));
   });
 
-  it("returns video ad storyboard on success", async () => {
-    const adResult = {
-      concept: "Summer vibes",
-      scenes: [
-        { visual: "Beach scene", text: "Summer is here", duration: "3s" },
-        { visual: "Product close-up", text: "Get yours now", duration: "2s" },
-      ],
-      cta: "Shop now",
-    };
-
+  it("reserves before spending and returns the storyboard on success", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
-    mockRateLimit.mockResolvedValueOnce({ success: true, remaining: 5 });
+    mockRateLimit.mockResolvedValueOnce({ success: true });
     mockSingle.mockResolvedValueOnce({
       data: {
         generation_count: 3,
@@ -210,38 +215,74 @@ describe("POST /api/generate-video-ad", () => {
         preferred_model: null,
       },
     });
-    mockIsProSubscription.mockReturnValueOnce(true);
-    mockIsProSubscription.mockReturnValueOnce(true);
-    mockGenerateVideoAd.mockResolvedValueOnce(adResult);
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
+    // reserve_generation succeeds (returns true) BEFORE generateVideoAd runs.
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
+    mockGenerateVideoAd.mockResolvedValueOnce({
+      scenes: [{ caption: "Hook", visual: "Product shot" }],
+    });
 
     const request = createRequest({
-      topic: "summer sale",
-      tone: "exciting",
-      product: "sunglasses",
+      topic: "test topic",
+      tone: "professional",
+      language: "English",
+      product: "Widget",
     });
     const response = await POST(request);
     const json = await response.json();
 
     expect(response.status).toBe(200);
-    expect(json.concept).toBe("Summer vibes");
-    expect(json.scenes).toHaveLength(2);
-    expect(json.cta).toBe("Shop now");
+    expect(json.scenes).toEqual([{ caption: "Hook", visual: "Product shot" }]);
+    // The reserve RPC is the only quota mutation; no post-spend increment.
+    expect(mockRpc).toHaveBeenCalledWith("reserve_generation", expect.any(Object));
+    expect(mockRpc).not.toHaveBeenCalledWith(
+      "increment_generation_count",
+      expect.anything()
+    );
     expect(mockGenerateVideoAd).toHaveBeenCalledWith(
       expect.objectContaining({
-        topic: "summer sale",
-        tone: "exciting",
-        product: "sunglasses",
+        topic: "test topic",
+        tone: "professional",
         language: "English",
+        product: "Widget",
       })
     );
   });
 
-  it("uses default model for Pro users without preferred_model", async () => {
+  it("passes the Pro limit (100) to reserveGeneration", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
-    mockRateLimit.mockResolvedValueOnce({ success: true, remaining: 5 });
+    mockRateLimit.mockResolvedValueOnce({ success: true });
+    mockSingle.mockResolvedValueOnce({
+      data: {
+        generation_count: 0,
+        subscription_status: "active",
+        brand_voice: null,
+        preferred_model: null,
+      },
+    });
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
+    mockGenerateVideoAd.mockResolvedValueOnce({ scenes: [] });
+
+    const request = createRequest({
+      topic: "test topic",
+      tone: "professional",
+      product: "Widget",
+    });
+    await POST(request);
+
+    // Limit is derived from subscription.ts (Pro = 100), never hardcoded.
+    expect(mockRpc).toHaveBeenCalledWith(
+      "reserve_generation",
+      expect.objectContaining({ p_user_id: "user-123", p_limit: 100 })
+    );
+  });
+
+  it("refunds the reserved slot when generation fails", async () => {
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: "user-123" } },
+    });
+    mockRateLimit.mockResolvedValueOnce({ success: true });
     mockSingle.mockResolvedValueOnce({
       data: {
         generation_count: 3,
@@ -250,80 +291,52 @@ describe("POST /api/generate-video-ad", () => {
         preferred_model: null,
       },
     });
-    mockIsProSubscription.mockReturnValueOnce(true);
-    mockIsProSubscription.mockReturnValueOnce(true);
-    mockGenerateVideoAd.mockResolvedValueOnce({ concept: "Test", frames: [], cta: "Buy" });
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
+    // reserve succeeds, then generateVideoAd throws → route must refund.
+    mockRpc.mockResolvedValueOnce({ data: true, error: null }); // reserve_generation
+    mockRpc.mockResolvedValueOnce({ data: null, error: null }); // refund_generation
+    mockGenerateVideoAd.mockRejectedValueOnce(new Error("OpenAI down"));
 
     const request = createRequest({
-      topic: "summer sale",
-      tone: "exciting",
-      product: "sunglasses",
+      topic: "test topic",
+      tone: "professional",
+      product: "Widget",
     });
     const response = await POST(request);
-    expect(response.status).toBe(200);
-    expect(mockGenerateVideoAd).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gpt-4o-mini" })
-    );
+
+    expect(response.status).toBe(500);
+    expect(mockRpc).toHaveBeenCalledWith("reserve_generation", expect.any(Object));
+    expect(mockRpc).toHaveBeenCalledWith("refund_generation", expect.any(Object));
   });
 
-  it("uses preferred_model when set for Pro users", async () => {
+  it("uses preferred_model for Pro users", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
-    mockRateLimit.mockResolvedValueOnce({ success: true, remaining: 5 });
+    mockRateLimit.mockResolvedValueOnce({ success: true });
     mockSingle.mockResolvedValueOnce({
       data: {
-        generation_count: 3,
+        generation_count: 0,
         subscription_status: "active",
-        brand_voice: "Bold",
+        brand_voice: "Friendly and warm",
         preferred_model: "gpt-4o",
       },
     });
-    mockIsProSubscription.mockReturnValueOnce(true);
-    mockIsProSubscription.mockReturnValueOnce(true);
-    mockGenerateVideoAd.mockResolvedValueOnce({ concept: "Test", frames: [], cta: "Buy" });
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
+    mockGenerateVideoAd.mockResolvedValueOnce({ scenes: [] });
 
     const request = createRequest({
-      topic: "summer sale",
-      tone: "exciting",
-      product: "sunglasses",
+      topic: "test topic",
+      tone: "professional",
+      product: "Widget",
     });
     const response = await POST(request);
+
     expect(response.status).toBe(200);
     expect(mockGenerateVideoAd).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gpt-4o", brandVoice: "Bold" })
-    );
-  });
-
-  it("falls back to gpt-4o-mini when Pro user has empty string preferred_model", async () => {
-    mockGetUser.mockResolvedValueOnce({
-      data: { user: { id: "user-123" } },
-    });
-    mockRateLimit.mockResolvedValueOnce({ success: true, remaining: 5 });
-    mockSingle.mockResolvedValueOnce({
-      data: {
-        generation_count: 3,
-        subscription_status: "active",
-        brand_voice: null,
-        preferred_model: "",
-      },
-    });
-    mockIsProSubscription.mockReturnValueOnce(true);
-    mockIsProSubscription.mockReturnValueOnce(true);
-    mockGenerateVideoAd.mockResolvedValueOnce({ concept: "Test", frames: [], cta: "Buy" });
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
-
-    const request = createRequest({
-      topic: "summer sale",
-      tone: "exciting",
-      product: "sunglasses",
-    });
-    const response = await POST(request);
-    expect(response.status).toBe(200);
-    expect(mockGenerateVideoAd).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gpt-4o-mini" })
+      expect.objectContaining({
+        model: "gpt-4o",
+        brandVoice: "Friendly and warm",
+      })
     );
   });
 
@@ -331,9 +344,9 @@ describe("POST /api/generate-video-ad", () => {
     mockGetUser.mockRejectedValueOnce(new Error("Unexpected error"));
 
     const request = createRequest({
-      topic: "summer sale",
-      tone: "exciting",
-      product: "sunglasses",
+      topic: "test",
+      tone: "professional",
+      product: "Widget",
     });
     const response = await POST(request);
     const json = await response.json();

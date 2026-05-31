@@ -1,4 +1,21 @@
+import { createHash, randomBytes } from "node:crypto";
 import type { ConnectedAccount, PlatformPublisher, PublishResult } from "./index";
+
+/**
+ * Generate a PKCE code verifier: 32 random bytes encoded as base64url
+ * (RFC 7636 allows 43-128 chars; 32 bytes -> 43 base64url chars).
+ */
+export function generateCodeVerifier(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+/**
+ * Derive the S256 PKCE code challenge from a verifier:
+ * challenge = base64url(sha256(verifier)).
+ */
+export function deriveCodeChallenge(verifier: string): string {
+  return createHash("sha256").update(verifier).digest("base64url");
+}
 
 export const twitterPublisher: PlatformPublisher = {
   async publish(account: ConnectedAccount, content: string, hashtags?: string[]): Promise<PublishResult> {
@@ -28,9 +45,10 @@ export const twitterPublisher: PlatformPublisher = {
     }
   },
 
-  getAuthUrl(redirectUri: string, state: string): string {
+  getAuthUrl(redirectUri: string, state: string, codeChallenge?: string): string {
     const clientId = process.env.TWITTER_CLIENT_ID;
     if (!clientId) throw new Error("TWITTER_CLIENT_ID not configured");
+    if (!codeChallenge) throw new Error("Twitter OAuth requires a PKCE code challenge");
 
     const params = new URLSearchParams({
       response_type: "code",
@@ -38,13 +56,15 @@ export const twitterPublisher: PlatformPublisher = {
       redirect_uri: redirectUri,
       state,
       scope: "tweet.read tweet.write users.read offline.access",
-      code_challenge: "challenge",
-      code_challenge_method: "plain",
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
     });
     return `https://twitter.com/i/oauth2/authorize?${params}`;
   },
 
-  async exchangeCode(code: string, redirectUri: string) {
+  async exchangeCode(code: string, redirectUri: string, codeVerifier?: string) {
+    if (!codeVerifier) throw new Error("Twitter OAuth requires a PKCE code verifier");
+
     const res = await fetch("https://api.twitter.com/2/oauth2/token", {
       method: "POST",
       headers: {
@@ -55,7 +75,7 @@ export const twitterPublisher: PlatformPublisher = {
         grant_type: "authorization_code",
         code,
         redirect_uri: redirectUri,
-        code_verifier: "challenge",
+        code_verifier: codeVerifier,
       }),
     });
 
@@ -65,7 +85,9 @@ export const twitterPublisher: PlatformPublisher = {
     const userRes = await fetch("https://api.twitter.com/2/users/me", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
+    if (!userRes.ok) throw new Error(`Twitter profile fetch failed: ${userRes.status}`);
     const user = await userRes.json();
+    if (!user?.data?.id) throw new Error("Twitter profile response missing data.id");
 
     return {
       accessToken: tokens.access_token,

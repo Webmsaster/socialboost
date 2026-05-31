@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { captureError } from "@/lib/logger";
+
+// org_members writes go through service-role (RLS denies direct end-user writes).
+function getAdmin() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 // GET: List all members of an organization
 export async function GET(request: NextRequest) {
@@ -86,7 +95,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Cannot remove the owner" }, { status: 403 });
     }
 
-    const { error } = await supabase
+    // Service-role write (RLS denies direct end-user org_members writes); the
+    // route has already verified the caller is an accepted owner/admin and the
+    // target is not the owner.
+    const { error } = await getAdmin()
       .from("org_members")
       .delete()
       .eq("id", memberId)

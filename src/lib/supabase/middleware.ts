@@ -80,7 +80,13 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const protectedPaths = ["/dashboard", "/create", "/history", "/calendar", "/accounts", "/settings"];
+  const protectedPaths = [
+    "/dashboard", "/create", "/history", "/calendar", "/accounts", "/settings",
+    // Previously missing — these dashboard routes served their (client) shell to
+    // unauthenticated visitors instead of redirecting. The data APIs enforce
+    // auth independently, but the page routes should redirect too.
+    "/admin", "/bulk", "/repurpose", "/series", "/team", "/templates", "/review",
+  ];
   const isProtected = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );

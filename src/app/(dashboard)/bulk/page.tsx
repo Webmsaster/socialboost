@@ -22,6 +22,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useRecentWebsites } from "@/lib/use-recent-websites";
+import { scoreContent } from "@/lib/content-score";
+import { useLanguage } from "@/lib/i18n";
 
 const PLATFORMS = [
   { id: "linkedin", label: "LinkedIn" },
@@ -78,6 +80,7 @@ function generateId(): string {
 }
 
 export default function BulkPage() {
+  const { t } = useLanguage();
   const [mode, setMode] = useState<BulkMode>("topic");
   const [topic, setTopic] = useState("");
   const [urlsInput, setUrlsInput] = useState("");
@@ -350,6 +353,12 @@ export default function BulkPage() {
         content: post.content,
         hashtags: post.hashtags,
         status: "draft",
+        // Score with THIS post's platform + hashtags, not a shared value.
+        content_score: scoreContent({
+          content: post.content,
+          platform: post.platform,
+          hashtags: post.hashtags,
+        }).score,
       });
 
       if (error) {
@@ -396,6 +405,12 @@ export default function BulkPage() {
         content: post.content,
         hashtags: post.hashtags,
         status: "draft" as const,
+        // Score each row with its own platform + hashtags.
+        content_score: scoreContent({
+          content: post.content,
+          platform: post.platform,
+          hashtags: post.hashtags,
+        }).score,
       }));
 
       const { error } = await supabase.from("posts").insert(rows);
@@ -527,7 +542,7 @@ export default function BulkPage() {
         {/* Topic OR URL list */}
         {mode === "topic" ? (
           <div className="space-y-2">
-            <Label>Topic / Theme</Label>
+            <Label>{t("bulk.topic")}</Label>
             <Textarea
               placeholder="Describe the main topic or theme for your posts..."
               value={topic}
@@ -592,7 +607,7 @@ export default function BulkPage() {
 
         {/* Platform toggles */}
         <div className="space-y-2">
-          <Label>Platforms</Label>
+          <Label>{t("bulk.platforms")}</Label>
           <div className="flex flex-wrap gap-2">
             {PLATFORMS.map((p) => {
               const isSelected = selectedPlatforms.has(p.id);
@@ -615,7 +630,7 @@ export default function BulkPage() {
           </div>
           {selectedPlatforms.size === 0 && (
             <p className="text-sm text-muted-foreground">
-              Select at least one platform
+              {t("bulk.selectPlatforms")}
             </p>
           )}
         </div>
@@ -666,7 +681,7 @@ export default function BulkPage() {
           {/* Variations — only meaningful in topic mode; URL mode = one post per URL */}
           {mode === "topic" && (
             <div className="space-y-2">
-              <Label>Variations per platform</Label>
+              <Label>{t("bulk.variations")}</Label>
               <Select
                 value={String(variations)}
                 onValueChange={(v) => setVariations(Number(v))}
@@ -692,7 +707,7 @@ export default function BulkPage() {
           <div>
             {selectedPlatforms.size > 0 && totalPosts > 0 && (
               <p className="text-sm text-muted-foreground">
-                Will generate{" "}
+                {t("bulk.willGenerate")}{" "}
                 <span className="font-semibold text-foreground">
                   {totalPosts}
                 </span>{" "}
@@ -723,7 +738,7 @@ export default function BulkPage() {
             }
             className="w-full sm:w-auto"
           >
-            {generating ? "Generating..." : "Generate All"}
+            {generating ? "Generating..." : t("bulk.generate")}
           </Button>
         </div>
       </form>
@@ -762,7 +777,7 @@ export default function BulkPage() {
                 onClick={handleSaveAll}
                 disabled={savingAll || generating}
               >
-                {savingAll ? "Saving..." : "Save All as Drafts"}
+                {savingAll ? "Saving..." : t("bulk.saveAll")}
               </Button>
             )}
           </div>
@@ -858,7 +873,7 @@ export default function BulkPage() {
                             onClick={() => handleSaveOne(post)}
                             disabled={savingIds.has(post.id) || savingAll}
                           >
-                            {savingIds.has(post.id) ? "Saving..." : "Save"}
+                            {savingIds.has(post.id) ? "Saving..." : t("bulk.save")}
                           </Button>
                         )}
                         {!post.error && (
@@ -867,7 +882,7 @@ export default function BulkPage() {
                             size="sm"
                             onClick={() => handleCopy(post)}
                           >
-                            Copy
+                            {t("bulk.copy")}
                           </Button>
                         )}
                         <Button
@@ -878,7 +893,7 @@ export default function BulkPage() {
                         >
                           {regeneratingIds.has(post.id)
                             ? "Regenerating..."
-                            : "Regenerate"}
+                            : t("bulk.regenerate")}
                         </Button>
                       </div>
                     </CardContent>

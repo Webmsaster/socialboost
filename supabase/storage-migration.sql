@@ -10,6 +10,7 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- Allow authenticated users to upload images to their own folder
+DROP POLICY IF EXISTS "Authenticated users can upload images" ON storage.objects;
 CREATE POLICY "Authenticated users can upload images"
   ON storage.objects FOR INSERT
   TO authenticated
@@ -19,12 +20,14 @@ CREATE POLICY "Authenticated users can upload images"
   );
 
 -- Allow public read access to all images
+DROP POLICY IF EXISTS "Public read access for generated images" ON storage.objects;
 CREATE POLICY "Public read access for generated images"
   ON storage.objects FOR SELECT
   TO public
   USING (bucket_id = 'generated-images');
 
 -- Allow users to delete their own images
+DROP POLICY IF EXISTS "Users can delete own images" ON storage.objects;
 CREATE POLICY "Users can delete own images"
   ON storage.objects FOR DELETE
   TO authenticated

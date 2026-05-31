@@ -47,4 +47,54 @@ describe("scoreContent", () => {
     expect(out.metrics.idealLength).toBe(400); // facebook ideal
     expect(out.metrics.maxLength).toBe(2000); // facebook max
   });
+
+  describe("cliché word-boundary matching", () => {
+    const hasClicheTip = (tips: string[], phrase: string) =>
+      tips.some((t) => t.includes(`Replace "${phrase}"`));
+
+    it.each(["elevated", "transformation", "empowering"])(
+      "does NOT flag %s (cliché only as a substring)",
+      (word) => {
+        const out = scoreContent({
+          content: `Our team ${word} the whole onboarding flow for new customers last quarter.`,
+          platform: "facebook",
+        });
+        const anyClicheTip = out.tips.some((t) => t.includes("Sounds less AI-generated"));
+        expect(anyClicheTip).toBe(false);
+      },
+    );
+
+    it("flags a standalone 'elevate'", () => {
+      const out = scoreContent({
+        content: "We elevate your brand with content that actually converts readers.",
+        platform: "facebook",
+      });
+      expect(hasClicheTip(out.tips, "elevate")).toBe(true);
+    });
+
+    it("flags a standalone 'leverage'", () => {
+      const out = scoreContent({
+        content: "We leverage data to ship features that customers genuinely want.",
+        platform: "facebook",
+      });
+      expect(hasClicheTip(out.tips, "leverage")).toBe(true);
+    });
+
+    it("still flags multi-word 'in today's fast-paced world'", () => {
+      const out = scoreContent({
+        content:
+          "In today's fast-paced world, your customers expect answers in seconds, not days.",
+        platform: "facebook",
+      });
+      expect(hasClicheTip(out.tips, "in today's fast-paced world")).toBe(true);
+    });
+
+    it("still flags hyphenated 'game-changer'", () => {
+      const out = scoreContent({
+        content: "This new workflow has been a real game-changer for our small support team.",
+        platform: "facebook",
+      });
+      expect(hasClicheTip(out.tips, "game-changer")).toBe(true);
+    });
+  });
 });

@@ -10,14 +10,20 @@ import { generateVoiceover } from "@/lib/openai-tts";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
 import { trackEvent } from "@/lib/analytics";
-import { isProSubscription, videoQuotaFor } from "@/lib/subscription";
+import { isProSubscription, videoQuotaFor, TEXT_QUOTA_PRO } from "@/lib/subscription";
+import {
+  reserveGeneration,
+  refundGeneration,
+  reserveVideoGeneration,
+  refundVideoGeneration,
+} from "@/lib/quota";
 import { persistImage } from "@/lib/storage";
 import {
   scrapeWebsite,
   buildPromptBlockFromContext,
 } from "@/lib/website-scraper";
 
-const PRO_LIMIT = 100;
+const PRO_LIMIT = TEXT_QUOTA_PRO;
 const MAX_SCENES_FOR_ASSETS = 6;
 
 export async function POST(request: NextRequest) {
@@ -81,30 +87,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const remaining = PRO_LIMIT - profile.generation_count;
-    // Worst-case cost: 1 script + 6 scene images + 1 voiceover = 8 generations.
-    if (remaining < 2) {
-      return NextResponse.json(
-        { error: `Not enough monthly quota (${remaining} left).` },
-        { status: 403 }
-      );
-    }
-
     // Separate video-quota cap. This route does the same expensive work
     // as /api/generate-video-assets (images per scene + TTS) so it shares
-    // the cap.
+    // the cap. Reserve the video slot up front (TOCTOU-safe); refunded later
+    // if no images succeed.
     const videoLimit = videoQuotaFor(profile.subscription_status);
-    if ((profile.video_generation_count ?? 0) >= videoLimit) {
+    const videoReserved = await reserveVideoGeneration(supabase, user.id, videoLimit);
+    if (!videoReserved) {
       return NextResponse.json(
         {
           error: `Monthly video limit reached (${videoLimit}/month on Pro). Resets next billing cycle.`,
         },
-        { status: 403 },
+        { status: 429 },
+      );
+    }
+
+    // Reserve 1 text generation for the script before generating it. If we
+    // can't, refund the video slot and bail.
+    const scriptReserved = await reserveGeneration(supabase, user.id, PRO_LIMIT);
+    if (!scriptReserved) {
+      await refundVideoGeneration(supabase, user.id).catch((err) =>
+        captureError("video-from-site: refund_video (no script quota) failed", err, {
+          userId: user.id,
+        })
+      );
+      return NextResponse.json(
+        { error: "Not enough monthly quota." },
+        { status: 429 }
       );
     }
 
     const ctx = await scrapeWebsite(websiteUrl);
     if (!ctx) {
+      // Scrape failed before we spent on OpenAI — refund both reservations.
+      await refundGeneration(supabase, user.id).catch(() => {});
+      await refundVideoGeneration(supabase, user.id).catch(() => {});
       return NextResponse.json(
         { error: "Could not fetch website content. Check the URL or try another site." },
         { status: 400 }
@@ -122,31 +139,47 @@ export async function POST(request: NextRequest) {
 
     const model = profile.preferred_model || "gpt-4o-mini";
 
-    const script = await generateVideoScript({
-      topic,
-      tone,
-      language,
-      platform,
-      brandVoice: profile.brand_voice || undefined,
-      model,
-    });
-
-    // 1 generation for the script.
-    await supabase.rpc("increment_generation_count", {
-      p_user_id: user.id,
-      p_limit: PRO_LIMIT,
-    });
+    let script;
+    try {
+      script = await generateVideoScript({
+        topic,
+        tone,
+        language,
+        platform,
+        brandVoice: profile.brand_voice || undefined,
+        model,
+      });
+    } catch (genError) {
+      // Script generation failed — refund both reservations.
+      await refundGeneration(supabase, user.id).catch(() => {});
+      await refundVideoGeneration(supabase, user.id).catch(() => {});
+      throw genError;
+    }
 
     const scenes = script.scenes.slice(0, MAX_SCENES_FOR_ASSETS);
-    const remainingAfterScript = remaining - 1;
     const assetCost = scenes.length + 1; // images + voiceover
-    const canBuildAssets = remainingAfterScript >= assetCost;
 
     let images: Array<{ sceneNumber: number; url: string | null; error: string | null }> = [];
     let voiceover: { dataUrl: string | null; error: string | null } = {
       dataUrl: null,
       error: null,
     };
+
+    // Reserve the asset-build text slots up front (TOCTOU-safe). If we can't
+    // reserve the full asset cost, skip assets and refund what we took — the
+    // script (already reserved+generated) is still returned.
+    let assetReserved = 0;
+    for (let i = 0; i < assetCost; i++) {
+      const ok = await reserveGeneration(supabase, user.id, PRO_LIMIT);
+      if (!ok) break;
+      assetReserved++;
+    }
+    const canBuildAssets = assetReserved >= assetCost;
+    if (!canBuildAssets) {
+      for (let i = 0; i < assetReserved; i++) {
+        await refundGeneration(supabase, user.id).catch(() => {});
+      }
+    }
 
     if (canBuildAssets) {
       const imagePromises = scenes.map(async (scene) => {
@@ -193,39 +226,35 @@ export async function POST(request: NextRequest) {
       images = imgs;
       voiceover = vo;
 
+      // We reserved `assetCost` text slots. Refund the slots for any image/
+      // voiceover that actually failed so users pay only for successes.
       const successfulImages = images.filter((i) => i.url).length;
       const successful = successfulImages + (voiceover.dataUrl ? 1 : 0);
-      if (successful > 0) {
-        const results = await Promise.all(
-          Array.from({ length: successful }, () =>
-            supabase.rpc("increment_generation_count", {
-              p_user_id: user.id,
-              p_limit: PRO_LIMIT,
-            })
-          )
+      const assetToRefund = assetCost - successful;
+      for (let i = 0; i < assetToRefund; i++) {
+        await refundGeneration(supabase, user.id).catch((err) =>
+          captureError("Failed to refund generation count (video-from-site)", err, {
+            userId: user.id,
+          })
         );
-        for (const { error: incError } of results) {
-          if (incError) {
-            captureError("Failed to increment generation count (video-from-site)", incError, {
-              userId: user.id,
-            });
-            break;
-          }
-        }
       }
 
-      // Also count this as 1 video for the dedicated video quota.
-      if (successfulImages > 0) {
-        const { error: videoIncErr } = await supabase.rpc(
-          "increment_video_generation_count",
-          { p_user_id: user.id, p_limit: videoLimit },
-        );
-        if (videoIncErr) {
-          captureError("Failed to increment video generation count", videoIncErr, {
+      // The dedicated video slot was reserved up front; refund it if no image
+      // succeeded (no usable video).
+      if (successfulImages === 0) {
+        await refundVideoGeneration(supabase, user.id).catch((err) =>
+          captureError("Failed to refund video generation count", err, {
             userId: user.id,
-          });
-        }
+          })
+        );
       }
+    } else {
+      // Assets skipped entirely → there is no video, refund the reserved slot.
+      await refundVideoGeneration(supabase, user.id).catch((err) =>
+        captureError("Failed to refund video generation count (assets skipped)", err, {
+          userId: user.id,
+        })
+      );
     }
 
     trackEvent({
@@ -240,7 +269,7 @@ export async function POST(request: NextRequest) {
       images,
       voiceover,
       assetsSkipped: !canBuildAssets
-        ? `Not enough quota for full assets (need ${assetCost}, have ${remainingAfterScript}).`
+        ? `Not enough quota for full assets (need ${assetCost}).`
         : null,
     });
   } catch (error) {

@@ -44,10 +44,18 @@ vi.mock("@/lib/openai", () => ({
   generateVideoScript: (...args: unknown[]) => mockGenerateVideoScript(...args),
 }));
 
-// Subscription mock
+// Subscription mock. textQuotaFor must be a real implementation here because
+// the route uses it to compute the limit passed to reserveGeneration; the
+// mock mirrors src/lib/subscription.ts (free 10 / pro 100). isProSubscription
+// is a separate spy so the Pro-gate (403) and the limit derivation stay
+// independently controllable from each test.
 const mockIsProSubscription = vi.fn();
 vi.mock("@/lib/subscription", () => ({
   isProSubscription: (...args: unknown[]) => mockIsProSubscription(...args),
+  TEXT_QUOTA_FREE: 10,
+  TEXT_QUOTA_PRO: 100,
+  textQuotaFor: (status: string | null | undefined) =>
+    status === "active" || status === "past_due" ? 100 : 10,
 }));
 
 // Logger mock
@@ -144,7 +152,7 @@ describe("POST /api/generate-video-script", () => {
     expect(json.error).toBe("Profile not found");
   });
 
-  it("returns 403 if not Pro subscription", async () => {
+  it("returns 403 if not Pro subscription (does not reserve or call OpenAI)", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
@@ -164,9 +172,11 @@ describe("POST /api/generate-video-script", () => {
 
     expect(response.status).toBe(403);
     expect(json.error).toContain("Pro subscription");
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockGenerateVideoScript).not.toHaveBeenCalled();
   });
 
-  it("returns 403 if generation limit reached", async () => {
+  it("returns 429 when over the limit (reserve denied) without calling OpenAI", async () => {
     mockGetUser.mockResolvedValueOnce({
       data: { user: { id: "user-123" } },
     });
@@ -175,6 +185,8 @@ describe("POST /api/generate-video-script", () => {
       data: { generation_count: 100, subscription_status: "active" },
     });
     mockIsProSubscription.mockReturnValueOnce(true);
+    // reserve_generation returns false → at/over limit, no OpenAI call.
+    mockRpc.mockResolvedValueOnce({ data: false, error: null });
 
     const request = createRequest({
       topic: "product launch",
@@ -184,11 +196,14 @@ describe("POST /api/generate-video-script", () => {
     const response = await POST(request);
     const json = await response.json();
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(429);
     expect(json.error).toContain("Monthly limit reached");
+    // Reserve-before-spend: OpenAI is NOT called when the reserve fails.
+    expect(mockGenerateVideoScript).not.toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledWith("reserve_generation", expect.any(Object));
   });
 
-  it("returns video script on success", async () => {
+  it("reserves before spending and returns the video script on success", async () => {
     const scriptResult = {
       hook: "Did you know...",
       scenes: [
@@ -210,9 +225,9 @@ describe("POST /api/generate-video-script", () => {
       },
     });
     mockIsProSubscription.mockReturnValueOnce(true);
-    mockIsProSubscription.mockReturnValueOnce(true);
+    // reserve_generation succeeds (returns true) BEFORE generateVideoScript runs.
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
     mockGenerateVideoScript.mockResolvedValueOnce(scriptResult);
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
 
     const request = createRequest({
       topic: "product launch",
@@ -226,6 +241,15 @@ describe("POST /api/generate-video-script", () => {
     expect(json.hook).toBe("Did you know...");
     expect(json.scenes).toHaveLength(1);
     expect(json.cta).toBe("Subscribe now");
+    // The reserve RPC is the only quota mutation; no post-spend increment.
+    expect(mockRpc).toHaveBeenCalledWith("reserve_generation", {
+      p_user_id: "user-123",
+      p_limit: 100,
+    });
+    expect(mockRpc).not.toHaveBeenCalledWith(
+      "increment_generation_count",
+      expect.anything()
+    );
     expect(mockGenerateVideoScript).toHaveBeenCalledWith(
       expect.objectContaining({
         topic: "product launch",
@@ -250,9 +274,8 @@ describe("POST /api/generate-video-script", () => {
       },
     });
     mockIsProSubscription.mockReturnValueOnce(true);
-    mockIsProSubscription.mockReturnValueOnce(true);
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
     mockGenerateVideoScript.mockResolvedValueOnce({ hook: "Test", scenes: [], cta: "Sub" });
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
 
     const request = createRequest({
       topic: "product launch",
@@ -280,9 +303,8 @@ describe("POST /api/generate-video-script", () => {
       },
     });
     mockIsProSubscription.mockReturnValueOnce(true);
-    mockIsProSubscription.mockReturnValueOnce(true);
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
     mockGenerateVideoScript.mockResolvedValueOnce({ hook: "Test", scenes: [], cta: "Sub" });
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
 
     const request = createRequest({
       topic: "product launch",
@@ -310,9 +332,8 @@ describe("POST /api/generate-video-script", () => {
       },
     });
     mockIsProSubscription.mockReturnValueOnce(true);
-    mockIsProSubscription.mockReturnValueOnce(true);
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
     mockGenerateVideoScript.mockResolvedValueOnce({ hook: "Test", scenes: [], cta: "Sub" });
-    mockRpc.mockResolvedValueOnce({ data: null, error: null });
 
     const request = createRequest({
       topic: "product launch",
@@ -324,6 +345,37 @@ describe("POST /api/generate-video-script", () => {
     expect(mockGenerateVideoScript).toHaveBeenCalledWith(
       expect.objectContaining({ model: "gpt-4o-mini" })
     );
+  });
+
+  it("refunds the reserved slot when generation fails", async () => {
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: "user-123" } },
+    });
+    mockRateLimit.mockResolvedValueOnce({ success: true, remaining: 5 });
+    mockSingle.mockResolvedValueOnce({
+      data: {
+        generation_count: 3,
+        subscription_status: "active",
+        brand_voice: null,
+        preferred_model: null,
+      },
+    });
+    mockIsProSubscription.mockReturnValueOnce(true);
+    // reserve succeeds, then generateVideoScript throws → route must refund.
+    mockRpc.mockResolvedValueOnce({ data: true, error: null }); // reserve_generation
+    mockRpc.mockResolvedValueOnce({ data: null, error: null }); // refund_generation
+    mockGenerateVideoScript.mockRejectedValueOnce(new Error("OpenAI down"));
+
+    const request = createRequest({
+      topic: "product launch",
+      tone: "professional",
+      platform: "youtube",
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(500);
+    expect(mockRpc).toHaveBeenCalledWith("reserve_generation", expect.any(Object));
+    expect(mockRpc).toHaveBeenCalledWith("refund_generation", { p_user_id: "user-123" });
   });
 
   it("returns 500 when an unexpected error is thrown (catch block)", async () => {

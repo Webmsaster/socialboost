@@ -87,16 +87,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Store in Supabase (use a simple insert to a contact_messages table)
-    // We create this inline if needed
-    await supabase.from("contact_messages").insert({
+    // Persist to the contact_messages table (created in schema.sql). Capture
+    // failures to Sentry instead of swallowing them — a missing table or RLS
+    // rejection would otherwise lose every message while the user sees success.
+    const { error: insertError } = await supabase.from("contact_messages").insert({
       name: name.trim(),
       email: email.trim(),
       subject: subject.trim(),
       message: message.trim(),
     });
-    // If the table doesn't exist, the insert will fail silently — that's OK,
-    // the email was still sent (if configured)
+    if (insertError) {
+      captureError("Contact message insert failed", insertError, { email: email.trim() });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

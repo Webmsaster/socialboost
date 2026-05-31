@@ -4,7 +4,13 @@ import { generateImage } from "@/lib/openai";
 import { generateVoiceover } from "@/lib/openai-tts";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
-import { isProSubscription, videoQuotaFor } from "@/lib/subscription";
+import { isProSubscription, videoQuotaFor, TEXT_QUOTA_PRO } from "@/lib/subscription";
+import {
+  reserveGeneration,
+  refundGeneration,
+  reserveVideoGeneration,
+  refundVideoGeneration,
+} from "@/lib/quota";
 import { persistImage } from "@/lib/storage";
 
 interface SceneInput {
@@ -29,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("subscription_status, generation_count, video_generation_count")
+      .select("subscription_status, generation_count, video_generation_count, bonus_generations")
       .eq("id", user.id)
       .single();
 
@@ -40,18 +46,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Video-specific quota guard. This is the expensive route (gpt-image-1
-    // ×N + TTS = ~$0.30) so it has its own cap separate from the regular
-    // generation_count. See src/lib/subscription.ts for the limits.
     const videoLimit = videoQuotaFor(profile.subscription_status);
-    if ((profile.video_generation_count ?? 0) >= videoLimit) {
-      return NextResponse.json(
-        {
-          error: `Monthly video limit reached (${videoLimit}/month on Pro). Resets next billing cycle.`,
-        },
-        { status: 403 },
-      );
-    }
+    const limit = TEXT_QUOTA_PRO + (profile.bonus_generations ?? 0);
 
     const body = await request.json();
     const hook: string = typeof body.hook === "string" ? body.hook : "";
@@ -63,14 +59,50 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing scenes" }, { status: 400 });
     }
 
-    // Budget check: each scene = 1 image + a share of the narration TTS.
-    // Count 1 generation per scene image; voiceover counts as 1 additional generation.
-    const estimatedCost = scenes.length + 1;
-    const limit = 100;
-    if (profile.generation_count + estimatedCost >= limit) {
+    // Reserve BEFORE the expensive work (TOCTOU-safe), separately for the
+    // video cap and the text cap. Each scene = 1 image generation + the
+    // narration counts as 1 voiceover generation. We reserve the video slot
+    // first (it's the scarcer, ~$0.30 resource); if either reservation can't
+    // be fully satisfied we refund whatever we took and return 429 without
+    // calling OpenAI. Unused/failed reservations are refunded after the work.
+    const estimatedCost = scenes.length + 1; // images + voiceover
+
+    // Video-specific quota: this is the expensive route (gpt-image-1 ×N + TTS
+    // = ~$0.30) so it has its own cap. See src/lib/subscription.ts.
+    const videoReserved = await reserveVideoGeneration(supabase, user.id, videoLimit);
+    if (!videoReserved) {
       return NextResponse.json(
-        { error: `Not enough monthly quota. Need ${estimatedCost}, have ${limit - profile.generation_count} left.` },
-        { status: 403 }
+        {
+          error: `Monthly video limit reached (${videoLimit}/month on Pro). Resets next billing cycle.`,
+        },
+        { status: 429 },
+      );
+    }
+
+    // Reserve the text generations one-by-one so we know exactly how many we
+    // got; if we can't reserve the full estimated cost, refund and bail.
+    let textReserved = 0;
+    for (let i = 0; i < estimatedCost; i++) {
+      const ok = await reserveGeneration(supabase, user.id, limit);
+      if (!ok) break;
+      textReserved++;
+    }
+    if (textReserved < estimatedCost) {
+      for (let i = 0; i < textReserved; i++) {
+        await refundGeneration(supabase, user.id).catch((err) =>
+          captureError("video assets: refund_generation (insufficient quota) failed", err, {
+            userId: user.id,
+          })
+        );
+      }
+      await refundVideoGeneration(supabase, user.id).catch((err) =>
+        captureError("video assets: refund_video_generation (insufficient quota) failed", err, {
+          userId: user.id,
+        })
+      );
+      return NextResponse.json(
+        { error: `Not enough monthly quota. Need ${estimatedCost}.` },
+        { status: 429 }
       );
     }
 
@@ -120,42 +152,29 @@ export async function POST(request: NextRequest) {
       voiceoverPromise,
     ]);
 
-    // Count successful generations and bump the quota for each.
+    // We reserved `estimatedCost` text slots (scenes + 1 voiceover) up front.
+    // Refund the slots for any image/voiceover that actually failed so users
+    // are only charged for successful generations.
     const successfulImages = images.filter((i) => i.url).length;
     const voiceoverOk = voiceover.dataUrl ? 1 : 0;
     const successful = successfulImages + voiceoverOk;
-
-    if (successful > 0) {
-      const results = await Promise.all(
-        Array.from({ length: successful }, () =>
-          supabase.rpc("increment_generation_count", {
-            p_user_id: user.id,
-            p_limit: limit,
-          })
-        )
+    const textToRefund = estimatedCost - successful;
+    for (let i = 0; i < textToRefund; i++) {
+      await refundGeneration(supabase, user.id).catch((err) =>
+        captureError("Failed to refund generation count (video assets)", err, {
+          userId: user.id,
+        })
       );
-      for (const { error: incError } of results) {
-        if (incError) {
-          captureError("Failed to increment generation count (video assets)", incError, {
-            userId: user.id,
-          });
-          break;
-        }
-      }
     }
 
-    // One asset-bundle = 1 video for quota purposes. Counted separately from
-    // text generations because video costs ~$0.30 vs text's ~$0.001.
-    if (successfulImages > 0) {
-      const { error: videoIncErr } = await supabase.rpc(
-        "increment_video_generation_count",
-        { p_user_id: user.id, p_limit: videoLimit },
-      );
-      if (videoIncErr) {
-        captureError("Failed to increment video generation count", videoIncErr, {
+    // One asset-bundle = 1 video for quota purposes. We reserved the video slot
+    // up front; if no image succeeded there's no usable video, so refund it.
+    if (successfulImages === 0) {
+      await refundVideoGeneration(supabase, user.id).catch((err) =>
+        captureError("Failed to refund video generation count", err, {
           userId: user.id,
-        });
-      }
+        })
+      );
     }
 
     return NextResponse.json({

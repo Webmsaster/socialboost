@@ -18,15 +18,18 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
+drop policy if exists "Users can read own profile" on public.profiles;
 create policy "Users can read own profile"
   on public.profiles for select
   using (auth.uid() = id);
 
+drop policy if exists "Users can update own profile (restricted)" on public.profiles;
 create policy "Users can update own profile (restricted)"
   on public.profiles for update
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
+drop policy if exists "Service role full access" on public.profiles;
 create policy "Service role full access"
   on public.profiles for all
   using (auth.role() = 'service_role');
@@ -47,7 +50,10 @@ create table if not exists public.posts (
   is_favorite boolean not null default false,
   status text not null default 'draft'
     check (status in ('draft', 'pending_review', 'approved', 'scheduled', 'published', 'failed')),
-  reviewed_by uuid references public.profiles(id),
+  -- Audit metadata, not ownership: when a reviewer's account is deleted the
+  -- reviewed post must survive, so SET NULL (RESTRICT would block deleting any
+  -- user who ever reviewed someone else's post).
+  reviewed_by uuid references public.profiles(id) on delete set null,
   reviewed_at timestamptz,
   review_note text,
   scheduled_for timestamptz,
@@ -66,20 +72,25 @@ create table if not exists public.posts (
 
 alter table public.posts enable row level security;
 
+drop policy if exists "Users can read own posts" on public.posts;
 create policy "Users can read own posts"
   on public.posts for select using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own posts" on public.posts;
 create policy "Users can insert own posts"
   on public.posts for insert with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update own posts" on public.posts;
 create policy "Users can update own posts"
   on public.posts for update
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can delete own posts" on public.posts;
 create policy "Users can delete own posts"
   on public.posts for delete using (auth.uid() = user_id);
 
+drop policy if exists "Service role full access on posts" on public.posts;
 create policy "Service role full access on posts"
   on public.posts for all
   using (auth.role() = 'service_role');
@@ -103,27 +114,55 @@ create table if not exists public.connected_accounts (
 
 alter table public.connected_accounts enable row level security;
 
+drop policy if exists "Users can read own connected accounts" on public.connected_accounts;
 create policy "Users can read own connected accounts"
   on public.connected_accounts for select
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own connected accounts" on public.connected_accounts;
 create policy "Users can insert own connected accounts"
   on public.connected_accounts for insert
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can delete own connected accounts" on public.connected_accounts;
 create policy "Users can delete own connected accounts"
   on public.connected_accounts for delete
   using (auth.uid() = user_id);
 
+drop policy if exists "Service role full access on connected_accounts" on public.connected_accounts;
 create policy "Service role full access on connected_accounts"
   on public.connected_accounts for all
   using (auth.role() = 'service_role');
 
--- Add foreign key from posts to connected_accounts
-alter table public.posts
-  add constraint fk_posts_connected_account
-  foreign key (connected_account_id) references public.connected_accounts(id)
-  on delete set null;
+-- The OAuth callback upserts with onConflict (user_id, platform); that requires a
+-- matching unique constraint, or the upsert errors (42P10) and connect silently
+-- fails. Idempotent add (dedupe any legacy duplicates first).
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'connected_accounts_user_platform_unique'
+  ) then
+    delete from public.connected_accounts a
+      using public.connected_accounts b
+      where a.ctid < b.ctid and a.user_id = b.user_id and a.platform = b.platform;
+    alter table public.connected_accounts
+      add constraint connected_accounts_user_platform_unique unique (user_id, platform);
+  end if;
+end $$;
+
+-- Add foreign key from posts to connected_accounts (idempotent: guard so a
+-- re-apply on an existing DB doesn't error with "constraint already exists").
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'fk_posts_connected_account'
+  ) then
+    alter table public.posts
+      add constraint fk_posts_connected_account
+      foreign key (connected_account_id) references public.connected_accounts(id)
+      on delete set null;
+  end if;
+end $$;
 
 -- Idempotent: add media_url column for existing deployments
 alter table public.posts add column if not exists media_url text;
@@ -162,11 +201,25 @@ create trigger on_auth_user_created
 create or replace function public.protect_profile_fields()
 returns trigger as $$
 begin
-  if current_setting('role') != 'service_role' then
+  -- Let privileged writes through, freeze the sensitive columns for everyone
+  -- else. Two privileged paths:
+  --   1. app.bypass_field_guard = 'on' — set by our SECURITY DEFINER RPCs
+  --      (increment_generation_count etc.). We use a custom GUC rather than
+  --      set_config('role', ...) because PostgreSQL 16+ forbids setting `role`
+  --      inside a SECURITY DEFINER function ("cannot set parameter role ...").
+  --   2. role = 'service_role' — the server admin client (e.g. the Stripe
+  --      webhook) writing directly. current_setting(..., true) uses missing_ok
+  --      so a normal client UPDATE (both GUCs unset) never aborts.
+  -- NOTE: migration-video-quota.sql redefines this with the video-quota columns
+  -- added — that is the canonical final version. Keep this list in sync.
+  if current_setting('app.bypass_field_guard', true) is distinct from 'on'
+     and current_setting('role', true) is distinct from 'service_role' then
     new.subscription_status := old.subscription_status;
     new.generation_count := old.generation_count;
     new.generation_reset_at := old.generation_reset_at;
     new.stripe_customer_id := old.stripe_customer_id;
+    new.bonus_generations := old.bonus_generations;
+    new.referral_code := old.referral_code;
     new.created_at := old.created_at;
   end if;
   return new;
@@ -187,7 +240,18 @@ create or replace function public.increment_generation_count(
 )
 returns table(new_count integer, was_incremented boolean) as $$
 begin
-  perform set_config('role', 'service_role', true);
+  -- A non-service-role caller may only touch its OWN row. Without this, any
+  -- authenticated user could call this RPC directly with another user's id to
+  -- burn their quota — direct RPC calls bypass the route-level rate limiter.
+  -- (v1/generate calls this via the service-role admin client, so it is exempt.)
+  if current_setting('role', true) is distinct from 'service_role'
+     and p_user_id is distinct from auth.uid() then
+    raise exception 'increment_generation_count: caller may only update its own row';
+  end if;
+
+  -- Bypass protect_profile_fields for this privileged write (see trigger note).
+  -- Custom GUC, not set_config('role',...): PG16+ forbids setting `role` in SECDEF.
+  perform set_config('app.bypass_field_guard', 'on', true);
 
   update public.profiles
   set generation_count = 0, generation_reset_at = now()
@@ -210,6 +274,12 @@ begin
   end if;
 end;
 $$ language plpgsql security definer;
+
+-- Lock down: not callable by anon/PUBLIC. authenticated (generate/repurpose via
+-- the user client) + service_role (v1/generate via the admin client) only.
+revoke all on function public.increment_generation_count(uuid, integer) from public;
+revoke all on function public.increment_generation_count(uuid, integer) from anon;
+grant execute on function public.increment_generation_count(uuid, integer) to authenticated, service_role;
 
 -- ============================================
 -- 8. Brand Voice & Model Preference columns
@@ -259,10 +329,12 @@ create table if not exists public.referrals (
 
 alter table public.referrals enable row level security;
 
+drop policy if exists "Users can read own referrals" on public.referrals;
 create policy "Users can read own referrals"
   on public.referrals for select
   using (auth.uid() = referrer_id);
 
+drop policy if exists "Service role full access on referrals" on public.referrals;
 create policy "Service role full access on referrals"
   on public.referrals for all
   using (auth.role() = 'service_role');
@@ -278,7 +350,9 @@ create or replace function public.grant_referral_bonus(
 )
 returns void as $$
 begin
-  perform set_config('role', 'service_role', true);
+  -- Bypass protect_profile_fields for this privileged write (see trigger note).
+  -- Custom GUC, not set_config('role',...): PG16+ forbids setting `role` in SECDEF.
+  perform set_config('app.bypass_field_guard', 'on', true);
 
   update public.profiles
   set bonus_generations = bonus_generations + p_bonus
@@ -289,6 +363,15 @@ begin
   where id = p_referred_id;
 end;
 $$ language plpgsql security definer;
+
+-- CRITICAL lockdown: only the server (service_role) may grant bonuses. This RPC
+-- was world-executable (anon + authenticated + PUBLIC), so any user could call
+-- grant_referral_bonus(my_id, my_id, 999999) and mint unlimited generations.
+-- /api/referral/claim invokes it via the service-role admin client.
+revoke all on function public.grant_referral_bonus(uuid, uuid, integer) from public;
+revoke all on function public.grant_referral_bonus(uuid, uuid, integer) from anon;
+revoke all on function public.grant_referral_bonus(uuid, uuid, integer) from authenticated;
+grant execute on function public.grant_referral_bonus(uuid, uuid, integer) to service_role;
 
 -- ============================================
 -- 12. Content Series (recurring post templates)
@@ -315,15 +398,20 @@ create table if not exists public.content_series (
 
 alter table public.content_series enable row level security;
 
+drop policy if exists "Users can read own series" on public.content_series;
 create policy "Users can read own series"
   on public.content_series for select using (auth.uid() = user_id);
+drop policy if exists "Users can insert own series" on public.content_series;
 create policy "Users can insert own series"
   on public.content_series for insert with check (auth.uid() = user_id);
+drop policy if exists "Users can update own series" on public.content_series;
 create policy "Users can update own series"
   on public.content_series for update
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "Users can delete own series" on public.content_series;
 create policy "Users can delete own series"
   on public.content_series for delete using (auth.uid() = user_id);
+drop policy if exists "Service role full access on content_series" on public.content_series;
 create policy "Service role full access on content_series"
   on public.content_series for all
   using (auth.role() = 'service_role');
@@ -344,17 +432,9 @@ create table if not exists public.organizations (
 
 alter table public.organizations enable row level security;
 
-create policy "Org members can read org"
-  on public.organizations for select
-  using (id in (select org_id from public.org_members where user_id = auth.uid()));
-create policy "Owner can update org"
-  on public.organizations for update using (owner_id = auth.uid());
-create policy "Users can create orgs"
-  on public.organizations for insert with check (auth.uid() = owner_id);
-create policy "Service role full access on organizations"
-  on public.organizations for all
-  using (auth.role() = 'service_role');
-
+-- org_members is created BEFORE the organizations SELECT policy below (which
+-- references org_members) so a clean standalone schema.sql apply doesn't error
+-- on a forward reference. organizations still precedes org_members (FK target).
 create table if not exists public.org_members (
   id uuid default gen_random_uuid() primary key,
   org_id uuid references public.organizations(id) on delete cascade not null,
@@ -368,18 +448,66 @@ create table if not exists public.org_members (
 
 alter table public.org_members enable row level security;
 
-create policy "Org members can read members"
+drop policy if exists "Org members can read org" on public.organizations;
+create policy "Org members can read org"
+  on public.organizations for select
+  using (id in (select org_id from public.org_members where user_id = auth.uid()));
+drop policy if exists "Owner can update org" on public.organizations;
+create policy "Owner can update org"
+  on public.organizations for update using (owner_id = auth.uid());
+drop policy if exists "Users can create orgs" on public.organizations;
+create policy "Users can create orgs"
+  on public.organizations for insert with check (auth.uid() = owner_id);
+drop policy if exists "Service role full access on organizations" on public.organizations;
+create policy "Service role full access on organizations"
+  on public.organizations for all
+  using (auth.role() = 'service_role');
+
+-- Non-recursive membership check. The original org_members policies each
+-- subqueried org_members from INSIDE an org_members policy → PostgreSQL rejects
+-- that as 42P17 "infinite recursion detected in policy", so every authenticated
+-- read/write of org_members errored and the whole Teams feature was dead. A
+-- SECURITY DEFINER helper reads the table WITHOUT re-triggering RLS.
+create or replace function public.is_org_member(p_org uuid)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.org_members
+    where org_id = p_org and user_id = auth.uid() and accepted = true
+  );
+$$;
+revoke all on function public.is_org_member(uuid) from public;
+revoke all on function public.is_org_member(uuid) from anon;
+grant execute on function public.is_org_member(uuid) to authenticated, service_role;
+
+-- End users may READ their own membership rows + the roster of orgs they belong
+-- to. They may NOT write org_members directly: every membership mutation
+-- (create-owner, invite, accept, remove) goes through the server via the
+-- service-role client after app-layer authorization, so a user cannot
+-- self-escalate to owner/admin by hitting the REST API directly.
+drop policy if exists "Members can read own org roster" on public.org_members;
+create policy "Members can read own org roster"
   on public.org_members for select
-  using (org_id in (select org_id from public.org_members om where om.user_id = auth.uid() and om.accepted = true));
-create policy "Admins can manage members"
-  on public.org_members for all
-  using (org_id in (select org_id from public.org_members om where om.user_id = auth.uid() and om.role in ('owner', 'admin')));
+  using (user_id = auth.uid() or public.is_org_member(org_id));
+drop policy if exists "Service role full access on org_members" on public.org_members;
 create policy "Service role full access on org_members"
   on public.org_members for all
   using (auth.role() = 'service_role');
 
 create index if not exists idx_org_members_org on public.org_members(org_id);
 create index if not exists idx_org_members_user on public.org_members(user_id);
+
+-- One membership row per (org, user). schema.sql's CREATE TABLE IF NOT EXISTS
+-- means migration-v2's UNIQUE never lands on an existing DB, so add it here
+-- idempotently (NULL user_id = pending invite, allowed to repeat).
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'org_members_org_user_unique') then
+    delete from public.org_members a using public.org_members b
+      where a.ctid < b.ctid and a.org_id = b.org_id and a.user_id = b.user_id and a.user_id is not null;
+    alter table public.org_members
+      add constraint org_members_org_user_unique unique (org_id, user_id);
+  end if;
+end $$;
 
 -- ============================================
 -- 14. Notification Preferences
@@ -396,6 +524,28 @@ create table if not exists public.stripe_events (
   received_at timestamptz not null default now()
 );
 alter table public.stripe_events enable row level security;
+drop policy if exists "Service role full access on stripe_events" on public.stripe_events;
 create policy "Service role full access on stripe_events"
   on public.stripe_events for all
   using (auth.role() = 'service_role');
+
+-- ============================================
+-- 16. Contact form submissions
+-- ============================================
+-- The public /api/contact endpoint persists submissions here via the
+-- service-role client. No user-facing access: only the service role (and admins
+-- through it) reads/writes, so RLS denies everything else by default.
+create table if not exists public.contact_messages (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  email text not null,
+  subject text not null,
+  message text not null,
+  created_at timestamptz not null default now()
+);
+alter table public.contact_messages enable row level security;
+drop policy if exists "Service role full access on contact_messages" on public.contact_messages;
+create policy "Service role full access on contact_messages"
+  on public.contact_messages for all
+  using (auth.role() = 'service_role');
+create index if not exists idx_contact_messages_created on public.contact_messages(created_at desc);

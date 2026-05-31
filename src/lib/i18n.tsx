@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useCallback, useSyncExternalStore } from "react";
+import { createContext, useContext, useCallback, useEffect, useSyncExternalStore } from "react";
 
 export type Lang = "en" | "de";
 
@@ -56,6 +56,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const setLang = useCallback((newLang: Lang) => {
     setLangInStore(newLang);
   }, []);
+
+  // Keep <html lang> in sync with the selected language for a11y / SEO.
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   const t = useCallback(
     (key: string): string => {

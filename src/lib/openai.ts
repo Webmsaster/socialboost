@@ -12,8 +12,27 @@ function getOpenAI() {
   return _openai;
 }
 
-export type Platform = "linkedin" | "facebook" | "instagram" | "pinterest" | "twitter";
-export type Tone = "professional" | "casual" | "inspirational" | "humorous" | "educational";
+// Single source of truth for the supported platform/tone values. Other modules
+// (validations, validate-template, import, v1/generate) derive their allow-lists
+// from these arrays so the sets can never drift apart again.
+export const PLATFORMS = [
+  "linkedin",
+  "facebook",
+  "instagram",
+  "pinterest",
+  "twitter",
+] as const;
+
+export const TONES = [
+  "professional",
+  "casual",
+  "inspirational",
+  "humorous",
+  "educational",
+] as const;
+
+export type Platform = (typeof PLATFORMS)[number];
+export type Tone = (typeof TONES)[number];
 
 export interface GeneratePostInput {
   platform: Platform;
@@ -115,7 +134,10 @@ Make the content authentic, engaging, and platform-appropriate. Never use generi
       },
       {
         role: "user",
-        content: `Create a ${input.tone} ${input.platform} post about: ${sanitizeInput(input.topic)}`,
+        // 4000 (not the 1000 default): when a website context block + the
+        // soft-CTA instruction are appended to the topic, the default cap would
+        // silently truncate them, dropping exactly the CTA the feature promises.
+        content: `Create a ${input.tone} ${input.platform} post about: ${sanitizeInput(input.topic, 4000)}`,
       },
     ],
     temperature: 0.8,
@@ -303,17 +325,20 @@ Create 3-6 scenes. Keep total duration between 15-60 seconds. Make it engaging a
       },
       {
         role: "user",
-        content: `Create a ${input.tone} video script about: ${sanitizeInput(input.topic)}`,
+        content: `Create a ${input.tone} video script about: ${sanitizeInput(input.topic, 4000)}`,
       },
     ],
     temperature: 0.8,
     max_tokens: 1500,
   });
 
-  const raw = response.choices[0].message.content;
+  const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty response from OpenAI");
 
-  return JSON.parse(raw) as VideoScriptOutput;
+  // Guard the array the Create page maps over: a malformed/partial model
+  // response must degrade gracefully, not crash the page with `undefined.map`.
+  const parsed = JSON.parse(raw) as VideoScriptOutput;
+  return { ...parsed, scenes: Array.isArray(parsed.scenes) ? parsed.scenes : [] };
 }
 
 // --- Feature 6: Video Ad Storyboard ---
@@ -392,10 +417,11 @@ Create 4-8 frames. Make the ad compelling, visually descriptive, and conversion-
     max_tokens: 1500,
   });
 
-  const raw = response.choices[0].message.content;
+  const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty response from OpenAI");
 
-  return JSON.parse(raw) as VideoAdOutput;
+  const parsed = JSON.parse(raw) as VideoAdOutput;
+  return { ...parsed, frames: Array.isArray(parsed.frames) ? parsed.frames : [] };
 }
 
 // --- Feature 7: Carousel Generator ---
@@ -470,10 +496,15 @@ The first slide should be an attention-grabbing cover. The last slide should be 
     max_tokens: 2000,
   });
 
-  const raw = response.choices[0].message.content;
+  const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty response from OpenAI");
 
-  return JSON.parse(raw) as CarouselOutput;
+  const parsed = JSON.parse(raw) as CarouselOutput;
+  return {
+    ...parsed,
+    slides: Array.isArray(parsed.slides) ? parsed.slides : [],
+    hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : [],
+  };
 }
 
 // --- Feature 8: A/B Variants ---
@@ -553,11 +584,11 @@ If two variants come out too similar, rewrite one of them from a different angle
     max_tokens: 2000,
   });
 
-  const raw = response.choices[0].message.content;
+  const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty response from OpenAI");
 
   const parsed = JSON.parse(raw) as { variants: PostVariant[] };
-  return parsed.variants;
+  return Array.isArray(parsed.variants) ? parsed.variants : [];
 }
 
 // --- Feature 7: Brand Voice Analyzer ---

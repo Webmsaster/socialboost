@@ -53,9 +53,39 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- -------------------------------------------------------------
+-- 4. Contact form submissions (persist /api/contact messages)
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.contact_messages (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name text NOT NULL,
+  email text NOT NULL,
+  subject text NOT NULL,
+  message text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  CREATE POLICY "Service role full access on contact_messages"
+    ON public.contact_messages FOR ALL
+    USING (auth.role() = 'service_role');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+CREATE INDEX IF NOT EXISTS idx_contact_messages_created ON public.contact_messages(created_at DESC);
+
+-- -------------------------------------------------------------
+-- 5. posts.reviewed_by: switch FK to ON DELETE SET NULL so deleting a
+--    reviewer's account doesn't block (RESTRICT) on reviewed posts.
+-- -------------------------------------------------------------
+ALTER TABLE public.posts DROP CONSTRAINT IF EXISTS posts_reviewed_by_fkey;
+ALTER TABLE public.posts ADD CONSTRAINT posts_reviewed_by_fkey
+  FOREIGN KEY (reviewed_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+-- -------------------------------------------------------------
 -- Done. Verify with:
 --   SELECT column_name FROM information_schema.columns
 --     WHERE table_name = 'content_series'
 --     AND column_name IN ('website_url', 'website_context', 'website_scraped_at');
 --   SELECT 1 FROM information_schema.tables WHERE table_name = 'stripe_events';
+--   SELECT 1 FROM information_schema.tables WHERE table_name = 'contact_messages';
+--   SELECT confdeltype FROM pg_constraint WHERE conname = 'posts_reviewed_by_fkey';
+--     -- expect 'n' (SET NULL)
 -- -------------------------------------------------------------

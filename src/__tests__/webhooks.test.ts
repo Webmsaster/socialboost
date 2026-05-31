@@ -3,6 +3,18 @@ import { fireWebhook } from "@/lib/webhooks";
 
 vi.mock("@/lib/logger", () => ({ captureError: vi.fn() }));
 
+// safeFetch now resolve-and-pins (real DNS + undici Agent) before connecting —
+// that's the SSRF/DNS-rebinding layer with its own coverage in ssrf.test.ts.
+// fireWebhook's unit boundary ends at safeFetch, so delegate straight to the
+// spied global fetch here (keep the real, synchronous parseSafeUrl).
+vi.mock("@/lib/ssrf", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ssrf")>();
+  return {
+    ...actual,
+    safeFetch: (url: string, init?: RequestInit) => fetch(url, init),
+  };
+});
+
 describe("fireWebhook", () => {
   it("does nothing when webhookUrl is null", async () => {
     const fetchSpy = vi.spyOn(global, "fetch");

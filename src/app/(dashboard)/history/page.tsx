@@ -63,6 +63,11 @@ export default function HistoryPage() {
   const [platformFilter, setPlatformFilter] = useState<string>("all");
   const [dateRangeFilter, setDateRangeFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
+  // Schedule-dialog state for moving an approved post into the publish queue.
+  // schedulePostId is the post being scheduled (null = dialog closed);
+  // scheduleFor holds the datetime-local string the user picks.
+  const [schedulePostId, setSchedulePostId] = useState<string | null>(null);
+  const [scheduleFor, setScheduleFor] = useState("");
   // Captured once on mount via useState's lazy initializer — keeps the render
   // path pure (React's purity lint rule rejects bare Date.now() inline).
   const [nowMs] = useState<number>(() => Date.now());
@@ -266,12 +271,24 @@ export default function HistoryPage() {
   // confirm it so the post moves out of "scheduled" into "published".
   async function handleMarkAsPublished(id: string) {
     const nowIso = new Date().toISOString();
-    const { error } = await supabase
+    // Guard on status="scheduled". The SWR list can be stale (we mutate with
+    // revalidate:false), so if the cron already published this post — or it went
+    // to "failed" — between load and click, this must NOT overwrite the real
+    // published_at or resurrect a failed post as published. .select() tells us
+    // whether a row actually changed.
+    const { data: updated, error } = await supabase
       .from("posts")
       .update({ status: "published", published_at: nowIso })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("status", "scheduled")
+      .select("id");
     if (error) {
       toast.error("Failed to update post");
+      return;
+    }
+    if (!updated || updated.length === 0) {
+      toast("Post was already updated — refreshing");
+      mutate();
       return;
     }
     updatePosts((prev) =>
@@ -280,6 +297,61 @@ export default function HistoryPage() {
       ),
     );
     toast.success("Marked as published");
+  }
+
+  // A post that failed to publish (expired token, transient platform 5xx) is
+  // otherwise a dead end: the cron only ever picks up "scheduled" posts and the
+  // UI offered no way back. "Retry" clears the error + reminder flag and flips it
+  // back to scheduled so the next publish run tries again — its (past)
+  // scheduled_for makes it immediately due.
+  async function handleRetryFailed(id: string) {
+    const { data: updated, error } = await supabase
+      .from("posts")
+      .update({ status: "scheduled", error_message: null, reminder_sent_at: null })
+      .eq("id", id)
+      .eq("status", "failed")
+      .select("id");
+    if (error) {
+      toast.error("Failed to retry post");
+      return;
+    }
+    if (!updated || updated.length === 0) {
+      toast("Post already updated — refreshing");
+      mutate();
+      return;
+    }
+    updatePosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: "scheduled" } : p)));
+    toast.success("Re-queued — it'll be retried on the next publish run");
+  }
+
+  // An "approved" post is otherwise a dead end: the cron only picks up posts in
+  // status "scheduled". Scheduling sets scheduled_for so the next publish run
+  // can pick it up, and clears reminder_sent_at so the manual-publish reminder
+  // fires fresh. Guard on status="approved" (CAS) — the SWR list can be stale
+  // (we mutate with revalidate:false), so if the post already moved on between
+  // load and click, this must NOT overwrite a newer state. .select() tells us
+  // whether a row actually changed.
+  async function handleSchedule(id: string, when: string) {
+    const scheduledForIso = new Date(when).toISOString();
+    const { data: updated, error } = await supabase
+      .from("posts")
+      .update({ status: "scheduled", scheduled_for: scheduledForIso, reminder_sent_at: null })
+      .eq("id", id)
+      .eq("status", "approved")
+      .select("id");
+    if (error) {
+      toast.error("Failed to schedule post");
+      return;
+    }
+    if (!updated || updated.length === 0) {
+      toast("Post was already updated — refreshing");
+      mutate();
+      return;
+    }
+    updatePosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: "scheduled" } : p)));
+    setSchedulePostId(null);
+    setScheduleFor("");
+    toast.success("Scheduled");
   }
 
   async function handleDuplicate(post: Post) {
@@ -573,6 +645,18 @@ export default function HistoryPage() {
                       Submit for Review
                     </Button>
                   )}
+                  {post.status === "approved" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSchedulePostId(post.id);
+                        setScheduleFor("");
+                      }}
+                    >
+                      Schedule
+                    </Button>
+                  )}
                   {post.status === "scheduled" && (
                     <Button
                       variant="ghost"
@@ -593,6 +677,15 @@ export default function HistoryPage() {
                       }}
                     >
                       Share link
+                    </Button>
+                  )}
+                  {post.status === "failed" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRetryFailed(post.id)}
+                    >
+                      Retry
                     </Button>
                   )}
                   <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDelete(post.id)}>
@@ -632,6 +725,58 @@ export default function HistoryPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Schedule modal — hand-rolled overlay (no shadcn Dialog in this repo),
+          mirrors the calendar page's detail-modal pattern. */}
+      {schedulePostId !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => {
+            setSchedulePostId(null);
+            setScheduleFor("");
+          }}
+        >
+          <Card
+            className="w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardContent className="space-y-4 pt-6">
+              <h2 className="text-lg font-semibold">Schedule post</h2>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Schedule for</label>
+                <Input
+                  type="datetime-local"
+                  value={scheduleFor}
+                  onChange={(e) => setScheduleFor(e.target.value)}
+                  min={new Date().toISOString().slice(0, 16)}
+                  className="w-full"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSchedulePostId(null);
+                    setScheduleFor("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={!scheduleFor}
+                  onClick={() => {
+                    if (schedulePostId && scheduleFor) {
+                      handleSchedule(schedulePostId, scheduleFor);
+                    }
+                  }}
+                >
+                  Schedule
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

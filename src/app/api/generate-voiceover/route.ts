@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
 import { generateVoiceover, type TTSVoice } from "@/lib/openai-tts";
-import { isProSubscription } from "@/lib/subscription";
+import { isProSubscription, TEXT_QUOTA_PRO } from "@/lib/subscription";
+import { reserveGeneration, refundGeneration } from "@/lib/quota";
 
 const VALID_VOICES: TTSVoice[] = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
 
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     // Pro-only feature.
     const { data: profile } = await supabase
       .from("profiles")
-      .select("subscription_status")
+      .select("subscription_status, generation_count, bonus_generations")
       .eq("id", user.id)
       .single();
 
@@ -31,6 +32,10 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
+
+    // Count the TTS call against the monthly quota (it's a paid OpenAI call).
+    // Pro-only route, so the base is always the Pro text limit.
+    const limit = TEXT_QUOTA_PRO + (profile.bonus_generations ?? 0);
 
     const body = await request.json();
     const text = typeof body.text === "string" ? body.text : "";
@@ -43,7 +48,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Text too long (max 4000 chars)" }, { status: 400 });
     }
 
-    const audio = await generateVoiceover({ text, voice });
+    // Reserve before the TTS call (TOCTOU-safe). false = over limit → 429.
+    const reserved = await reserveGeneration(supabase, user.id, limit);
+    if (!reserved) {
+      return NextResponse.json({ error: `Monthly limit reached (${limit}).` }, { status: 429 });
+    }
+
+    let audio;
+    try {
+      audio = await generateVoiceover({ text, voice });
+    } catch (genError) {
+      await refundGeneration(supabase, user.id).catch((err) =>
+        captureError("voiceover: refund_generation failed", err, { userId: user.id })
+      );
+      throw genError;
+    }
 
     return new NextResponse(audio as unknown as BodyInit, {
       status: 200,

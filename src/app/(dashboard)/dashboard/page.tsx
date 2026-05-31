@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DashboardSkeleton } from "@/components/loading-skeleton";
 import { useLanguage } from "@/lib/i18n";
+import { textQuotaFor, videoQuotaFor } from "@/lib/subscription";
 import { Onboarding } from "@/components/onboarding";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { achievements } from "@/lib/achievements";
@@ -25,6 +26,7 @@ interface Profile {
   generation_count: number;
   video_generation_count: number;
   subscription_status: string;
+  bonus_generations: number;
 }
 
 export default function DashboardPage() {
@@ -49,7 +51,7 @@ export default function DashboardPage() {
         .select("platform, status, created_at, scheduled_for")
         .gte("created_at", ninetyDaysAgo)
         .limit(500),
-      supabase.from("profiles").select("generation_count, video_generation_count, subscription_status").eq("id", user.id).single(),
+      supabase.from("profiles").select("generation_count, video_generation_count, subscription_status, bonus_generations").eq("id", user.id).single(),
     ]);
 
     if (postsRes.error) throw postsRes.error;
@@ -93,7 +95,10 @@ export default function DashboardPage() {
   const loading = isLoading;
   const errorMessage = error ? (error instanceof Error ? error.message : "Failed to load dashboard") : null;
 
-  const limit = profile?.subscription_status === "active" ? 100 : 10;
+  // Mirror the server's allowance: base plan quota + referral bonus_generations
+  // (see src/app/api/generate/route.ts) so the usage meter matches enforcement.
+  const limit = textQuotaFor(profile?.subscription_status) + (profile?.bonus_generations ?? 0);
+  const videoLimit = videoQuotaFor(profile?.subscription_status);
 
   if (errorMessage) {
     return (
@@ -298,18 +303,20 @@ export default function DashboardPage() {
                 />
               </div>
             </div>
-            {profile.subscription_status === "active" && (
+            {videoLimit > 0 && (
               <div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Video renders</span>
                   <span className="text-sm font-medium">
-                    {Math.max(0, 5 - (profile.video_generation_count ?? 0))} of 5 left this month
+                    {Math.max(0, videoLimit - (profile.video_generation_count ?? 0))} of {videoLimit} left this month
                   </span>
                 </div>
                 <div className="mt-2 h-2 rounded-full bg-muted">
                   <div
                     className="h-2 rounded-full bg-amber-500 transition-all"
-                    style={{ width: `${Math.min(((profile.video_generation_count ?? 0) / 5) * 100, 100)}%` }}
+                    style={{
+                      width: `${Math.min(((profile.video_generation_count ?? 0) / videoLimit) * 100, 100)}%`,
+                    }}
                   />
                 </div>
               </div>
