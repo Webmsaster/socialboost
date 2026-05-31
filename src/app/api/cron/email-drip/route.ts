@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { captureError } from "@/lib/logger";
 import { isProSubscription } from "@/lib/subscription";
+import { requireCronAuth } from "@/lib/cron-auth";
 import {
   sendWelcomeEmail,
   sendDay3ReminderEmail,
@@ -42,10 +43,8 @@ function ageWindow(days: number): { start: string; end: string } {
  * Day 1: Welcome, Day 3: Feature reminder, Day 7: Upgrade nudge.
  */
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const unauthorized = requireCronAuth(request);
+  if (unauthorized) return unauthorized;
 
   const supabase = getAdmin();
 

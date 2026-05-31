@@ -9,27 +9,19 @@ const mockLimit = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue({
     auth: { getUser: () => mockGetUser() },
-    from: () => ({
-      select: (...args: unknown[]) => {
-        mockSelect(...args);
-        return {
-          eq: (...eqArgs: unknown[]) => {
-            mockEq(...eqArgs);
-            return {
-              order: (...orderArgs: unknown[]) => {
-                mockOrder(...orderArgs);
-                return {
-                  limit: (...limitArgs: unknown[]) => {
-                    mockLimit(...limitArgs);
-                    return mockLimit.mock.results[mockLimit.mock.calls.length - 1]?.value ?? { data: [], error: null };
-                  },
-                };
-              },
-            };
-          },
-        };
-      },
-    }),
+    // Chainable builder: supports select().eq(user_id).eq(status).order().limit().
+    from: () => {
+      const builder: Record<string, (...a: unknown[]) => unknown> = {
+        select: (...args: unknown[]) => { mockSelect(...args); return builder; },
+        eq: (...args: unknown[]) => { mockEq(...args); return builder; },
+        order: (...args: unknown[]) => { mockOrder(...args); return builder; },
+        limit: (...args: unknown[]) => {
+          mockLimit(...args);
+          return mockLimit.mock.results[mockLimit.mock.calls.length - 1]?.value ?? { data: [], error: null };
+        },
+      };
+      return builder;
+    },
   }),
 }));
 
@@ -81,5 +73,7 @@ describe("GET /api/insights", () => {
     expect(json.insights.toneRanking).toBeInstanceOf(Array);
     expect(json.insights.topPosts).toHaveLength(2);
     expect(json.insights.totalAnalyzed).toBe(2);
+    // Results must be scoped to the caller, not just RLS.
+    expect(mockEq).toHaveBeenCalledWith("user_id", "u1");
   });
 });

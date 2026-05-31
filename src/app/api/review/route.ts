@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
+import { rateLimit } from "@/lib/rate-limit";
 import { sendReviewApprovedEmail, sendReviewRejectedEmail } from "@/lib/email";
 import { logAudit } from "@/lib/audit-log";
 import { dispatchWebhooks } from "@/lib/webhook-dispatcher";
@@ -77,6 +78,9 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const { success } = await rateLimit(user.id, "/api/review");
+    if (!success) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+
     const { postId } = await request.json();
     if (!postId) return NextResponse.json({ error: "Missing postId" }, { status: 400 });
 
@@ -108,11 +112,16 @@ export async function PATCH(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { postId, action, note } = await request.json() as {
+    const { success } = await rateLimit(user.id, "/api/review");
+    if (!success) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+
+    const { postId, action, note: rawNote } = await request.json() as {
       postId: string;
       action: "approve" | "reject";
       note?: string;
     };
+    // Cap the review note before it is stored and embedded in notification emails.
+    const note = typeof rawNote === "string" ? rawNote.slice(0, 2000) : rawNote;
 
     if (!postId || !action) {
       return NextResponse.json({ error: "Missing postId or action" }, { status: 400 });

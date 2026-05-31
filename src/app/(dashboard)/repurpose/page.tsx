@@ -54,7 +54,7 @@ export default function RepurposePage() {
       setLoading(true);
       const { data, error } = await supabase
         .from("posts")
-        .select("*")
+        .select("id, platform, topic, content, hashtags, tone, status, created_at")
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) {

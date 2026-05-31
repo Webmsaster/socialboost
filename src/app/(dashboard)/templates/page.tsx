@@ -51,7 +51,7 @@ export default function TemplatesPage() {
     async function load() {
       const { data } = await supabase
         .from("templates")
-        .select("*")
+        .select("id, name, platform, tone, topic, language, created_at")
         .order("created_at", { ascending: false });
       if (data) setTemplates(data);
     }

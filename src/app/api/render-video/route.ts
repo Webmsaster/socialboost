@@ -12,6 +12,11 @@ interface SceneInput {
   textOverlay?: string;
 }
 
+// Bound the call to the external render worker so a stalled worker can't hang
+// the handler until the platform's hard function timeout (which would kill the
+// request before the refund below runs, leaking the reserved quota slot).
+const RENDER_TIMEOUT_MS = 120_000;
+
 export async function POST(request: NextRequest) {
   try {
     const renderUrl = process.env.VIDEO_RENDER_URL;
@@ -77,26 +82,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const workerRes = await fetch(`${renderUrl.replace(/\/$/, "")}/render`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${renderToken}`,
-      },
-      body: JSON.stringify({
-        userId: user.id,
-        scenes: validScenes,
-        // data: URLs are inline (safe); an http(s) voiceover URL must pass the
-        // same SSRF check before the worker fetches it.
-        voiceoverDataUrl:
-          typeof body.voiceoverDataUrl === "string" &&
-          (body.voiceoverDataUrl.startsWith("data:") || parseSafeUrl(body.voiceoverDataUrl) !== null)
-            ? body.voiceoverDataUrl
-            : undefined,
-        aspect,
-        brandName: typeof body.brandName === "string" ? body.brandName : undefined,
-      }),
-    });
+    const controller = new AbortController();
+    const renderTimeout = setTimeout(() => controller.abort(), RENDER_TIMEOUT_MS);
+    let workerRes: Response;
+    try {
+      workerRes = await fetch(`${renderUrl.replace(/\/$/, "")}/render`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${renderToken}`,
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          scenes: validScenes,
+          // data: URLs are inline (safe); an http(s) voiceover URL must pass the
+          // same SSRF check before the worker fetches it.
+          voiceoverDataUrl:
+            typeof body.voiceoverDataUrl === "string" &&
+            (body.voiceoverDataUrl.startsWith("data:") || parseSafeUrl(body.voiceoverDataUrl) !== null)
+              ? body.voiceoverDataUrl
+              : undefined,
+          aspect,
+          brandName: typeof body.brandName === "string" ? body.brandName : undefined,
+        }),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      // Timeout (abort) or network error. The reserved slot must be refunded —
+      // the outer catch returns 500 without refunding, so a hung/failed worker
+      // call would otherwise burn a generation for a video the user never got.
+      captureError("Render worker fetch failed", err, { userId: user.id });
+      await refundGeneration(supabase, user.id).catch((e) =>
+        captureError("render-video: refund_generation failed", e, { userId: user.id })
+      );
+      return NextResponse.json(
+        { error: "Render failed. Please try again later." },
+        { status: 502 },
+      );
+    } finally {
+      clearTimeout(renderTimeout);
+    }
 
     if (!workerRes.ok) {
       const text = await workerRes.text();

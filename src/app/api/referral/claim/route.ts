@@ -76,11 +76,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Grant bonus to both users — only reached when the insert above succeeded.
-    await supabase.rpc("grant_referral_bonus", {
+    const { error: grantError } = await supabase.rpc("grant_referral_bonus", {
       p_referrer_id: referrer.id,
       p_referred_id: newUserId,
       p_bonus: BONUS_PER_REFERRAL,
     });
+    if (grantError) {
+      // Surface the failure (don't return a false success), but do NOT roll back
+      // the referrals row. grant_referral_bonus does non-idempotent additive
+      // increments and auto-commits per RPC, so if it committed server-side while
+      // the response was lost, deleting the guard row here would let a retry grant
+      // the bonus a SECOND time (and bonus_generations inflates the monthly quota
+      // cap). Keeping the unique(referrer_id, referred_id) row preserves the
+      // at-most-once guarantee. Proper fix: fold the dedup-insert and the grant
+      // into one idempotent transactional RPC (see MEMORY deferred items).
+      captureError("Referral bonus grant failed", grantError, {
+        referrerId: referrer.id,
+        referredId: newUserId,
+      });
+      return NextResponse.json({ error: "Failed to grant referral bonus" }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, bonus: BONUS_PER_REFERRAL });
   } catch (error) {

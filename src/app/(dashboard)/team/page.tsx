@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { CardSkeleton } from "@/components/loading-skeleton";
 import { toast } from "sonner";
 import { useLanguage } from "@/lib/i18n";
 
@@ -33,6 +34,7 @@ interface OrgMember {
 export default function TeamPage() {
   const { t } = useLanguage();
   const [memberships, setMemberships] = useState<OrgMembership[]>([]);
+  const [loadingTeams, setLoadingTeams] = useState(true);
   const [newOrgName, setNewOrgName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [creating, setCreating] = useState(false);
@@ -51,13 +53,17 @@ export default function TeamPage() {
   }, []);
 
   const loadTeams = useCallback(async () => {
-    const res = await fetch("/api/team");
-    if (res.ok) {
-      const data = await res.json();
-      setMemberships(data.memberships || []);
-      for (const m of data.memberships || []) {
-        loadMembers(m.org_id);
+    try {
+      const res = await fetch("/api/team");
+      if (res.ok) {
+        const data = await res.json();
+        setMemberships(data.memberships || []);
+        for (const m of data.memberships || []) {
+          loadMembers(m.org_id);
+        }
       }
+    } finally {
+      setLoadingTeams(false);
     }
   }, [loadMembers]);
 
@@ -144,7 +150,9 @@ export default function TeamPage() {
         <p className="mt-2 text-muted-foreground">{t("team.description")}</p>
       </div>
 
-      {memberships.length === 0 ? (
+      {loadingTeams ? (
+        <CardSkeleton />
+      ) : memberships.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <h3 className="text-lg font-semibold">{t("team.noTeam")}</h3>

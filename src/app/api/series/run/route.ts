@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     if (!result.ok) {
       const status =
         result.reason === "limit_reached"
-          ? 403
+          ? 429
           : result.reason === "generation_failed"
             ? 502
             : 500;

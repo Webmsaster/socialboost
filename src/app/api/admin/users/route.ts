@@ -33,7 +33,14 @@ export async function GET(request: NextRequest) {
       .range(offset, offset + limit - 1);
 
     if (search.trim()) {
-      query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`);
+      // PostgREST parses the .or() argument with its own filter grammar, so a raw
+      // value can break out of the ilike operand and inject extra clauses (a comma
+      // starts a new OR condition, parens group, backslash escapes, * is the
+      // wildcard). Strip those characters before interpolating.
+      const safeSearch = search.trim().replace(/[,()*\\]/g, "");
+      if (safeSearch) {
+        query = query.or(`email.ilike.%${safeSearch}%,full_name.ilike.%${safeSearch}%`);
+      }
     }
 
     const { data, error, count } = await query;

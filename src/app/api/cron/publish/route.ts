@@ -6,6 +6,7 @@ import { logAudit } from "@/lib/audit-log";
 import { dispatchWebhooks } from "@/lib/webhook-dispatcher";
 import { trackEvent } from "@/lib/analytics";
 import { encryptToken, decryptToken } from "@/lib/token-crypto";
+import { requireCronAuth } from "@/lib/cron-auth";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -28,10 +29,8 @@ function getSupabaseAdmin() {
  * then marks the post as published from /history.
  */
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const unauthorized = requireCronAuth(request);
+  if (unauthorized) return unauthorized;
 
   const supabase = getSupabaseAdmin();
 

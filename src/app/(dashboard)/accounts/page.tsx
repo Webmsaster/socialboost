@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CardSkeleton } from "@/components/loading-skeleton";
 import { useLanguage } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -27,21 +28,28 @@ export default function AccountsPage() {
   const { t } = useLanguage();
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
+  const [accountsLoading, setAccountsLoading] = useState(true);
 
   useEffect(() => {
     loadAccounts();
   }, []);
 
   async function loadAccounts() {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("connected_accounts")
-      .select("id, platform, platform_username, created_at");
-    if (error) {
-      toast.error("Failed to load connected accounts");
-      return;
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("connected_accounts")
+        .select("id, platform, platform_username, created_at");
+      if (error) {
+        toast.error("Failed to load connected accounts");
+        return;
+      }
+      if (data) setAccounts(data);
+    } finally {
+      // Avoids flashing every platform as "Not connected" before the first load
+      // resolves (which implies disconnected accounts that are actually connected).
+      setAccountsLoading(false);
     }
-    if (data) setAccounts(data);
   }
 
   async function handleConnect(platform: string) {
@@ -97,6 +105,13 @@ export default function AccountsPage() {
         </p>
       </div>
 
+      {accountsLoading ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+      ) : (
       <div className="grid gap-4 md:grid-cols-2">
         {platformConfigs.map((platform) => {
           const account = getAccount(platform.id);
@@ -146,6 +161,7 @@ export default function AccountsPage() {
           );
         })}
       </div>
+      )}
 
       <p className="text-sm text-muted-foreground">
         Connected accounts allow SocialBoost to publish scheduled posts directly to your platforms.

@@ -4,6 +4,7 @@ import { captureError } from "@/lib/logger";
 import { getPublisher, ensureFreshToken } from "@/lib/platforms/registry";
 import { decryptToken, encryptToken } from "@/lib/token-crypto";
 import type { ConnectedAccount } from "@/lib/platforms";
+import { requireCronAuth } from "@/lib/cron-auth";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -18,10 +19,8 @@ function getSupabaseAdmin() {
  * Secured via CRON_SECRET header.
  */
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const unauthorized = requireCronAuth(request);
+  if (unauthorized) return unauthorized;
 
   const supabase = getSupabaseAdmin();
 

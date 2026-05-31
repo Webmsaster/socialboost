@@ -5,6 +5,9 @@ import { NextRequest } from "next/server";
 let mockSeriesData: unknown[] = [];
 let insertCalled = false;
 let lastInsertedRow: Record<string, unknown> | null = null;
+// Quota is now enforced by the reserve_generation RPC (reserve-before-spend),
+// so the DB decides limit_reached, not a JS count check. Default: slot granted.
+let mockReserveOk = true;
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(() => ({
@@ -38,7 +41,10 @@ vi.mock("@supabase/supabase-js", () => ({
         }),
       };
     },
-    rpc: () => ({ data: null, error: null }),
+    rpc: (fn: string) => {
+      if (fn === "reserve_generation") return { data: mockReserveOk, error: null };
+      return { data: null, error: null };
+    },
   })),
 }));
 
@@ -67,6 +73,7 @@ describe("GET /api/cron/generate-series", () => {
     mockSeriesData = [];
     insertCalled = false;
     lastInsertedRow = null;
+    mockReserveOk = true;
     process.env.CRON_SECRET = CRON_SECRET;
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
@@ -133,6 +140,8 @@ describe("GET /api/cron/generate-series", () => {
   });
 
   it("skips series when user has reached generation limit", async () => {
+    // At/over the cap the reserve_generation RPC returns false (no slot).
+    mockReserveOk = false;
     mockSeriesData = [{
       id: "s1",
       user_id: "u1",
