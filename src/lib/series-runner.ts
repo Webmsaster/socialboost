@@ -12,7 +12,7 @@ import {
 } from "./website-scraper";
 import { captureError } from "./logger";
 import { scoreContent } from "./content-score";
-import { isProSubscription } from "./subscription";
+import { isProSubscription, textQuotaFor } from "./subscription";
 
 export type SeriesRow = {
   id: string;
@@ -53,7 +53,7 @@ export async function runSeriesOnce(
   profile: ProfileRow,
   now: Date = new Date()
 ): Promise<SeriesRunResult> {
-  const limit = (isProSubscription(profile.subscription_status) ? 100 : 10) + (profile.bonus_generations ?? 0);
+  const limit = textQuotaFor(profile.subscription_status) + (profile.bonus_generations ?? 0);
   if (profile.generation_count >= limit) {
     return { ok: false, reason: "limit_reached" };
   }

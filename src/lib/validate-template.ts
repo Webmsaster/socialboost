@@ -12,24 +12,15 @@
  * ("English" is the DB default), so existing payloads keep working.
  */
 
+import { PLATFORMS, TONES } from "@/lib/openai";
+
 const NAME_MAX_LENGTH = 100;
 const TOPIC_MAX_LENGTH = 5000;
 
-export const VALID_PLATFORMS = [
-  "linkedin",
-  "facebook",
-  "instagram",
-  "pinterest",
-  "twitter",
-] as const;
-
-export const VALID_TONES = [
-  "professional",
-  "casual",
-  "inspirational",
-  "humorous",
-  "educational",
-] as const;
+// Re-exported from the single source of truth in src/lib/openai.ts so the
+// template validator can never drift from the generator's supported values.
+export const VALID_PLATFORMS = PLATFORMS;
+export const VALID_TONES = TONES;
 
 // Allowed languages: the display names offered by the templates UI
 // (src/app/(dashboard)/templates/page.tsx -> ["English","German","French","Spanish"]),

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DashboardSkeleton } from "@/components/loading-skeleton";
 import { useLanguage } from "@/lib/i18n";
-import { isProSubscription, videoQuotaFor } from "@/lib/subscription";
+import { textQuotaFor, videoQuotaFor } from "@/lib/subscription";
 import { Onboarding } from "@/components/onboarding";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { achievements } from "@/lib/achievements";
@@ -26,6 +26,7 @@ interface Profile {
   generation_count: number;
   video_generation_count: number;
   subscription_status: string;
+  bonus_generations: number;
 }
 
 export default function DashboardPage() {
@@ -50,7 +51,7 @@ export default function DashboardPage() {
         .select("platform, status, created_at, scheduled_for")
         .gte("created_at", ninetyDaysAgo)
         .limit(500),
-      supabase.from("profiles").select("generation_count, video_generation_count, subscription_status").eq("id", user.id).single(),
+      supabase.from("profiles").select("generation_count, video_generation_count, subscription_status, bonus_generations").eq("id", user.id).single(),
     ]);
 
     if (postsRes.error) throw postsRes.error;
@@ -94,7 +95,9 @@ export default function DashboardPage() {
   const loading = isLoading;
   const errorMessage = error ? (error instanceof Error ? error.message : "Failed to load dashboard") : null;
 
-  const limit = isProSubscription(profile?.subscription_status) ? 100 : 10;
+  // Mirror the server's allowance: base plan quota + referral bonus_generations
+  // (see src/app/api/generate/route.ts) so the usage meter matches enforcement.
+  const limit = textQuotaFor(profile?.subscription_status) + (profile?.bonus_generations ?? 0);
   const videoLimit = videoQuotaFor(profile?.subscription_status);
 
   if (errorMessage) {

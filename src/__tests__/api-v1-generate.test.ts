@@ -46,6 +46,9 @@ vi.mock("@/lib/rate-limit", () => ({
 const mockGeneratePost = vi.fn();
 vi.mock("@/lib/openai", () => ({
   generatePost: (...args: unknown[]) => mockGeneratePost(...args),
+  // The route now derives its allow-lists from these shared constants.
+  PLATFORMS: ["linkedin", "facebook", "instagram", "pinterest", "twitter"],
+  TONES: ["professional", "casual", "inspirational", "humorous", "educational"],
 }));
 
 // Subscription mock. textQuotaFor must be a real implementation here because
@@ -146,6 +149,20 @@ describe("POST /api/v1/generate", () => {
 
     expect(response.status).toBe(400);
     expect(json.error).toContain("Invalid platform");
+  });
+
+  it("returns 400 for an invalid tone", async () => {
+    mockValidateApiKey.mockResolvedValueOnce("user-123");
+    mockRateLimit.mockResolvedValueOnce({ success: true, remaining: 5, limit: 10 });
+
+    const request = createRequest({ platform: "linkedin", topic: "test topic", tone: "sarcastic" });
+    const response = await POST(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(json.error).toContain("Invalid tone");
+    // Tone is rejected before any quota work.
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   it("returns 404 if the profile is not found", async () => {

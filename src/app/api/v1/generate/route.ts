@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { validateApiKey } from "@/lib/api-keys";
-import { generatePost, type Platform, type Tone } from "@/lib/openai";
+import { generatePost, PLATFORMS, TONES, type Platform, type Tone } from "@/lib/openai";
 import { captureError } from "@/lib/logger";
 import { rateLimit } from "@/lib/rate-limit";
 import { isProSubscription, textQuotaFor } from "@/lib/subscription";
@@ -60,9 +60,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Topic too long (max 2000 chars)" }, { status: 400 });
     }
 
-    const validPlatforms = ["linkedin", "facebook", "instagram", "pinterest", "twitter"];
-    if (!validPlatforms.includes(platform)) {
-      return NextResponse.json({ error: `Invalid platform. Use: ${validPlatforms.join(", ")}` }, { status: 400 });
+    if (!(PLATFORMS as readonly string[]).includes(platform)) {
+      return NextResponse.json({ error: `Invalid platform. Use: ${PLATFORMS.join(", ")}` }, { status: 400 });
+    }
+    // Validate tone when provided (previously accepted any string and passed it
+    // straight to the model). Omitted tone still defaults to "professional".
+    if (tone !== undefined && !(TONES as readonly string[]).includes(tone)) {
+      return NextResponse.json({ error: `Invalid tone. Use: ${TONES.join(", ")}` }, { status: 400 });
     }
 
     // Check limits

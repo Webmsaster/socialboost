@@ -12,8 +12,27 @@ function getOpenAI() {
   return _openai;
 }
 
-export type Platform = "linkedin" | "facebook" | "instagram" | "pinterest" | "twitter";
-export type Tone = "professional" | "casual" | "inspirational" | "humorous" | "educational";
+// Single source of truth for the supported platform/tone values. Other modules
+// (validations, validate-template, import, v1/generate) derive their allow-lists
+// from these arrays so the sets can never drift apart again.
+export const PLATFORMS = [
+  "linkedin",
+  "facebook",
+  "instagram",
+  "pinterest",
+  "twitter",
+] as const;
+
+export const TONES = [
+  "professional",
+  "casual",
+  "inspirational",
+  "humorous",
+  "educational",
+] as const;
+
+export type Platform = (typeof PLATFORMS)[number];
+export type Tone = (typeof TONES)[number];
 
 export interface GeneratePostInput {
   platform: Platform;

@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/logger";
 import { rateLimit } from "@/lib/rate-limit";
+import { PLATFORMS, TONES } from "@/lib/openai";
 
-const VALID_PLATFORMS = ["linkedin", "facebook", "instagram", "pinterest", "twitter"];
-const VALID_TONES = ["professional", "casual", "inspirational", "humorous", "educational"];
+// Widened to string[] so the lowercased CSV values can be membership-tested
+// against the shared allow-lists (src/lib/openai.ts).
+const VALID_PLATFORMS: readonly string[] = PLATFORMS;
+const VALID_TONES: readonly string[] = TONES;
 
 export async function POST(request: NextRequest) {
   try {

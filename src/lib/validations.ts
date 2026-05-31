@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PLATFORMS, TONES } from "@/lib/openai";
 
 export const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -29,9 +30,9 @@ export const resetPasswordSchema = z.object({
 });
 
 export const createPostSchema = z.object({
-  platform: z.enum(["linkedin", "facebook", "instagram", "pinterest", "twitter"]),
+  platform: z.enum(PLATFORMS),
   topic: z.string().min(3, "Topic must be at least 3 characters").max(1000, "Topic is too long"),
-  tone: z.enum(["professional", "casual", "inspirational", "humorous", "educational"]),
+  tone: z.enum(TONES),
   language: z.enum(["English", "German", "French", "Spanish"]),
 });
 

@@ -79,9 +79,3 @@ export const testimonials: Testimonial[] = [
     company: "ScaleUp Digital",
   },
 ];
-
-/** Return a random subset of testimonials */
-export function getRandomTestimonials(count: number): Testimonial[] {
-  const shuffled = [...testimonials].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
-}
