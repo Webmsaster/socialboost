@@ -7,3 +7,6 @@ Sentry.init({
   replaysOnErrorSampleRate: 1.0,
   enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
 });
+
+// Instruments client-side router navigations for tracing (App Router).
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
