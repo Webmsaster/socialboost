@@ -6,14 +6,19 @@ on:
   pull_request:
     branches: ['**']
 
+# Cancel superseded runs when new commits are pushed to the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -26,6 +31,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Audit (high and critical only)
+        run: npm audit --audit-level=high
 
       - name: Run tests
         run: npm test
@@ -42,3 +50,29 @@ jobs:
           STRIPE_SECRET_KEY: sk_test_placeholder
           STRIPE_WEBHOOK_SECRET: whsec_placeholder
           SUPABASE_SERVICE_ROLE_KEY: placeholder
+
+  # The Railway video worker is a separate package (own tsconfig/deps) excluded
+  # from the root typecheck — give it its own typecheck + build so a broken
+  # import there fails the PR instead of only surfacing at Railway deploy time.
+  worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install worker dependencies
+        run: npm ci
+
+      - name: Type check worker
+        run: npm run typecheck
+
+      - name: Build worker
+        run: npm run build
