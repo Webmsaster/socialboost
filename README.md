@@ -99,7 +99,7 @@ PGPASSWORD=postgres psql -h 127.0.0.1 -p 55322 -U postgres -d postgres \
   -f supabase/PENDING-APPLY-ON-LIVE.sql
 ```
 
-Copy `.env.example` to `.env.local` and set the values to point at your local Supabase (`http://127.0.0.1:55321`) and the demo keys printed by `supabase status -o env`.
+Copy `.env.local.example` to `.env.local` and set the values to point at your local Supabase (`http://127.0.0.1:55321`) and the demo keys printed by `supabase status -o env`.
 
 ### Run
 
