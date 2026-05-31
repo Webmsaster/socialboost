@@ -31,7 +31,6 @@ interface Post {
 }
 
 const platforms = ["linkedin", "facebook", "instagram", "pinterest", "twitter"] as const;
-const tones = ["professional", "casual", "inspirational", "humorous", "educational"] as const;
 
 type RepurposeResult = Record<string, { content: string; hashtags: string[] }>;
 
@@ -109,7 +108,6 @@ export default function RepurposePage() {
           content: customContent,
           sourcePlatform,
           targetPlatforms,
-          tone,
           language: "English",
         }),
       });
@@ -234,21 +232,6 @@ export default function RepurposePage() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>{t("repurpose.tone")}</Label>
-                  <Select value={tone} onValueChange={setTone}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tones.map((t_) => (
-                        <SelectItem key={t_} value={t_}>
-                          {t(`tone.${t_}`)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
             </CardContent>
           </Card>

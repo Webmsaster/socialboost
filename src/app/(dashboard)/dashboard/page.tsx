@@ -23,6 +23,7 @@ interface Post {
 
 interface Profile {
   generation_count: number;
+  video_generation_count: number;
   subscription_status: string;
 }
 
@@ -48,7 +49,7 @@ export default function DashboardPage() {
         .select("platform, status, created_at, scheduled_for")
         .gte("created_at", ninetyDaysAgo)
         .limit(500),
-      supabase.from("profiles").select("generation_count, subscription_status").eq("id", user.id).single(),
+      supabase.from("profiles").select("generation_count, video_generation_count, subscription_status").eq("id", user.id).single(),
     ]);
 
     if (postsRes.error) throw postsRes.error;
@@ -282,19 +283,37 @@ export default function DashboardPage() {
 
       {profile && (
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{t("dashboard.usage")}</span>
-              <span className="text-sm font-medium">
-                {limit - profile.generation_count} {t("dashboard.remaining")} ({profile.generation_count}/{limit})
-              </span>
+          <CardContent className="pt-6 space-y-4">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">{t("dashboard.usage")}</span>
+                <span className="text-sm font-medium">
+                  {limit - profile.generation_count} {t("dashboard.remaining")} ({profile.generation_count}/{limit})
+                </span>
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-muted">
+                <div
+                  className="h-2 rounded-full bg-primary transition-all"
+                  style={{ width: `${Math.min((profile.generation_count / limit) * 100, 100)}%` }}
+                />
+              </div>
             </div>
-            <div className="mt-2 h-2 rounded-full bg-muted">
-              <div
-                className="h-2 rounded-full bg-primary transition-all"
-                style={{ width: `${Math.min((profile.generation_count / limit) * 100, 100)}%` }}
-              />
-            </div>
+            {profile.subscription_status === "active" && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Video renders</span>
+                  <span className="text-sm font-medium">
+                    {Math.max(0, 5 - (profile.video_generation_count ?? 0))} of 5 left this month
+                  </span>
+                </div>
+                <div className="mt-2 h-2 rounded-full bg-muted">
+                  <div
+                    className="h-2 rounded-full bg-amber-500 transition-all"
+                    style={{ width: `${Math.min(((profile.video_generation_count ?? 0) / 5) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

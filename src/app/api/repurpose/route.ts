@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generatePost, type Platform, type Tone } from "@/lib/openai";
+import { repurposePost, type Platform } from "@/lib/openai";
 import { rateLimit } from "@/lib/rate-limit";
 import { captureError } from "@/lib/logger";
 import { trackEvent } from "@/lib/analytics";
@@ -15,11 +15,10 @@ export async function POST(request: NextRequest) {
     const { success } = await rateLimit(user.id, "/api/repurpose");
     if (!success) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
-    const { content, sourcePlatform, targetPlatforms, tone, language } = await request.json() as {
+    const { content, sourcePlatform, targetPlatforms, language } = await request.json() as {
       content: string;
       sourcePlatform: Platform;
       targetPlatforms: Platform[];
-      tone: Tone;
       language: string;
     };
 
@@ -54,10 +53,10 @@ export async function POST(request: NextRequest) {
 
     for (const targetPlatform of targetPlatforms) {
       if (targetPlatform === sourcePlatform) continue;
-      const result = await generatePost({
-        platform: targetPlatform,
-        topic: `Adapt the following ${sourcePlatform} post for ${targetPlatform}. Keep the core message but adjust style and length for the platform:\n\n${content}`,
-        tone: tone || "professional",
+      const result = await repurposePost({
+        original: content,
+        sourcePlatform,
+        targetPlatform,
         language: language || "English",
         brandVoice: profile.brand_voice || undefined,
         model,

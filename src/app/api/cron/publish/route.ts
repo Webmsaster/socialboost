@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { captureError } from "@/lib/logger";
-import { sendPostPublishedEmail, sendPublishFailedEmail } from "@/lib/email";
+import { sendPostPublishedEmail, sendPublishFailedEmail, sendScheduledReminderEmail } from "@/lib/email";
 import { logAudit } from "@/lib/audit-log";
 import { dispatchWebhooks } from "@/lib/webhook-dispatcher";
 import { trackEvent } from "@/lib/analytics";
@@ -18,9 +18,10 @@ function getSupabaseAdmin() {
  * Call via Vercel Cron or external scheduler every 5 minutes.
  * Secured via CRON_SECRET header.
  *
- * Without OAuth platform connections, posts are marked as "published"
- * so they appear correctly in the calendar/history. When OAuth is added,
- * this endpoint will actually push content to the platforms.
+ * For users without an OAuth-connected account on the post's platform we
+ * send a "time to post manually" reminder email (copy-paste-friendly body)
+ * instead of silently flipping the status. The user posts on their own,
+ * then marks the post as published from /history.
  */
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
   // Find all posts scheduled for a time in the past that are still "scheduled"
   const { data: posts, error: fetchError } = await supabase
     .from("posts")
-    .select("id, user_id, platform, content, hashtags, media_url, connected_account_id")
+    .select("id, user_id, platform, topic, content, hashtags, media_url, connected_account_id, reminder_sent_at")
     .eq("status", "scheduled")
     .lte("scheduled_for", new Date().toISOString())
     .order("scheduled_for", { ascending: true })
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
 
   let published = 0;
   let failed = 0;
+  let remindersSent = 0;
 
   for (const post of posts) {
     if (post.connected_account_id) {
@@ -172,45 +174,49 @@ export async function GET(request: NextRequest) {
         }
       }
     } else {
-      // No connected account — mark as published (user handles manual posting)
-      const { error } = await supabase
-        .from("posts")
-        .update({
-          status: "published",
-          published_at: new Date().toISOString(),
-        })
-        .eq("id", post.id);
-
-      if (!error) {
-        trackEvent({
-          event: "post_published",
-          userId: post.user_id,
-          properties: { platform: post.platform, via: "manual" },
-        });
+      // No connected account — send a "time to post manually" reminder
+      // instead of auto-marking the post as published (the old behavior was
+      // a lie: nothing actually got posted, we just flipped the status).
+      // Skip if we've already pinged the user for this post.
+      if (post.reminder_sent_at) {
+        continue;
       }
+      const profileLookup = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("id", post.user_id)
+        .single();
+      const profile = profileLookup?.data;
 
-      if (error) {
-        captureError("Cron: failed to mark post as published", error, { postId: post.id });
-        failed++;
-      } else {
-        published++;
-
-        await logAudit(post.user_id, "post.published", { postId: post.id, platform: post.platform });
-        dispatchWebhooks(post.user_id, "post.published", {
-          postId: post.id,
+      if (profile?.email) {
+        const ok = await sendScheduledReminderEmail(profile.email, {
+          id: post.id,
           platform: post.platform,
-        }).catch(() => { /* handled inside */ });
+          content: post.content,
+          hashtags: post.hashtags ?? [],
+          topic: post.topic ?? null,
+        }).catch((err) => {
+          captureError("Cron: sendScheduledReminderEmail failed", err);
+          return false;
+        });
 
-        // Send notification email
-        const { data: profile } = await supabase.from("profiles").select("email").eq("id", post.user_id).single();
-        if (profile?.email) {
-          sendPostPublishedEmail(profile.email, post.content, post.platform).catch(
-            (err) => captureError("Cron: sendPostPublishedEmail failed", err)
-          );
+        if (ok) {
+          await supabase
+            .from("posts")
+            .update({ reminder_sent_at: new Date().toISOString() })
+            .eq("id", post.id);
+          remindersSent++;
+          trackEvent({
+            event: "scheduled_reminder_sent",
+            userId: post.user_id,
+            properties: { platform: post.platform },
+          });
+        } else {
+          failed++;
         }
       }
     }
   }
 
-  return NextResponse.json({ processed: posts.length, published, failed });
+  return NextResponse.json({ processed: posts.length, published, failed, remindersSent });
 }

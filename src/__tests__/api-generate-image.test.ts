@@ -192,7 +192,9 @@ describe("POST /api/generate-image", () => {
 
     expect(response.status).toBe(200);
     expect(json.url).toBe("https://storage.supabase.co/image.png");
-    expect(mockGenerateImage).toHaveBeenCalledWith("a sunset over mountains");
+    // The route now passes a platform-derived size as the second arg.
+    // Without a platform in the body we fall back to 1024x1024 (square).
+    expect(mockGenerateImage).toHaveBeenCalledWith("a sunset over mountains", "1024x1024");
     expect(mockPersistImage).toHaveBeenCalledWith(
       "https://openai.com/temp-image.png",
       "user-123"

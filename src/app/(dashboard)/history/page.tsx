@@ -29,6 +29,7 @@ interface Post {
   status: string;
   is_favorite: boolean;
   created_at: string;
+  published_at?: string | null;
 }
 
 type FilterStatus = "all" | "draft" | "pending_review" | "approved" | "scheduled" | "published";
@@ -56,7 +57,15 @@ export default function HistoryPage() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [websiteFilter, setWebsiteFilter] = useState<string>(URL_ALL);
+  // Platform + date-range filters. "all" means no constraint; we store the
+  // platform as a single value (not multi) because the existing tab UI is
+  // already a single-select pattern and a multi-select would over-complicate.
+  const [platformFilter, setPlatformFilter] = useState<string>("all");
+  const [dateRangeFilter, setDateRangeFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
+  // Captured once on mount via useState's lazy initializer — keeps the render
+  // path pure (React's purity lint rule rejects bare Date.now() inline).
+  const [nowMs] = useState<number>(() => Date.now());
   const { t } = useLanguage();
   const router = useRouter();
   const supabase = createClient();
@@ -110,17 +119,34 @@ export default function HistoryPage() {
     if (websiteFilter !== URL_ALL) {
       result = result.filter((p) => p.topic === websiteFilter);
     }
+    if (platformFilter !== "all") {
+      result = result.filter((p) => p.platform === platformFilter);
+    }
+    if (dateRangeFilter !== "all") {
+      const days =
+        dateRangeFilter === "7d"
+          ? 7
+          : dateRangeFilter === "30d"
+          ? 30
+          : dateRangeFilter === "90d"
+          ? 90
+          : null;
+      if (days !== null) {
+        const cutoff = nowMs - days * 24 * 60 * 60 * 1000;
+        result = result.filter((p) => new Date(p.created_at).getTime() >= cutoff);
+      }
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
         (p) =>
           p.topic.toLowerCase().includes(q) ||
           p.content.toLowerCase().includes(q) ||
-          p.platform.toLowerCase().includes(q)
+          p.platform.toLowerCase().includes(q),
       );
     }
     return result;
-  }, [posts, search, showFavoritesOnly, websiteFilter]);
+  }, [posts, search, showFavoritesOnly, websiteFilter, platformFilter, dateRangeFilter, nowMs]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPosts.length / POSTS_PER_PAGE));
   // Clamp the page instead of resetting via an effect — pure derivation avoids cascading renders.
@@ -232,6 +258,28 @@ export default function HistoryPage() {
     } catch {
       toast.error("Failed to submit for review");
     }
+  }
+
+  // Used for the manual-publish workflow. The cron sends a copy-paste-ready
+  // reminder when a scheduled post hits its time without a connected account;
+  // once the user actually posts on the platform, they come back here and
+  // confirm it so the post moves out of "scheduled" into "published".
+  async function handleMarkAsPublished(id: string) {
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase
+      .from("posts")
+      .update({ status: "published", published_at: nowIso })
+      .eq("id", id);
+    if (error) {
+      toast.error("Failed to update post");
+      return;
+    }
+    updatePosts((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, status: "published", published_at: nowIso } : p,
+      ),
+    );
+    toast.success("Marked as published");
   }
 
   async function handleDuplicate(post: Post) {
@@ -362,6 +410,51 @@ export default function HistoryPage() {
         />
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground shrink-0">Platform:</span>
+          <Select value={platformFilter} onValueChange={setPlatformFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All platforms</SelectItem>
+              <SelectItem value="linkedin">LinkedIn</SelectItem>
+              <SelectItem value="facebook">Facebook</SelectItem>
+              <SelectItem value="instagram">Instagram</SelectItem>
+              <SelectItem value="pinterest">Pinterest</SelectItem>
+              <SelectItem value="twitter">Twitter / X</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground shrink-0">Date:</span>
+          <Select value={dateRangeFilter} onValueChange={setDateRangeFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All time</SelectItem>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(platformFilter !== "all" || dateRangeFilter !== "all") && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setPlatformFilter("all");
+              setDateRangeFilter("all");
+            }}
+          >
+            Clear filters
+          </Button>
+        )}
+      </div>
+
       {websiteOptions.length > 0 && (
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground shrink-0">Website:</span>
@@ -478,6 +571,15 @@ export default function HistoryPage() {
                       onClick={() => handleSubmitForReview(post.id)}
                     >
                       Submit for Review
+                    </Button>
+                  )}
+                  {post.status === "scheduled" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleMarkAsPublished(post.id)}
+                    >
+                      Mark as published
                     </Button>
                   )}
                   {post.status === "published" && (

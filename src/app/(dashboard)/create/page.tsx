@@ -94,6 +94,12 @@ export default function CreatePage() {
   const [loadingFullVideo, setLoadingFullVideo] = useState(false);
   const [fullVideoUrl, setFullVideoUrl] = useState<string | null>(null);
 
+  // Whether the user has set up a brand voice (manual textarea or auto-trained).
+  // If empty, we surface a one-time onboarding banner — most users skip this
+  // field and then complain about generic AI output.
+  const [hasBrandVoice, setHasBrandVoice] = useState<boolean | null>(null);
+  const [brandVoiceBannerDismissed, setBrandVoiceBannerDismissed] = useState(false);
+
   // Website → full video (video-script tab)
   const [siteUrl, setSiteUrl] = useState("");
   const [loadingSiteVideo, setLoadingSiteVideo] = useState(false);
@@ -112,6 +118,26 @@ export default function CreatePage() {
   // Copy states
   const [copied, setCopied] = useState(false);
   const [copiedVariant, setCopiedVariant] = useState<string | null>(null);
+
+  // Check whether the user has filled in a brand voice. If not, we'll show a
+  // banner suggesting auto-training — the Phase 2 feature is useless if nobody
+  // discovers it.
+  useEffect(() => {
+    setBrandVoiceBannerDismissed(
+      localStorage.getItem("brand_voice_banner_dismissed") === "1",
+    );
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("brand_voice")
+        .eq("id", user.id)
+        .single();
+      const bv = (data?.brand_voice ?? "").toString().trim();
+      setHasBrandVoice(bv.length > 0);
+    })();
+  }, [supabase]);
 
   // Auto-save draft to localStorage
   useEffect(() => {
@@ -311,7 +337,7 @@ export default function CreatePage() {
           const imgRes = await fetch("/api/generate-image", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: topic }),
+            body: JSON.stringify({ prompt: topic, platform }),
           });
           if (imgRes.ok) {
             const imgData = await imgRes.json();
@@ -910,7 +936,6 @@ export default function CreatePage() {
               {fullVideoUrl && (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">Rendered MP4</p>
-                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                   <video
                     src={fullVideoUrl}
                     controls
@@ -1171,6 +1196,35 @@ export default function CreatePage() {
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-bold">Create Content</h1>
+
+      {hasBrandVoice === false && !brandVoiceBannerDismissed && (
+        <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+          <div className="flex-1 space-y-1">
+            <p className="text-sm font-medium">
+              Generic AI output is your default — fix it in 30 seconds
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Your brand voice is empty, so every post sounds like ChatGPT. Train it on
+              your existing posts in Settings and every future post sounds like you wrote it.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button asChild size="sm">
+              <a href="/settings#brand-voice">Train now</a>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                localStorage.setItem("brand_voice_banner_dismissed", "1");
+                setBrandVoiceBannerDismissed(true);
+              }}
+            >
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Shared list of previously-used website URLs, attached via list="recent-websites" on every URL input on this page. */}
       {recentWebsites.length > 0 && (
