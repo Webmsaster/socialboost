@@ -138,8 +138,8 @@ export async function POST(request: NextRequest) {
     if (canBuildAssets) {
       const imagePromises = scenes.map(async (scene) => {
         try {
-          const prompt = `Cinematic social media ad frame. ${scene.visual}. High contrast, vibrant, professional.`;
-          const temporary = await generateImage(prompt);
+          const prompt = `${scene.visual}. Single subject, one continuous shot, no split-screen, no collage, no grid, no text, no watermark. Photorealistic, vertical composition, vibrant lighting, cinematic depth of field.`;
+          const temporary = await generateImage(prompt, "1024x1536");
           const persisted = await persistImage(temporary, user.id).catch(() => temporary);
           return { sceneNumber: scene.sceneNumber, url: persisted, error: null as string | null };
         } catch (err) {

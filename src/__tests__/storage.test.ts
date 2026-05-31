@@ -79,4 +79,27 @@ describe("persistImage", () => {
     const result = await persistImage("https://temp-url.com/image.png", "user-123");
     expect(result).toBe("https://temp-url.com/image.png");
   });
+
+  it("decodes data URL and uploads buffer without fetching", async () => {
+    mockUpload.mockResolvedValue({ error: null });
+    mockGetPublicUrl.mockReturnValue({
+      data: { publicUrl: "https://storage.supabase.co/from-b64.png" },
+    });
+
+    const b64 = Buffer.from("hello").toString("base64");
+    const dataUrl = `data:image/png;base64,${b64}`;
+
+    const result = await persistImage(dataUrl, "user-123");
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mockUpload).toHaveBeenCalledWith(
+      expect.stringContaining("user-123/"),
+      expect.any(Buffer),
+      { contentType: "image/png", upsert: false }
+    );
+    const lastCall = mockUpload.mock.calls.at(-1)!;
+    const bufferArg = lastCall[1];
+    expect((bufferArg as Buffer).toString()).toBe("hello");
+    expect(result).toBe("https://storage.supabase.co/from-b64.png");
+  });
 });

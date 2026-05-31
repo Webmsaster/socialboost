@@ -20,21 +20,30 @@ export async function persistImage(
   userId: string
 ): Promise<string> {
   try {
-    const response = await fetch(temporaryUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download image: ${response.status}`);
+    let buffer: Buffer;
+    let contentType = "image/png";
+    const dataUrlMatch = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(temporaryUrl);
+    if (dataUrlMatch) {
+      contentType = dataUrlMatch[1];
+      buffer = Buffer.from(dataUrlMatch[2], "base64");
+    } else {
+      const response = await fetch(temporaryUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download image: ${response.status}`);
+      }
+      const blob = await response.blob();
+      buffer = Buffer.from(await blob.arrayBuffer());
     }
 
-    const blob = await response.blob();
-    const buffer = Buffer.from(await blob.arrayBuffer());
-    const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`;
+    const ext = contentType.split("/")[1]?.split("+")[0] || "png";
+    const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
     const supabase = getStorageAdmin();
 
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
       .upload(fileName, buffer, {
-        contentType: "image/png",
+        contentType,
         upsert: false,
       });
 

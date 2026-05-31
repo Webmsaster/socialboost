@@ -100,26 +100,37 @@ Make the content authentic, engaging, and platform-appropriate. Never use generi
   const raw = response.choices[0].message.content;
   if (!raw) throw new Error("Empty response from OpenAI");
 
-  const parsed = JSON.parse(raw) as GeneratePostOutput;
-  return parsed;
+  const parsed = JSON.parse(raw) as Partial<GeneratePostOutput>;
+  return {
+    content: parsed.content ?? "",
+    hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : [],
+    content_score: parsed.content_score,
+    score_reason: parsed.score_reason,
+  };
 }
 
 // --- Feature 1: AI Image Generation ---
 
-export async function generateImage(prompt: string): Promise<string> {
+export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
+
+export async function generateImage(
+  prompt: string,
+  size: ImageSize = "1024x1024",
+): Promise<string> {
   const openai = getOpenAI();
   const safePrompt = `Create a social media visual for: ${sanitizeInput(prompt, 500)}. Professional, clean, modern design.`;
 
   const response = await openai.images.generate({
-    model: "dall-e-3",
+    model: "gpt-image-1",
     prompt: safePrompt,
     n: 1,
-    size: "1024x1024",
+    size,
   });
 
-  const url = response.data?.[0]?.url;
-  if (!url) throw new Error("No image URL returned from DALL-E");
-  return url;
+  const item = response.data?.[0] as { url?: string; b64_json?: string } | undefined;
+  if (item?.url) return item.url;
+  if (item?.b64_json) return `data:image/png;base64,${item.b64_json}`;
+  throw new Error("No image returned from OpenAI");
 }
 
 // --- Feature 5: Video Script Generator ---

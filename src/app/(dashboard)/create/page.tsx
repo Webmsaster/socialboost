@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useRecentWebsites } from "@/lib/use-recent-websites";
+import { trackClient } from "@/lib/track-client";
 import { PostPreview } from "@/components/post-preview";
 import {
   PLATFORM_LIMITS,
@@ -90,6 +91,8 @@ export default function CreatePage() {
     images: Array<{ sceneNumber: number; url: string | null; error: string | null }>;
     voiceover: { dataUrl: string | null; error: string | null };
   } | null>(null);
+  const [loadingFullVideo, setLoadingFullVideo] = useState(false);
+  const [fullVideoUrl, setFullVideoUrl] = useState<string | null>(null);
 
   // Website → full video (video-script tab)
   const [siteUrl, setSiteUrl] = useState("");
@@ -178,6 +181,8 @@ export default function CreatePage() {
     setVideoAdResult(null);
     setCarouselResult(null);
     setCurrentSlide(0);
+    setVideoAssets(null);
+    setFullVideoUrl(null);
   }, [contentType]);
 
   // --- Hashtag suggestions ---
@@ -219,6 +224,8 @@ export default function CreatePage() {
     setVideoAdResult(null);
     setCarouselResult(null);
     setCurrentSlide(0);
+    setVideoAssets(null);
+    setFullVideoUrl(null);
   }, []);
 
   async function handleGenerate(e: React.FormEvent) {
@@ -441,12 +448,19 @@ export default function CreatePage() {
       content,
       hashtags,
       status: "draft",
+      content_score: contentScore?.score ?? 0,
     });
 
     if (error) {
       toast.error("Failed to save");
     } else {
       toast.success("Post saved as draft!");
+      trackClient("post_saved_as_draft", {
+        platform,
+        tone,
+        contentType,
+        score: contentScore?.score ?? null,
+      });
     }
   }
 
@@ -463,6 +477,55 @@ export default function CreatePage() {
         return "Generate Storyboard";
       case "carousel":
         return "Generate Carousel";
+    }
+  }
+
+  async function handleRenderFullVideo() {
+    if (!videoAssets || !videoScriptResult) return;
+    const usableImages = videoAssets.images.filter((i) => !!i.url);
+    if (usableImages.length === 0) {
+      toast.error("No scene images available to render");
+      return;
+    }
+    trackClient("render_video_clicked", { sceneCount: usableImages.length });
+
+    setLoadingFullVideo(true);
+    setFullVideoUrl(null);
+    try {
+      const scenes = usableImages.map((img) => {
+        const scriptScene = videoScriptResult.scenes.find(
+          (s) => s.sceneNumber === img.sceneNumber,
+        );
+        const durationNum = scriptScene
+          ? parseInt(String(scriptScene.duration).match(/\d+/)?.[0] ?? "5", 10)
+          : 5;
+        return {
+          imageUrl: img.url as string,
+          duration: durationNum,
+          textOverlay: scriptScene?.textOverlay ?? "",
+        };
+      });
+
+      const res = await fetch("/api/render-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scenes,
+          voiceoverDataUrl: videoAssets.voiceover.dataUrl ?? undefined,
+          aspect: "9:16",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to render video");
+        return;
+      }
+      setFullVideoUrl(data.videoUrl);
+      toast.success("Full video rendered!");
+    } catch {
+      toast.error("Failed to render video");
+    } finally {
+      setLoadingFullVideo(false);
     }
   }
 
@@ -827,9 +890,41 @@ export default function CreatePage() {
 
           {videoAssets && (
             <div className="mt-4 space-y-4 rounded-lg border border-dashed p-4">
-              <p className="text-sm font-semibold">
-                Video assets — import into CapCut, InShot, or any video editor
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <p className="text-sm font-semibold">
+                  Video assets — import into CapCut, InShot, or any video editor
+                </p>
+                <Button
+                  size="sm"
+                  onClick={handleRenderFullVideo}
+                  disabled={
+                    loadingFullVideo ||
+                    !videoAssets.images.some((i) => !!i.url) ||
+                    !videoAssets.voiceover.dataUrl
+                  }
+                >
+                  {loadingFullVideo ? "Rendering..." : "Render Full Video (Pro)"}
+                </Button>
+              </div>
+
+              {fullVideoUrl && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Rendered MP4</p>
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <video
+                    src={fullVideoUrl}
+                    controls
+                    className="w-full max-h-[480px] rounded-md border bg-black"
+                  />
+                  <a
+                    href={fullVideoUrl}
+                    download={`socialboost-video-${Date.now()}.mp4`}
+                    className="inline-block text-xs text-primary hover:underline"
+                  >
+                    Download MP4
+                  </a>
+                </div>
+              )}
 
               {videoAssets.voiceover.dataUrl && (
                 <div className="space-y-2">
@@ -1089,7 +1184,10 @@ export default function CreatePage() {
       {/* Content Type Tabs */}
       <Tabs
         value={contentType}
-        onValueChange={(v) => setContentType(v as ContentType)}
+        onValueChange={(v) => {
+          setContentType(v as ContentType);
+          trackClient("tab_switched", { to: v });
+        }}
       >
         <TabsList className="w-full md:w-auto">
           <TabsTrigger value="post">Social Post</TabsTrigger>

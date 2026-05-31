@@ -160,7 +160,7 @@ describe("OpenAI lib", () => {
 
   // ---------- generateImage ----------
   describe("generateImage", () => {
-    it("returns image URL", async () => {
+    it("returns image URL when provider sends one", async () => {
       const { generateImage } = await import("@/lib/openai");
 
       const url = "https://example.com/image.png";
@@ -172,20 +172,45 @@ describe("OpenAI lib", () => {
       expect(result).toBe(url);
       expect(mockImagesGenerate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: "dall-e-3",
+          model: "gpt-image-1",
           n: 1,
           size: "1024x1024",
         })
       );
     });
 
-    it("throws when no URL is returned", async () => {
+    it("returns data URL when provider sends b64_json", async () => {
+      const { generateImage } = await import("@/lib/openai");
+
+      const b64 = "aGVsbG8="; // "hello"
+      mockImagesGenerate.mockResolvedValueOnce({
+        data: [{ b64_json: b64 }],
+      });
+
+      const result = await generateImage("a sunset");
+      expect(result).toBe(`data:image/png;base64,${b64}`);
+    });
+
+    it("throws when no image is returned", async () => {
       const { generateImage } = await import("@/lib/openai");
 
       mockImagesGenerate.mockResolvedValueOnce({ data: [] });
 
       await expect(generateImage("broken prompt")).rejects.toThrow(
-        "No image URL returned from DALL-E"
+        "No image returned from OpenAI"
+      );
+    });
+
+    it("forwards the size override to OpenAI", async () => {
+      const { generateImage } = await import("@/lib/openai");
+
+      mockImagesGenerate.mockResolvedValueOnce({
+        data: [{ url: "https://example.com/portrait.png" }],
+      });
+
+      await generateImage("a vertical scene", "1024x1536");
+      expect(mockImagesGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({ size: "1024x1536" })
       );
     });
   });
