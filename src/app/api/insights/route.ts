@@ -8,10 +8,15 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // Get published posts with metrics, sorted by engagement score
+    // Get published posts with metrics, sorted by engagement score. Scope to the
+    // caller explicitly (don't rely on RLS alone): /api/metrics does the same, and
+    // without it a future RLS change (e.g. the public-share feature) could leak
+    // other users' top-performing content into this user's analytics. It also lets
+    // the query use a per-user index instead of scanning the whole table.
     const { data: posts, error } = await supabase
       .from("posts")
       .select("id, platform, topic, content, tone, hashtags, likes, shares, comments, impressions, content_score, created_at")
+      .eq("user_id", user.id)
       .eq("status", "published")
       .order("content_score", { ascending: false })
       .limit(20);

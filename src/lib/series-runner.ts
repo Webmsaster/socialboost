@@ -13,6 +13,7 @@ import {
 import { captureError } from "./logger";
 import { scoreContent } from "./content-score";
 import { isProSubscription, textQuotaFor } from "./subscription";
+import { reserveGeneration, refundGeneration } from "./quota";
 
 export type SeriesRow = {
   id: string;
@@ -53,8 +54,16 @@ export async function runSeriesOnce(
   profile: ProfileRow,
   now: Date = new Date()
 ): Promise<SeriesRunResult> {
+  // Reserve a generation slot atomically BEFORE the expensive OpenAI call —
+  // the same reserve-before-spend flow the other generation routes use
+  // (src/lib/quota.ts). The old read-compare (`generation_count >= limit`) plus
+  // post-hoc increment_generation_count left a TOCTOU window where concurrent
+  // runs over-spent and — worse — a user already at the cap still got a post
+  // generated that was never counted (the increment RPC only bumps
+  // `WHERE generation_count < limit`). Every failure path below refunds.
   const limit = textQuotaFor(profile.subscription_status) + (profile.bonus_generations ?? 0);
-  if (profile.generation_count >= limit) {
+  const reserved = await reserveGeneration(supabase, series.user_id, limit);
+  if (!reserved) {
     return { ok: false, reason: "limit_reached" };
   }
 
@@ -63,16 +72,22 @@ export async function runSeriesOnce(
     const lastScraped = series.website_scraped_at ? new Date(series.website_scraped_at) : null;
     const stale = !lastScraped || now.getTime() - lastScraped.getTime() > 24 * 60 * 60 * 1000;
     if (stale) {
-      const fresh = await scrapeWebsite(series.website_url);
-      if (fresh) {
-        websiteContext = fresh;
-        await supabase
-          .from("content_series")
-          .update({
-            website_context: fresh,
-            website_scraped_at: now.toISOString(),
-          })
-          .eq("id", series.id);
+      // A scrape failure must not abort the run now that a slot is reserved —
+      // fall back to the last-known context (or none) and continue.
+      try {
+        const fresh = await scrapeWebsite(series.website_url);
+        if (fresh) {
+          websiteContext = fresh;
+          await supabase
+            .from("content_series")
+            .update({
+              website_context: fresh,
+              website_scraped_at: now.toISOString(),
+            })
+            .eq("id", series.id);
+        }
+      } catch (err) {
+        captureError("Series runner: website scrape failed", err, { seriesId: series.id });
       }
     }
   }
@@ -119,6 +134,9 @@ export async function runSeriesOnce(
     }
   } catch (err) {
     captureError("Series runner: generation failed", err, { seriesId: series.id });
+    await refundGeneration(supabase, series.user_id).catch((e) =>
+      captureError("Series runner: refund after generation failure failed", e, { seriesId: series.id })
+    );
     return {
       ok: false,
       reason: "generation_failed",
@@ -161,6 +179,9 @@ export async function runSeriesOnce(
 
   if (insertError || !inserted) {
     captureError("Series runner: insert failed", insertError, { seriesId: series.id });
+    await refundGeneration(supabase, series.user_id).catch((e) =>
+      captureError("Series runner: refund after insert failure failed", e, { seriesId: series.id })
+    );
     return {
       ok: false,
       reason: "insert_failed",
@@ -173,11 +194,7 @@ export async function runSeriesOnce(
     .update({ last_generated_at: now.toISOString() })
     .eq("id", series.id);
 
-  await supabase.rpc("increment_generation_count", {
-    p_user_id: series.user_id,
-    p_limit: limit,
-  });
-
+  // No increment here: the slot was already reserved atomically up front.
   return { ok: true, postId: inserted.id };
 }
 

@@ -76,11 +76,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Grant bonus to both users — only reached when the insert above succeeded.
-    await supabase.rpc("grant_referral_bonus", {
+    const { error: grantError } = await supabase.rpc("grant_referral_bonus", {
       p_referrer_id: referrer.id,
       p_referred_id: newUserId,
       p_bonus: BONUS_PER_REFERRAL,
     });
+    if (grantError) {
+      // The referrals row is already committed (bonus_granted=true) but the grant
+      // didn't apply. Without rolling it back, the unique(referrer_id, referred_id)
+      // guard would permanently block any retry and the promised bonus would be
+      // silently lost. Delete the row so a retry can re-attempt, then signal failure.
+      captureError("Referral bonus grant failed", grantError, {
+        referrerId: referrer.id,
+        referredId: newUserId,
+      });
+      await supabase
+        .from("referrals")
+        .delete()
+        .eq("referrer_id", referrer.id)
+        .eq("referred_id", newUserId);
+      return NextResponse.json({ error: "Failed to grant referral bonus" }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, bonus: BONUS_PER_REFERRAL });
   } catch (error) {

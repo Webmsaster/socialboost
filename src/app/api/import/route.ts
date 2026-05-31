@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       hashtags: string[];
       tone: string;
       status: string;
+      scheduled_for: string | null;
     };
     const toInsert: ValidRow[] = [];
     const errors: string[] = [];
@@ -54,6 +55,9 @@ export async function POST(request: NextRequest) {
       const tone = String(row.tone || row.Tone || "professional").toLowerCase().trim();
       const hashtagsRaw = String(row.hashtags || row.Hashtags || "");
       const status = String(row.status || row.Status || "draft").toLowerCase().trim();
+      const scheduledForRaw = String(
+        row.scheduled_for || row.scheduledFor || row["Scheduled For"] || ""
+      ).trim();
 
       if (!content) {
         errors.push(`Row ${i + 1}: missing content`);
@@ -75,6 +79,17 @@ export async function POST(request: NextRequest) {
         ? hashtagsRaw.split(",").map((h) => h.trim().replace(/^#/, "")).filter(Boolean)
         : [];
 
+      // Only keep "scheduled" if a valid date is supplied. A scheduled post with
+      // no scheduled_for is stuck forever: the publish cron matches
+      // `scheduled_for <= now`, and `NULL <= now` is UNKNOWN, so it is never
+      // published and never gets a manual-publish reminder. Fall back to draft.
+      let scheduledFor: string | null = null;
+      if (scheduledForRaw) {
+        const d = new Date(scheduledForRaw);
+        if (!Number.isNaN(d.getTime())) scheduledFor = d.toISOString();
+      }
+      const finalStatus = status === "scheduled" && scheduledFor ? "scheduled" : "draft";
+
       toInsert.push({
         user_id: user.id,
         platform,
@@ -82,7 +97,8 @@ export async function POST(request: NextRequest) {
         content,
         hashtags,
         tone: VALID_TONES.includes(tone) ? tone : "professional",
-        status: status === "scheduled" ? "scheduled" : "draft",
+        status: finalStatus,
+        scheduled_for: finalStatus === "scheduled" ? scheduledFor : null,
       });
     }
 
@@ -93,8 +109,10 @@ export async function POST(request: NextRequest) {
         .insert(toInsert, { count: "exact" });
       if (error) {
         captureError("CSV import batch insert failed", error, { userId: user.id });
+        // Don't leak the raw Postgres error (column/constraint/RLS hints) to the
+        // client — it's already captured above. Match the rest of the API surface.
         return NextResponse.json(
-          { error: "Failed to insert imported posts", details: error.message },
+          { error: "Failed to insert imported posts" },
           { status: 500 }
         );
       }
