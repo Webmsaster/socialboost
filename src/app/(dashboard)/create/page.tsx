@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { useLanguage } from "@/lib/i18n";
 import { useRecentWebsites } from "@/lib/use-recent-websites";
 import { trackClient } from "@/lib/track-client";
 import { scoreContent } from "@/lib/content-score";
@@ -44,6 +45,7 @@ import {
 // --- Component ---
 
 export default function CreatePage() {
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const supabase = createClient();
 
@@ -502,7 +504,7 @@ export default function CreatePage() {
   // --- Render Helpers ---
 
   function getGenerateButtonText(): string {
-    if (loading) return "Generating...";
+    if (loading) return t("create.generating");
     switch (contentType) {
       case "post":
         return enableVariants ? "Generate A/B Variants" : "Generate Post";
@@ -592,7 +594,7 @@ export default function CreatePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Generated Post
+            {t("create.result")}
             <Badge variant="secondary">{platform}</Badge>
           </CardTitle>
         </CardHeader>
@@ -612,7 +614,7 @@ export default function CreatePage() {
 
           {imageUrl && (
             <div className="space-y-2">
-              <p className="text-sm font-medium">Generated Image</p>
+              <p className="text-sm font-medium">{t("create.imageResult")}</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imageUrl}
@@ -671,7 +673,7 @@ export default function CreatePage() {
                 )
               }
             >
-              {copied ? "Copied!" : "Copy"}
+              {copied ? t("create.copied") : t("create.copy")}
             </Button>
             <Button
               variant="outline"
@@ -679,7 +681,7 @@ export default function CreatePage() {
                 handleSavePost(postResult.content, postResult.hashtags)
               }
             >
-              Save as Draft
+              {t("create.save")}
             </Button>
           </div>
         </CardContent>
@@ -731,8 +733,8 @@ export default function CreatePage() {
                     onClick={() => copyVariant(variant)}
                   >
                     {copiedVariant === variant.variantLabel
-                      ? "Copied!"
-                      : "Copy"}
+                      ? t("create.copied")
+                      : t("create.copy")}
                   </Button>
                   <Button
                     variant="outline"
@@ -741,7 +743,7 @@ export default function CreatePage() {
                       handleSavePost(variant.content, variant.hashtags)
                     }
                   >
-                    Select & Save
+                    {t("create.selectVariant")}
                   </Button>
                 </div>
               </CardContent>
@@ -759,7 +761,7 @@ export default function CreatePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Video Script
+            {t("create.videoScript")}
             <Badge variant="secondary">
               {videoScriptResult.totalDuration}
             </Badge>
@@ -778,7 +780,7 @@ export default function CreatePage() {
 
           {/* Scenes */}
           <div className="space-y-4">
-            <p className="text-sm font-semibold">Scenes</p>
+            <p className="text-sm font-semibold">{t("create.scenes")}</p>
             {videoScriptResult.scenes.map((scene) => (
               <div
                 key={scene.sceneNumber}
@@ -819,7 +821,7 @@ export default function CreatePage() {
           {/* CTA */}
           <div className="rounded-lg border-l-4 border-green-500 bg-green-500/5 p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-green-600">
-              Call to Action
+              {t("create.cta")}
             </p>
             <p className="mt-1 text-sm font-medium">{videoScriptResult.cta}</p>
           </div>
@@ -837,7 +839,7 @@ export default function CreatePage() {
                 copyToClipboard(formatVideoScriptText(videoScriptResult))
               }
             >
-              {copied ? "Copied!" : "Copy Script"}
+              {copied ? t("create.copied") : t("create.copyScript")}
             </Button>
             <Button
               variant="outline"
@@ -881,7 +883,7 @@ export default function CreatePage() {
                 }
               }}
             >
-              {loadingVoiceover ? "Generating..." : "Generate Voiceover (Pro)"}
+              {loadingVoiceover ? t("create.generating") : "Generate Voiceover (Pro)"}
             </Button>
             <Button
               variant="outline"
@@ -919,7 +921,7 @@ export default function CreatePage() {
                 }
               }}
             >
-              {loadingVideoAssets ? "Generating..." : "Generate Full Video Assets (Pro)"}
+              {loadingVideoAssets ? t("create.generating") : "Generate Full Video Assets (Pro)"}
             </Button>
           </div>
 
@@ -1029,7 +1031,7 @@ export default function CreatePage() {
 
           {/* Frames */}
           <div className="space-y-4">
-            <p className="text-sm font-semibold">Frames</p>
+            <p className="text-sm font-semibold">{t("create.frames")}</p>
             <div className="grid gap-4 md:grid-cols-2">
               {videoAdResult.frames.map((frame) => (
                 <div
@@ -1063,7 +1065,7 @@ export default function CreatePage() {
           {/* CTA */}
           <div className="rounded-lg border-l-4 border-green-500 bg-green-500/5 p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-green-600">
-              Call to Action
+              {t("create.cta")}
             </p>
             <p className="mt-1 text-sm font-medium">{videoAdResult.cta}</p>
           </div>
@@ -1087,7 +1089,7 @@ export default function CreatePage() {
                 copyToClipboard(formatVideoAdText(videoAdResult))
               }
             >
-              {copied ? "Copied!" : "Copy Storyboard"}
+              {copied ? t("create.copied") : "Copy Storyboard"}
             </Button>
           </div>
         </CardContent>
@@ -1181,7 +1183,7 @@ export default function CreatePage() {
                 copyToClipboard(formatCarouselText(carouselResult))
               }
             >
-              {copied ? "Copied!" : "Copy All"}
+              {copied ? t("create.copied") : t("create.copyAll")}
             </Button>
             <Button
               variant="outline"
@@ -1192,7 +1194,7 @@ export default function CreatePage() {
                 )
               }
             >
-              Save as Draft
+              {t("create.save")}
             </Button>
           </div>
         </CardContent>
@@ -1204,7 +1206,7 @@ export default function CreatePage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold">Create Content</h1>
+      <h1 className="text-3xl font-bold">{t("create.title")}</h1>
 
       {hasBrandVoice === false && !brandVoiceBannerDismissed && (
         <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
@@ -1253,10 +1255,10 @@ export default function CreatePage() {
         }}
       >
         <TabsList className="w-full md:w-auto">
-          <TabsTrigger value="post">Social Post</TabsTrigger>
-          <TabsTrigger value="video-script">Video Script</TabsTrigger>
-          <TabsTrigger value="video-ad">Video Ad</TabsTrigger>
-          <TabsTrigger value="carousel">Carousel</TabsTrigger>
+          <TabsTrigger value="post">{t("create.socialPost")}</TabsTrigger>
+          <TabsTrigger value="video-script">{t("create.videoScript")}</TabsTrigger>
+          <TabsTrigger value="video-ad">{t("create.videoAd")}</TabsTrigger>
+          <TabsTrigger value="carousel">{t("create.carousel")}</TabsTrigger>
         </TabsList>
 
         {/* All tab contents share the same form */}
@@ -1265,7 +1267,7 @@ export default function CreatePage() {
             {/* Common inputs */}
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Platform</Label>
+                <Label>{t("create.platform")}</Label>
                 <Select value={platform} onValueChange={setPlatform}>
                   <SelectTrigger>
                     <SelectValue />
@@ -1281,7 +1283,7 @@ export default function CreatePage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Tone</Label>
+                <Label>{t("create.tone")}</Label>
                 <Select value={tone} onValueChange={setTone}>
                   <SelectTrigger>
                     <SelectValue />
@@ -1298,7 +1300,7 @@ export default function CreatePage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Language</Label>
+              <Label>{t("create.language")}</Label>
               <Select value={language} onValueChange={setLanguage}>
                 <SelectTrigger>
                   <SelectValue />
@@ -1391,7 +1393,7 @@ export default function CreatePage() {
                     disabled={loadingSiteVideo || !siteUrl.trim()}
                     onClick={handleGenerateVideoFromSite}
                   >
-                    {loadingSiteVideo ? "Generating..." : "Generate video for my site"}
+                    {loadingSiteVideo ? t("create.generating") : "Generate video for my site"}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -1474,7 +1476,7 @@ export default function CreatePage() {
                       className="h-4 w-4 rounded border-input accent-primary"
                     />
                     <span className="text-sm font-medium">
-                      Also generate image
+                      {t("create.generateImage")}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       (DALL-E 3)

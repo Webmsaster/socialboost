@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useLanguage } from "@/lib/i18n";
 
 const platforms = ["linkedin", "facebook", "instagram", "pinterest", "twitter"] as const;
 const tones = ["professional", "casual", "inspirational", "humorous", "educational"] as const;
@@ -33,6 +34,7 @@ interface Template {
 }
 
 export default function TemplatesPage() {
+  const { t } = useLanguage();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -131,7 +133,7 @@ export default function TemplatesPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Templates</h1>
         <Button onClick={() => setShowForm(!showForm)}>
-          {showForm ? "Cancel" : "Create Template"}
+          {showForm ? t("templates.cancel") : t("templates.create")}
         </Button>
       </div>
 
@@ -143,7 +145,7 @@ export default function TemplatesPage() {
           <CardContent>
             <form onSubmit={handleCreate} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="template-name">Template Name</Label>
+                <Label htmlFor="template-name">{t("templates.name")}</Label>
                 <Input
                   id="template-name"
                   placeholder="e.g. Weekly LinkedIn Update"
@@ -215,7 +217,7 @@ export default function TemplatesPage() {
               </div>
 
               <Button type="submit" disabled={loading}>
-                {loading ? "Creating..." : "Save Template"}
+                {loading ? "Creating..." : t("templates.save")}
               </Button>
             </form>
           </CardContent>
@@ -260,7 +262,7 @@ export default function TemplatesPage() {
                 )}
                 <div className="flex gap-2 pt-1">
                   <Button size="sm" onClick={() => handleUse(template.id)}>
-                    Use Template
+                    {t("templates.use")}
                   </Button>
                   <Button
                     variant="ghost"
@@ -268,7 +270,7 @@ export default function TemplatesPage() {
                     className="text-destructive"
                     onClick={() => handleDelete(template.id)}
                   >
-                    Delete
+                    {t("templates.delete")}
                   </Button>
                 </div>
               </CardContent>

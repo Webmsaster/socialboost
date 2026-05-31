@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Info } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -17,11 +16,11 @@ interface ConnectedAccount {
 }
 
 const platformConfigs = [
-  { id: "linkedin", name: "LinkedIn", color: "bg-blue-600", supported: true },
-  { id: "facebook", name: "Facebook", color: "bg-blue-500", supported: true },
-  { id: "instagram", name: "Instagram", color: "bg-pink-500", supported: true },
-  { id: "pinterest", name: "Pinterest", color: "bg-red-500", supported: true },
-  { id: "twitter", name: "Twitter / X", color: "bg-neutral-800", supported: true },
+  { id: "linkedin", name: "LinkedIn", color: "bg-blue-600" },
+  { id: "facebook", name: "Facebook", color: "bg-blue-500" },
+  { id: "instagram", name: "Instagram", color: "bg-pink-500" },
+  { id: "pinterest", name: "Pinterest", color: "bg-red-500" },
+  { id: "twitter", name: "Twitter / X", color: "bg-neutral-800" },
 ];
 
 export default function AccountsPage() {
@@ -98,13 +97,6 @@ export default function AccountsPage() {
         </p>
       </div>
 
-      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950">
-        <Info className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
-        <p className="text-sm text-blue-800 dark:text-blue-200">
-          Social media account connections will be available soon. You can already generate and copy content for any platform.
-        </p>
-      </div>
-
       <div className="grid gap-4 md:grid-cols-2">
         {platformConfigs.map((platform) => {
           const account = getAccount(platform.id);
@@ -143,9 +135,9 @@ export default function AccountsPage() {
                     <Button
                       size="sm"
                       onClick={() => handleConnect(platform.id)}
-                      disabled={isLoading || !platform.supported}
+                      disabled={isLoading}
                     >
-                      {!platform.supported ? "Coming soon" : isLoading ? "Connecting..." : t("accounts.connect")}
+                      {isLoading ? "Connecting..." : t("accounts.connect")}
                     </Button>
                   </>
                 )}
@@ -157,7 +149,6 @@ export default function AccountsPage() {
 
       <p className="text-sm text-muted-foreground">
         Connected accounts allow SocialBoost to publish scheduled posts directly to your platforms.
-        Instagram and Pinterest support is coming soon.
       </p>
     </div>
   );
