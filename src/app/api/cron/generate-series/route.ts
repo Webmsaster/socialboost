@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { captureError } from "@/lib/logger";
+import { requireCronAuth } from "@/lib/cron-auth";
 import {
   runSeriesOnce,
   type ProfileRow,
@@ -22,10 +23,8 @@ function getSupabaseAdmin() {
  * Secured via CRON_SECRET header. Run daily via Vercel Cron.
  */
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const unauthorized = requireCronAuth(request);
+  if (unauthorized) return unauthorized;
 
   const supabase = getSupabaseAdmin();
   const now = new Date();
